@@ -1,0 +1,35 @@
+{
+  "id": "/quickly-app",
+  "name": "Quickly",
+  "short_name": "Quickly",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
+  "orientation": "portrait",
+  "description": "Gestión de reparto y logística en tiempo real.",
+  "icons": [
+    {
+      "src": "https://ui-avatars.com/api/?name=Q&background=0b0e14&color=fff&size=192&format=png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?name=Q&background=0b0e14&color=fff&size=512&format=png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "https://placehold.co/1280x720/0b0e14/ffffff/png?text=Quickly+Dashboard",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard de Gestión"
+    }
+  ],
+  "categories": ["business", "productivity"]
+}

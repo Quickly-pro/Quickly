@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.tenden_c.twa",
+      "sha256_cert_fingerprints": [
+        "3B:96:91:1D:73:31:F0:B6:DE:11:0C:4C:BC:32:2D:59:B9:B4:62:F2:C1:EC:A3:FA:F8:7A:90:4D:6A:41:B3:37"
+      ]
+    }
+  }
+]

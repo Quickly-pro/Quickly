@@ -1,0 +1,17 @@
+export const companyInfo = {
+  name: 'Quickly Distribuciones S.L.',
+  legalName: 'Quickly Distribuciones Sociedad Limitada',
+  cif: 'B-12345678',
+  address: 'Polígono Industrial Norte, Calle Transporte 42',
+  city: 'Madrid',
+  postalCode: '28037',
+  phone: '+34 912 345 678',
+  email: 'info@quickly.es',
+  website: 'www.quickly.es',
+  logo: 'https://static.readdy.ai/image/cd6101a5b75cc4d1ea08021147541bde/4d8ea097db74c93575cbe24fdfc5bded.png',
+  brandColor: '#f97316',
+  founded: '2018',
+  employees: 12,
+  clients: 156,
+  monthlyRevenue: 45280,
+};
