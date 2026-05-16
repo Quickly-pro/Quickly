@@ -523,8 +523,8 @@ export default function IncidenciasVehiculo() {
 
       {/* Detail + Repair History Modal */}
       {showDetail && detailIncident && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div ref={detailModalRef} className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closeDetail}>
+          <div ref={detailModalRef} className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between flex-shrink-0">
               <div>
                 <h3 className="font-semibold text-gray-800 dark:text-slate-100 flex items-center gap-2">
