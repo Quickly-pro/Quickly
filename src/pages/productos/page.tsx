@@ -224,18 +224,16 @@ export default function Productos() {
 
     const media = uploadedImage ? [{ url: uploadedImage, type: 'image' }] : [];
     const { error } = await supabase.from('producto_elementos').insert({
-      name: newProduct.name.trim(),
-      category_id: newProduct.categoryId ? Number(newProduct.categoryId) : null,
-      price: Number(newProduct.price),
-      stock: Number(newProduct.stock || 0),
-      min_stock: Number(newProduct.minStock || 10),
-      description: newProduct.description?.trim() || null,
-      status: 'active',
-      currency: 'EUR',
-      pricing_mode: 0,
+      nombre:        newProduct.name.trim(),
+      categoria_id:  newProduct.categoryId ? Number(newProduct.categoryId) : null,
+      precio:        Number(newProduct.price),
+      stock_actual:  Number(newProduct.stock || 0),
+      stock_minimo:  Number(newProduct.minStock || 10),
+      descripcion:   newProduct.description?.trim() || null,
+      estado:        'active',
       media,
-      weight: newProduct.weight ? Number(newProduct.weight) : null,
-      dimensions: newProduct.dimensions?.trim() || null,
+      peso:          newProduct.weight ? Number(newProduct.weight) : null,
+      dimensiones:   newProduct.dimensions?.trim() || null,
     });
 
     setIsSaving(false);
@@ -328,16 +326,16 @@ export default function Productos() {
 
     const media = editImage ? [{ url: editImage, type: 'image' }] : [];
     const { error } = await supabase.from('producto_elementos').update({
-      name: editForm.name.trim(),
-      category_id: editForm.categoryId ? Number(editForm.categoryId) : null,
-      price: Number(editForm.price),
-      stock: Number(editForm.stock || 0),
-      min_stock: Number(editForm.minStock || 10),
-      description: editForm.description?.trim() || null,
+      nombre:       editForm.name.trim(),
+      categoria_id: editForm.categoryId ? Number(editForm.categoryId) : null,
+      precio:       Number(editForm.price),
+      stock_actual: Number(editForm.stock || 0),
+      stock_minimo: Number(editForm.minStock || 10),
+      descripcion:  editForm.description?.trim() || null,
       media,
-      weight: editForm.weight ? Number(editForm.weight) : null,
-      dimensions: editForm.dimensions?.trim() || null,
-    }).eq('id', editingProduct.id);
+      peso:         editForm.weight ? Number(editForm.weight) : null,
+      dimensiones:  editForm.dimensions?.trim() || null,
+    }).eq('identificación', editingProduct.id);
 
     setIsEditing(false);
 
@@ -353,7 +351,7 @@ export default function Productos() {
   };
 
   const deleteProduct = async (id: number) => {
-    const { error } = await supabase.from('producto_elementos').delete().eq('id', id);
+    const { error } = await supabase.from('producto_elementos').delete().eq('identificación', id);
     if (!error) {
       setShowProductDetail(false);
       setSelectedProduct(null);
