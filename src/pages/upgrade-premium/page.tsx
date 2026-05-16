@@ -89,7 +89,7 @@ export default function UpgradePremium() {
   const FALLBACK_PRICE_IDS: Record<string, Record<string, string | undefined>> = {
     premium: {
       monthly: 'price_1TVAN7Ps4Jcmx8yrRzGWR1hl',
-      annual: undefined, // añade aquí el Price ID anual cuando lo tengas
+      annual: 'price_1TXTKTPs4Jcmx8yrsBco7NXH',
     },
     enterprise: {
       monthly: undefined,
@@ -316,10 +316,15 @@ export default function UpgradePremium() {
                     €{plan.price}
                   </span>
                   <span className="text-sm text-gray-400 dark:text-slate-400">{plan.period}</span>
-                  {plan.hasDiscount && (
+                  {annual && plan.hasDiscount && (
                     <span className="ml-2 text-xs text-green-600 font-medium">
                       Ahorras con anual
                     </span>
+                  )}
+                  {!annual && plan.hasDiscount && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      Ahorra un 20% eligiendo el plan anual (€{displayPrices[plan.id]?.annual}/año)
+                    </p>
                   )}
                 </div>
 
@@ -339,7 +344,7 @@ export default function UpgradePremium() {
 
                 <button
                   onClick={() => handleSubscribe(plan.id, plan.priceId)}
-                  disabled={isLoading || !plan.priceId}
+                  disabled={isLoading || (plan.id !== 'premium' && !plan.priceId)}
                   className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
                     plan.popular
                       ? 'bg-amber-500 text-white hover:bg-amber-600 disabled:bg-amber-300'
@@ -351,7 +356,7 @@ export default function UpgradePremium() {
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       Procesando...
                     </>
-                  ) : !plan.priceId ? (
+                  ) : plan.id !== 'premium' && !plan.priceId ? (
                     'Próximamente'
                   ) : (
                     <>

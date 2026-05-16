@@ -476,8 +476,17 @@ export default function Incidencias() {
                 <p className="text-sm text-gray-600 dark:text-slate-300 mb-3">{incident.description}</p>
                 {incident.photo && (
                   <div className="mb-3">
-                    <button onClick={() => window.open(incident.photo, '_blank')} className="flex items-center gap-1.5 text-xs text-orange-600 hover:underline">
-                      <i className="ri-image-line" /> Ver foto adjunta
+                    <button
+                      onClick={() => window.open(incident.photo, '_blank')}
+                      className="block w-full overflow-hidden rounded-lg border border-gray-100 dark:border-slate-700 hover:border-orange-300 dark:hover:border-orange-700 transition-all"
+                      title="Click para abrir en grande"
+                    >
+                      <img
+                        src={incident.photo}
+                        alt={`Foto incidencia ${incident.id}`}
+                        className="w-full h-32 object-cover"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                      />
                     </button>
                   </div>
                 )}
@@ -548,8 +557,17 @@ export default function Incidencias() {
                       <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {ticket.invoice_photo ? (
-                          <button onClick={() => window.open(ticket.invoice_photo, '_blank')} className="w-8 h-8 flex items-center justify-center rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-100">
-                            <i className="ri-image-line" />
+                          <button
+                            onClick={() => window.open(ticket.invoice_photo, '_blank')}
+                            className="w-14 h-14 rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 hover:border-orange-400 transition-all flex-shrink-0"
+                            title="Click para abrir en grande"
+                          >
+                            <img
+                              src={ticket.invoice_photo}
+                              alt={`Factura ${ticket.id}`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                            />
                           </button>
                         ) : (
                           <span className="text-gray-400 dark:text-slate-500 w-8 text-center">—</span>

@@ -38,7 +38,13 @@ serve(async (req) => {
     }
 
     if (!priceId) {
-      return new Response(JSON.stringify({ error: `Price not configured for ${plan}_${annual ? "annual" : "monthly"}` }), { status: 400, headers: { "Content-Type": "application/json" } });
+      const period = annual ? "anual" : "mensual";
+      return new Response(
+        JSON.stringify({
+          error: `El precio ${period} de ${plan} no está configurado. Añade la variable STRIPE_PRICE_${plan.toUpperCase()}_${annual ? "ANNUAL" : "MONTHLY"} en los secrets de Supabase.`,
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     // Create or reuse Stripe customer

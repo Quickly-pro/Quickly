@@ -9,7 +9,7 @@ export interface ProductCategory {
 }
 
 export interface Product {
-  id: number;
+  id: string;             // UUID
   name: string;
   category_id: number | null;
   status: string;
@@ -27,19 +27,19 @@ export interface Product {
 
 function mapRow(p: any): Product {
   return {
-    id:               Number(p['identificación'] ?? p.id ?? 0),
-    name:             String(p.nombre ?? ''),
-    category_id:      p['categoría_id'] != null ? Number(p['categoría_id']) : null,
-    status:           String(p.estado ?? 'active'),
-    description:      p['descripción'] ?? null,
-    price:            Number(p.precio ?? 0),
-    stock:            Number(p.stock ?? 0),
+    id:               String(p.id ?? ''),
+    name:             String(p.name ?? ''),
+    category_id:      p.category_id != null ? Number(p.category_id) : null,
+    status:           String(p.status ?? 'active'),
+    description:      p.description ?? null,
+    price:            Number(p.price ?? p.precio_unidad ?? 0),
+    stock:            Number(p.stock ?? p.stock_actual ?? 0),
     min_stock:        Number(p.min_stock ?? 10),
-    discount_enabled: Boolean(p.descuento_habilitado ?? false),
-    discount_price:   p.precio_descuento != null ? Number(p.precio_descuento) : null,
-    media:            Array.isArray(p.medios) ? p.medios : [],
-    weight:           null,
-    dimensions:       null,
+    discount_enabled: Boolean(p.discount_enabled ?? false),
+    discount_price:   p.discount_price != null ? Number(p.discount_price) : null,
+    media:            Array.isArray(p.media) ? p.media : [],
+    weight:           p.weight != null ? Number(p.weight) : null,
+    dimensions:       p.dimensions ?? null,
     created_at:       p.created_at ?? '',
   };
 }
@@ -55,20 +55,22 @@ export function useProducts() {
     setError(null);
 
     const [prodResult, catResult] = await Promise.all([
-      supabase.from('producto_elementos').select('*').limit(200),
+      supabase.from('product_items').select('*').limit(200),
       supabase.from('product_categories').select('*').order('sort_order').order('id'),
     ]);
 
     if (prodResult.error) {
-      console.error('[useProducts] Error:', prodResult.error);
+      console.error('[useProducts] Error cargando productos:', prodResult.error);
       setError(prodResult.error.message);
     } else {
-      setProducts((prodResult.data || []).map(mapRow));
+      const rows = prodResult.data || [];
+      console.log(`[useProducts] Filas recibidas: ${rows.length}`, rows[0] ?? '(vacío)');
+      setProducts(rows.map(mapRow));
     }
 
     const cats: ProductCategory[] = (catResult.data || []).map((c: any) => ({
       id:         Number(c.id),
-      name:       String(c.name ?? c.nombre ?? ''),
+      name:       String(c.name ?? ''),
       sort_order: Number(c.sort_order ?? 0),
       color:      c.color ?? '#f97316',
     }));
@@ -81,7 +83,7 @@ export function useProducts() {
   useEffect(() => {
     const channel = supabase
       .channel('products-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'producto_elementos' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_items' }, () => {
         fetchAll();
       })
       .subscribe();

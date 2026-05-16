@@ -130,12 +130,14 @@ export default function Albaranes() {
 
   const updateStatus = (a: Albaran, status: AlbaranStatus) => {
     setList(prev => prev.map(x => x.id === a.id ? { ...x, status } : x));
+    setSelected(prev => (prev && prev.id === a.id ? { ...prev, status } : prev));
     addNotification('Estado actualizado', `${a.id} ahora está "${STATUS_LABEL[status]}"`, 'route');
   };
 
   const convertToInvoice = (a: Albaran) => {
     const invoiceId = `F-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
     setList(prev => prev.map(x => x.id === a.id ? { ...x, status: 'facturado', invoiceId } : x));
+    setSelected(prev => (prev && prev.id === a.id ? { ...prev, status: 'facturado', invoiceId } : prev));
     addNotification('Factura generada', `${a.id} → ${invoiceId}`, 'invoice');
   };
 
@@ -148,6 +150,8 @@ export default function Albaranes() {
 
   const signAlbaran = (a: Albaran, name: string) => {
     setList(prev => prev.map(x => x.id === a.id ? { ...x, signature: name } : x));
+    // Actualiza también el albarán abierto en el modal de detalle para que la firma se vea al instante.
+    setSelected(prev => (prev && prev.id === a.id ? { ...prev, signature: name } : prev));
     addNotification('Albarán firmado', `${a.id} firmado por ${name}`, 'route');
     setShowSign(null);
   };
