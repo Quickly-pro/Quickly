@@ -222,18 +222,19 @@ export default function Productos() {
     setIsSaving(true);
     setSaveError(null);
 
-    const media = uploadedImage ? [{ url: uploadedImage, type: 'image' }] : [];
+    const medios = uploadedImage ? [{ url: uploadedImage, type: 'image' }] : [];
     const { error } = await supabase.from('producto_elementos').insert({
-      nombre:        newProduct.name.trim(),
-      categoria_id:  newProduct.categoryId ? Number(newProduct.categoryId) : null,
-      precio:        Number(newProduct.price),
-      stock_actual:  Number(newProduct.stock || 0),
-      stock_minimo:  Number(newProduct.minStock || 10),
-      descripcion:   newProduct.description?.trim() || null,
-      estado:        'active',
-      media,
-      peso:          newProduct.weight ? Number(newProduct.weight) : null,
-      dimensiones:   newProduct.dimensions?.trim() || null,
+      nombre:                 newProduct.name.trim(),
+      'categoría_id':         newProduct.categoryId ? Number(newProduct.categoryId) : null,
+      precio:                 Number(newProduct.price),
+      stock:                  Number(newProduct.stock || 0),
+      min_stock:              Number(newProduct.minStock || 10),
+      'descripción':          newProduct.description?.trim() || null,
+      estado:                 'active',
+      moneda:                 'EUR',
+      modo_precios:           0,
+      medios,
+      descuento_habilitado:   false,
     });
 
     setIsSaving(false);
@@ -324,17 +325,15 @@ export default function Productos() {
     setIsEditing(true);
     setSaveError(null);
 
-    const media = editImage ? [{ url: editImage, type: 'image' }] : [];
+    const medios = editImage ? [{ url: editImage, type: 'image' }] : [];
     const { error } = await supabase.from('producto_elementos').update({
-      nombre:       editForm.name.trim(),
-      categoria_id: editForm.categoryId ? Number(editForm.categoryId) : null,
-      precio:       Number(editForm.price),
-      stock_actual: Number(editForm.stock || 0),
-      stock_minimo: Number(editForm.minStock || 10),
-      descripcion:  editForm.description?.trim() || null,
-      media,
-      peso:         editForm.weight ? Number(editForm.weight) : null,
-      dimensiones:  editForm.dimensions?.trim() || null,
+      nombre:               editForm.name.trim(),
+      'categoría_id':       editForm.categoryId ? Number(editForm.categoryId) : null,
+      precio:               Number(editForm.price),
+      stock:                Number(editForm.stock || 0),
+      min_stock:            Number(editForm.minStock || 10),
+      'descripción':        editForm.description?.trim() || null,
+      medios,
     }).eq('identificación', editingProduct.id);
 
     setIsEditing(false);
