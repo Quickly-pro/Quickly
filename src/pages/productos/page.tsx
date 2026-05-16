@@ -254,7 +254,7 @@ export default function Productos() {
     let data = [...products];
     if (filterCategory !== 'todos') {
       const cat = categories.find(c => c.name === filterCategory);
-      data = data.filter(p => p.category_id === (cat?.id ?? null));
+      data = data.filter(p => Number(p.category_id) === cat?.id);
     }
     if (searchText.trim()) {
       const q = searchText.toLowerCase();
@@ -269,10 +269,11 @@ export default function Productos() {
   const groupedByCategory = useMemo(() => {
     const groups: { category: Category | null; products: Product[] }[] = [];
     categories.forEach(cat => {
-      const catProducts = products.filter(p => p.category_id === cat.id);
+      const catProducts = products.filter(p => Number(p.category_id) === cat.id);
       if (catProducts.length > 0) groups.push({ category: cat, products: catProducts });
     });
-    const uncategorized = products.filter(p => !p.category_id);
+    const knownIds = new Set(categories.map(c => c.id));
+    const uncategorized = products.filter(p => !p.category_id || !knownIds.has(Number(p.category_id)));
     if (uncategorized.length > 0) groups.push({ category: null, products: uncategorized });
     return groups;
   }, [products, categories]);
