@@ -1,32 +1,11 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useRole } from '@/hooks/useRole';
 import { useNotificationsContext } from '@/context/NotificationsContext';
 import Modal from '@/components/base/Modal';
 import ImageWithFallback from '@/components/base/ImageWithFallback';
-
-interface Category {
-  id: number;
-  name: string;
-  sort_order: number;
-}
-
-interface Product {
-  id: number;
-  name: string;
-  category_id: number | null;
-  status: string;
-  description: string | null;
-  price: number;
-  stock: number;
-  min_stock: number;
-  discount_enabled: boolean;
-  discount_price: number | null;
-  media: any[];
-  created_at: string;
-  product_categories?: Category | null;
-}
+import { useProducts, type Product, type ProductCategory as Category } from '@/hooks/useProducts';
 
 interface CartItem {
   product_id: number;
@@ -40,9 +19,9 @@ export default function Productos() {
   const { isCliente } = useRole();
   const navigate = useNavigate();
   const { addNotification } = useNotificationsContext();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // Datos reales de Supabase via hook
+  const { products, categories, loading, refetch: fetchAll } = useProducts();
 
   // Real-time stock alert toasts
   const [stockAlertToasts, setStockAlertToasts] = useState<{ id: number; name: string; stock: number; min_stock: number }[]>([]);
@@ -80,33 +59,6 @@ export default function Productos() {
   const [editImageName, setEditImageName] = useState<string>('');
   const [isEditing, setIsEditing] = useState(false);
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
-    const [
-      { data: prodData, error: prodError },
-      { data: catData },
-    ] = await Promise.all([
-      supabase.from('product_items').select('*').order('id', { ascending: false }).limit(100),
-      supabase.from('product_categories').select('*').order('sort_order').order('id'),
-    ]);
-
-    if (prodError) console.error('Error cargando productos:', prodError);
-
-    const mapped = (prodData || []).map((p: any) => ({
-      ...p,
-      media: Array.isArray(p.media) ? p.media : [],
-      product_categories: null,
-    }));
-    setProducts(mapped);
-    setCategories(catData || []);
-    setLoading(false);
-    prevProductsRef.current = mapped;
-  }, []);
-
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
-
   // Detect stock drops in real-time and push alerts
   useEffect(() => {
     if (products.length === 0 || prevProductsRef.current.length === 0) {
@@ -142,20 +94,7 @@ export default function Productos() {
     prevProductsRef.current = products;
   }, [products, addNotification]);
 
-  // Real-time subscription for instant product updates
-  useEffect(() => {
-    const channel = supabase
-      .channel('product-stock-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'product_items' },
-        () => {
-          fetchAll();
-        }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchAll]);
+  // La suscripción en tiempo real ya está en useProducts hook
 
   const getCategoryName = (catId: number | null) => {
     if (!catId) return 'Sin categoría';
