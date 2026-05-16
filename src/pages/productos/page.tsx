@@ -83,17 +83,19 @@ export default function Productos() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const [
-      { data: prodData },
+      { data: prodData, error: prodError },
       { data: catData },
     ] = await Promise.all([
-      supabase.from('product_items').select('*, product_categories(id, name, sort_order)').order('id', { ascending: false }).limit(100),
-      supabase.from('product_categories').select('*').order('sort_order'),
+      supabase.from('product_items').select('*').order('id', { ascending: false }).limit(100),
+      supabase.from('product_categories').select('*').order('sort_order').order('id'),
     ]);
+
+    if (prodError) console.error('Error cargando productos:', prodError);
 
     const mapped = (prodData || []).map((p: any) => ({
       ...p,
-      media: p.media || [],
-      product_categories: p.product_categories || null,
+      media: Array.isArray(p.media) ? p.media : [],
+      product_categories: null,
     }));
     setProducts(mapped);
     setCategories(catData || []);
