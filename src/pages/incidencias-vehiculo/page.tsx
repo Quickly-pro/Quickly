@@ -157,6 +157,7 @@ export default function IncidenciasVehiculo() {
   const [detailRepairs, setDetailRepairs] = useState<VehicleRepair[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
+  const detailModalRef = useRef<HTMLDivElement>(null);
 
   // Add repair modal
   const [showRepairModal, setShowRepairModal] = useState(false);
@@ -236,6 +237,7 @@ export default function IncidenciasVehiculo() {
     setDetailIncident(null);
     setDetailRepairs([]);
   };
+  useClickOutside(detailModalRef, closeDetail, showDetail);
 
   const addRepair = async () => {
     if (!detailIncident || !repairForm.description) return;
@@ -522,8 +524,8 @@ export default function IncidenciasVehiculo() {
       {/* Detail + Repair History Modal */}
       {showDetail && detailIncident && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-900 z-10">
+          <div ref={detailModalRef} className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between flex-shrink-0">
               <div>
                 <h3 className="font-semibold text-gray-800 dark:text-slate-100 flex items-center gap-2">
                   <i className="ri-car-line text-orange-500" />
@@ -544,7 +546,7 @@ export default function IncidenciasVehiculo() {
               </div>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
               {/* Incident info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">

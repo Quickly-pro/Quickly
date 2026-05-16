@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
 import { useNotificationsContext } from '@/context/NotificationsContext';
@@ -89,15 +90,13 @@ interface Vehicle {
 
 function getMapEmbedUrl(addresses: string[]) {
   if (addresses.length === 0) {
-    return 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3037.6!2d-3.7038!3d40.4168!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xd422997800a3c81%3A0xc436dec1618c2267!2sMadrid!5e0!3m2!1ses!2ses!4v1700000000000';
+    return 'https://maps.google.com/maps?q=Madrid,España&output=embed&hl=es';
   }
-  const origin = encodeURIComponent(addresses[0]);
-  const destination = encodeURIComponent(addresses[addresses.length - 1]);
-  const base = 'https://www.google.com/maps/embed';
   if (addresses.length === 1) {
-    return `${base}?pb=!1m18!1m12!1m3!1d3037.6!2d-3.7038!3d40.4168!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2s${origin}!5e0!3m2!1ses!2ses!4v1700000000000`;
+    return `https://maps.google.com/maps?q=${encodeURIComponent(addresses[0])}&output=embed&hl=es`;
   }
-  return `${base}?pb=!1m28!1m12!1m3!1d12144.7!2d-3.7038!3d40.4168!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!4m13!3e0!4m5!1s${origin}!2sMadrid!3m2!1d40.4168!2d-3.7038!4m5!1s${destination}!2sMadrid!3m2!1d40.4168!2d-3.7038!5e0!3m2!1ses!2ses!4v1700000000000`;
+  const stops = addresses.map(a => encodeURIComponent(a)).join('/');
+  return `https://maps.google.com/maps/dir/${stops}?output=embed&hl=es`;
 }
 
 function getOptimizedRouteUrl(addresses: string[]) {
@@ -175,6 +174,8 @@ export default function MapaReparto() {
   const { profile } = useProfile();
   const { addNotification } = useNotificationsContext();
   const { toasts, pushToast, removeToast } = useArrivalToasts();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const prefillHandledRef = useRef(false);
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -224,6 +225,53 @@ export default function MapaReparto() {
   useEffect(() => {
     fetchDestinations();
   }, [fetchDestinations]);
+
+  // Precarga datos del cliente cuando se llega desde "Localizar" en /clientes
+  // URL ejemplo: /mapa-reparto?name=...&address=...&phone=...&autoAdd=1
+  useEffect(() => {
+    if (prefillHandledRef.current) return;
+    const name = searchParams.get('name');
+    const address = searchParams.get('address');
+    if (!name && !address) return;
+
+    prefillHandledRef.current = true;
+    const phone = searchParams.get('phone') || '';
+    const notes = searchParams.get('notes') || '';
+    const autoAdd = searchParams.get('autoAdd') === '1';
+
+    setNewDest({ name: name || '', address: address || '', phone, notes });
+
+    if (autoAdd && name && address) {
+      // Añadir directamente sin abrir el modal
+      (async () => {
+        const payload: any = {
+          client: name,
+          address,
+          phone: phone || null,
+          notes: notes || null,
+          order_num: 9999,
+          status: 'pending',
+          driver: profile.full_name || 'Sin asignar',
+          route_id: null,
+        };
+        const { error } = await supabase.from('route_stops').insert(payload);
+        if (!error) {
+          addNotification('Cliente localizado', `${name} añadido al mapa de reparto`, 'route');
+          fetchDestinations();
+        } else {
+          // Si falla, abrimos el modal con los datos para que el usuario pueda revisar/guardar
+          addNotification('Revisa el destino', error.message || 'Revisa los datos y pulsa Añadir', 'system');
+          setShowAdd(true);
+        }
+      })();
+    } else {
+      // Si no hay autoAdd, simplemente abrimos el modal con los datos prellenados
+      setShowAdd(true);
+    }
+
+    // Limpia los query params para que al navegar de nuevo no se vuelva a auto-añadir
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams, profile.full_name, addNotification, fetchDestinations]);
 
   // Get user real geolocation
   const getUserLocation = useCallback(() => {
@@ -347,28 +395,53 @@ export default function MapaReparto() {
   }, [vehicles, destinations, pushToast, addNotification]);
 
   const addDestination = async () => {
-    if (!newDest.name || !newDest.address) return;
+    if (!newDest.name.trim() || !newDest.address.trim()) return;
+
+    // Optimistic update: añadir al mapa de inmediato sin esperar a Supabase
+    const tempId = Date.now();
+    const tempDest: Destination = {
+      id: tempId,
+      name: newDest.name.trim(),
+      address: newDest.address.trim(),
+      phone: newDest.phone.trim() || '',
+      notes: newDest.notes.trim() || '',
+      order_num: destinations.length + 1,
+      visited: false,
+      created_by: profile.full_name || 'Sin asignar',
+    };
+    setDestinations(prev => {
+      const updated = [...prev, tempDest];
+      setVehicles(createDemoVehicles(updated));
+      return updated;
+    });
+    setShowAdd(false);
+    setNewDest({ name: '', address: '', phone: '', notes: '' });
+    addNotification('Destino añadido', `${newDest.name.trim()} añadido al mapa`, 'route');
+
     const payload: any = {
-      client: newDest.name,
-      address: newDest.address,
-      phone: newDest.phone,
-      notes: newDest.notes,
+      client: newDest.name.trim(),
+      address: newDest.address.trim(),
+      phone: newDest.phone.trim() || null,
+      notes: newDest.notes.trim() || null,
       order_num: destinations.length + 1,
       status: 'pending',
       driver: profile.full_name || 'Sin asignar',
       route_id: null,
-      time: '',
     };
-    // If we have the user's current location and this is the first stop, use it
     if (userLocation && destinations.length === 0) {
       payload.lat = userLocation.lat;
       payload.lng = userLocation.lng;
     }
     const { error } = await supabase.from('route_stops').insert(payload);
-    if (!error) {
-      addNotification('Destino añadido', `${newDest.name} añadido al mapa`, 'route');
-      setShowAdd(false);
-      setNewDest({ name: '', address: '', phone: '', notes: '' });
+    if (error) {
+      // Rollback si falla la BD
+      setDestinations(prev => {
+        const rolled = prev.filter(d => d.id !== tempId);
+        setVehicles(createDemoVehicles(rolled));
+        return rolled;
+      });
+      addNotification('Error al añadir', error.message || 'No se pudo guardar el destino', 'system');
+    } else {
       fetchDestinations();
     }
   };
