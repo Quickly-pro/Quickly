@@ -264,6 +264,17 @@ export default function Productos() {
   const lowStockProducts = useMemo(() => products.filter(p => p.stock < p.min_stock), [products]);
   const totalInventoryValue = useMemo(() => products.reduce((sum, p) => sum + p.stock * p.price, 0), [products]);
 
+  const groupedByCategory = useMemo(() => {
+    const groups: { category: Category | null; products: Product[] }[] = [];
+    categories.forEach(cat => {
+      const catProducts = products.filter(p => p.category_id === cat.id);
+      if (catProducts.length > 0) groups.push({ category: cat, products: catProducts });
+    });
+    const uncategorized = products.filter(p => !p.category_id);
+    if (uncategorized.length > 0) groups.push({ category: null, products: uncategorized });
+    return groups;
+  }, [products, categories]);
+
   const createProduct = async () => {
     if (!newProduct.name || !newProduct.price) return;
     setIsSaving(true);
@@ -436,6 +447,106 @@ export default function Productos() {
 
   const cartTotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
   const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
+
+  const renderProductCard = (product: Product) => {
+    const isLowStock = product.stock < product.min_stock;
+    const catName = getCategoryName(product.category_id);
+    const finalPrice = product.discount_enabled && product.discount_price
+      ? product.discount_price
+      : product.price;
+    const hasDiscount = product.discount_enabled && product.discount_price && product.discount_price < product.price;
+
+    return (
+      <div
+        key={product.id}
+        className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden hover:shadow-md dark:hover:shadow-slate-800/50 transition-all"
+      >
+        <div className="relative aspect-square bg-gray-50 dark:bg-slate-800 overflow-hidden">
+          <ImageWithFallback
+            src={productImage(product)}
+            alt={product.name}
+            className="w-full h-full object-cover"
+            fallbackClassName="w-full h-full"
+          />
+          {!isCliente && isLowStock && (
+            <div className="absolute top-2 left-2 px-2 py-1 bg-red-500 text-white rounded-md text-xs font-medium">
+              Stock bajo
+            </div>
+          )}
+          {hasDiscount && (
+            <div className="absolute top-2 right-2 px-2 py-0.5 bg-green-500 text-white rounded-full text-xs font-medium">
+              -{Math.round((1 - (product.discount_price || 0) / product.price) * 100)}%
+            </div>
+          )}
+          <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/50 text-white rounded-full text-xs font-medium">
+            {catName}
+          </div>
+        </div>
+        <div className="p-4">
+          <h3 className="font-semibold text-sm text-gray-800 dark:text-slate-200 line-clamp-2">{product.name}</h3>
+          <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">ID: {product.id}</p>
+          {!isCliente && (
+            <div className="mt-2">
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className={`${isLowStock ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>
+                  Stock: {product.stock} / mín {product.min_stock}
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${isLowStock ? 'bg-red-500' : 'bg-green-500'}`}
+                  style={{ width: `${Math.min(100, product.min_stock > 0 ? (product.stock / (product.min_stock * 3)) * 100 : 0)}%` }}
+                />
+              </div>
+            </div>
+          )}
+          <div className="flex items-center justify-between mt-3">
+            <span className="text-lg font-bold text-orange-600">
+              €{Number(finalPrice).toFixed(2)}
+            </span>
+            {hasDiscount && (
+              <span className="text-xs text-gray-400 line-through">€{Number(product.price).toFixed(2)}</span>
+            )}
+          </div>
+          <div className="flex gap-1 mt-3">
+            {isCliente ? (
+              <>
+                <button
+                  onClick={() => { setSelectedProduct(product); setShowProductDetail(true); }}
+                  className="flex-1 py-1.5 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-md text-xs hover:bg-gray-100 dark:hover:bg-slate-700"
+                >
+                  Ver detalle
+                </button>
+                <button
+                  onClick={() => addToCart(product)}
+                  disabled={product.stock <= 0}
+                  className="flex-1 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-md text-xs hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Elegir
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => { setSelectedProduct(product); setShowProductDetail(true); }}
+                  className="flex-1 py-1.5 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-md text-xs hover:bg-gray-100 dark:hover:bg-slate-700"
+                >
+                  Ver detalle
+                </button>
+                <button
+                  onClick={() => startEdit(product)}
+                  className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-md hover:bg-gray-200 dark:hover:bg-slate-700"
+                  title="Editar producto"
+                >
+                  <div className="w-4 h-4 flex items-center justify-center"><i className="ri-pencil-line text-xs" /></div>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -613,129 +724,79 @@ export default function Productos() {
         </div>
       ))}
 
-      {/* Product Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-product-shop>
+      {/* Product Sections */}
+      <div className="space-y-8" data-product-shop>
         {loading ? (
-          Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden animate-pulse">
-              <div className="aspect-square bg-gray-200 dark:bg-slate-700" />
-              <div className="p-4 space-y-2">
-                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4" />
-                <div className="h-3 bg-gray-200 dark:bg-slate-700 rounded w-1/2" />
-                <div className="flex justify-between pt-2">
-                  <div className="h-5 bg-gray-200 dark:bg-slate-700 rounded w-16" />
-                  <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-12" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden animate-pulse">
+                <div className="aspect-square bg-gray-200 dark:bg-slate-700" />
+                <div className="p-4 space-y-2">
+                  <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 dark:bg-slate-700 rounded w-1/2" />
+                  <div className="flex justify-between pt-2">
+                    <div className="h-5 bg-gray-200 dark:bg-slate-700 rounded w-16" />
+                    <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-12" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
-        ) : filteredProducts.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-gray-400 dark:text-slate-500">
-            No se encontraron productos con los filtros actuales.
+            ))}
           </div>
-        ) : (
-          filteredProducts.map((product) => {
-            const isLowStock = product.stock < product.min_stock;
-            const catName = getCategoryName(product.category_id);
-            const finalPrice = product.discount_enabled && product.discount_price
-              ? product.discount_price
-              : product.price;
-            const hasDiscount = product.discount_enabled && product.discount_price && product.discount_price < product.price;
+        ) : filterCategory === 'todos' ? (
+          (() => {
+            const groups = groupedByCategory.map(({ category, products: catProducts }) => {
+              const filtered = searchText.trim()
+                ? catProducts.filter(p => p.name.toLowerCase().includes(searchText.toLowerCase()) || p.description?.toLowerCase().includes(searchText.toLowerCase()))
+                : catProducts;
+              return { category, filtered };
+            }).filter(g => g.filtered.length > 0);
 
-            return (
-              <div
-                key={product.id}
-                className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden hover:shadow-md dark:hover:shadow-slate-800/50 transition-all"
-              >
-                <div className="relative aspect-square bg-gray-50 dark:bg-slate-800 overflow-hidden">
-                  <ImageWithFallback
-                    src={productImage(product)}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                    fallbackClassName="w-full h-full"
-                  />
-                  {!isCliente && isLowStock && (
-                    <div className="absolute top-2 left-2 px-2 py-1 bg-red-500 text-white rounded-md text-xs font-medium">
-                      Stock bajo
+            return groups.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 dark:text-slate-500">
+                No se encontraron productos con los filtros actuales.
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {groups.map(({ category, filtered }) => (
+                  <div key={category?.id ?? 'uncategorized'}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <h2 className="text-sm font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wide">
+                        {category?.name ?? 'Sin categoría'}
+                      </h2>
+                      <div className="flex-1 h-px bg-gray-100 dark:bg-slate-700" />
+                      <span className="text-xs text-gray-400 dark:text-slate-500">
+                        {filtered.length} producto{filtered.length !== 1 ? 's' : ''}
+                      </span>
                     </div>
-                  )}
-                  {hasDiscount && (
-                    <div className="absolute top-2 right-2 px-2 py-0.5 bg-green-500 text-white rounded-full text-xs font-medium">
-                      -{Math.round((1 - (product.discount_price || 0) / product.price) * 100)}%
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {filtered.map(product => renderProductCard(product))}
                     </div>
-                  )}
-                  <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/50 text-white rounded-full text-xs font-medium">
-                    {catName}
                   </div>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-sm text-gray-800 dark:text-slate-200 line-clamp-2">{product.name}</h3>
-                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">ID: {product.id}</p>
-
-                  {/* Stock bar - solo empresa/empleado */}
-                  {!isCliente && (
-                    <div className="mt-2">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className={`${isLowStock ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>
-                          Stock: {product.stock} / mín {product.min_stock}
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${isLowStock ? 'bg-red-500' : 'bg-green-500'}`}
-                          style={{ width: `${Math.min(100, product.min_stock > 0 ? (product.stock / (product.min_stock * 3)) * 100 : 0)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between mt-3">
-                    <span className="text-lg font-bold text-orange-600">
-                      €{Number(finalPrice).toFixed(2)}
-                    </span>
-                    {hasDiscount && (
-                      <span className="text-xs text-gray-400 line-through">€{Number(product.price).toFixed(2)}</span>
-                    )}
-                  </div>
-                  <div className="flex gap-1 mt-3">
-                    {isCliente ? (
-                      <>
-                        <button
-                          onClick={() => { setSelectedProduct(product); setShowProductDetail(true); }}
-                          className="flex-1 py-1.5 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-md text-xs hover:bg-gray-100 dark:hover:bg-slate-700"
-                        >
-                          Ver detalle
-                        </button>
-                        <button
-                          onClick={() => addToCart(product)}
-                          disabled={product.stock <= 0}
-                          className="flex-1 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-md text-xs hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          Elegir
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => { setSelectedProduct(product); setShowProductDetail(true); }}
-                          className="flex-1 py-1.5 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-md text-xs hover:bg-gray-100 dark:hover:bg-slate-700"
-                        >
-                          Ver detalle
-                        </button>
-                        <button
-                          onClick={() => startEdit(product)}
-                          className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-md hover:bg-gray-200 dark:hover:bg-slate-700"
-                          title="Editar producto"
-                        >
-                          <div className="w-4 h-4 flex items-center justify-center"><i className="ri-pencil-line text-xs" /></div>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
+                ))}
               </div>
             );
-          })
+          })()
+        ) : (
+          filteredProducts.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 dark:text-slate-500">
+              No se encontraron productos con los filtros actuales.
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-sm font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wide">
+                  {filterCategory}
+                </h2>
+                <div className="flex-1 h-px bg-gray-100 dark:bg-slate-700" />
+                <span className="text-xs text-gray-400 dark:text-slate-500">
+                  {filteredProducts.length} producto{filteredProducts.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {filteredProducts.map(product => renderProductCard(product))}
+              </div>
+            </div>
+          )
         )}
       </div>
 
@@ -914,142 +975,145 @@ export default function Productos() {
           title="Añadir Producto"
           size="lg"
         >
-          <div className="space-y-4">
-            {/* Image Upload */}
-            <div>
-              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Foto del producto</label>
+          <div className="space-y-3">
+            {/* Image Upload - full width at top, igual que el detalle */}
+            <div
+              onClick={() => !uploadedImage && document.getElementById('product-image-input')?.click()}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              className="relative w-full h-48 rounded-xl overflow-hidden bg-gray-100 dark:bg-slate-800 cursor-pointer"
+            >
               {uploadedImage ? (
-                <div className="relative rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700">
-                  <img src={uploadedImage} alt="Preview" className="w-full h-48 object-cover" />
+                <>
+                  <img src={uploadedImage} alt="Preview" className="w-full h-full object-cover" />
                   <div className="absolute top-2 right-2 flex gap-2">
                     <span className="px-2 py-1 bg-black/60 text-white rounded-md text-xs">{uploadedImageName}</span>
                     <button
-                      onClick={clearImage}
+                      onClick={e => { e.stopPropagation(); clearImage(); }}
                       className="w-7 h-7 flex items-center justify-center bg-black/60 text-white rounded-md hover:bg-black/80"
                     >
                       <i className="ri-close-line text-sm" />
                     </button>
                   </div>
-                </div>
+                </>
               ) : (
-                <div
-                  onClick={() => document.getElementById('product-image-input')?.click()}
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors
-                    ${isDragging ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/10' : 'border-gray-200 dark:border-slate-700 hover:border-orange-300 dark:hover:border-orange-500'}`}
-                >
-                  <div className="w-10 h-10 mx-auto flex items-center justify-center mb-2">
-                    <i className="ri-upload-cloud-2-line text-gray-400 dark:text-slate-500 text-2xl" />
-                  </div>
-                  <p className="text-sm text-gray-500 dark:text-slate-400">Arrastra una imagen o haz clic para seleccionar</p>
-                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">JPG, PNG, WebP hasta 5MB</p>
-                  <input
-                    id="product-image-input"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="hidden"
-                  />
+                <div className={`w-full h-full flex flex-col items-center justify-center transition-colors ${isDragging ? 'bg-orange-50 dark:bg-orange-900/10' : ''}`}>
+                  <i className="ri-upload-cloud-2-line text-gray-400 dark:text-slate-500 text-3xl mb-2" />
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Arrastra o haz clic para añadir foto</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">JPG, PNG, WebP · máx 5MB</p>
                 </div>
               )}
+              <input id="product-image-input" type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
             </div>
 
-            <div>
-              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Nombre</label>
-              <input
-                type="text"
-                placeholder="Nombre del producto..."
-                value={newProduct.name}
-                onChange={e => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Categoría</label>
+            {/* Filas estilo detalle */}
+            <div className="space-y-2">
+              {/* Nombre */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Nombre</span>
+                <input
+                  type="text"
+                  placeholder="Nombre del producto..."
+                  value={newProduct.name}
+                  onChange={e => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
+                  className="flex-1 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none placeholder-gray-300 dark:placeholder-slate-600"
+                />
+              </div>
+
+              {/* Categoría */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Categoría</span>
                 <select
                   value={newProduct.categoryId}
                   onChange={e => setNewProduct(prev => ({ ...prev, categoryId: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
+                  className="flex-1 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none cursor-pointer dark:bg-slate-800"
                 >
                   <option value="">Sin categoría</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Precio (€)</label>
-                <input
-                  type="number"
-                  placeholder="0.00"
-                  value={newProduct.price}
-                  onChange={e => setNewProduct(prev => ({ ...prev, price: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
-                />
+
+              {/* Precio */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Precio</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-bold text-orange-600">€</span>
+                  <input
+                    type="number"
+                    placeholder="0.00"
+                    value={newProduct.price}
+                    onChange={e => setNewProduct(prev => ({ ...prev, price: e.target.value }))}
+                    className="w-24 text-sm font-bold text-orange-600 bg-transparent text-right outline-none placeholder-orange-300 dark:placeholder-orange-800"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Stock</label>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={newProduct.stock}
-                  onChange={e => setNewProduct(prev => ({ ...prev, stock: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
-                />
+
+              {/* Stock */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Stock</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={newProduct.stock}
+                    onChange={e => setNewProduct(prev => ({ ...prev, stock: e.target.value }))}
+                    className="w-16 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none placeholder-gray-300 dark:placeholder-slate-600"
+                  />
+                  <span className="text-sm text-gray-400 dark:text-slate-500">/</span>
+                  <input
+                    type="number"
+                    placeholder="10"
+                    value={newProduct.minStock}
+                    onChange={e => setNewProduct(prev => ({ ...prev, minStock: e.target.value }))}
+                    className="w-16 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none placeholder-gray-300 dark:placeholder-slate-600"
+                  />
+                  <span className="text-xs text-gray-400 dark:text-slate-500">mín.</span>
+                </div>
               </div>
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Stock mínimo</label>
-                <input
-                  type="number"
-                  placeholder="10"
-                  value={newProduct.minStock}
-                  onChange={e => setNewProduct(prev => ({ ...prev, minStock: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Peso (kg)</label>
+
+              {/* Peso */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Peso (kg)</span>
                 <input
                   type="number"
                   placeholder="Ej: 25"
                   value={newProduct.weight}
                   onChange={e => setNewProduct(prev => ({ ...prev, weight: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
+                  className="flex-1 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none placeholder-gray-300 dark:placeholder-slate-600"
                 />
               </div>
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Dimensiones (cm)</label>
+
+              {/* Dimensiones */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Dimensiones</span>
                 <input
                   type="text"
-                  placeholder="LxAxH"
+                  placeholder="LxAxH (cm)"
                   value={newProduct.dimensions}
                   onChange={e => setNewProduct(prev => ({ ...prev, dimensions: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
+                  className="flex-1 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none placeholder-gray-300 dark:placeholder-slate-600"
+                />
+              </div>
+
+              {/* Descripción */}
+              <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                <span className="text-sm text-gray-600 dark:text-slate-400 block mb-2">Descripción</span>
+                <textarea
+                  value={newProduct.description}
+                  onChange={e => setNewProduct(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full text-sm text-gray-800 dark:text-slate-200 bg-transparent outline-none resize-none placeholder-gray-300 dark:placeholder-slate-600"
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Descripción del producto..."
                 />
               </div>
             </div>
-            <div>
-              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Descripción</label>
-              <textarea
-                value={newProduct.description}
-                onChange={e => setNewProduct(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300 resize-none"
-                rows={2}
-                maxLength={500}
-                placeholder="Descripción del producto..."
-              />
-            </div>
+
             {/* Error feedback */}
             {saveError && (
               <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg">
-                <div className="w-4 h-4 flex items-center justify-center mt-0.5 flex-shrink-0">
-                  <i className="ri-error-warning-line text-red-500 text-sm" />
-                </div>
+                <i className="ri-error-warning-line text-red-500 text-sm mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-red-600 dark:text-red-400">{saveError}</p>
               </div>
             )}
@@ -1089,140 +1153,150 @@ export default function Productos() {
           title={`Editar: ${editingProduct.name}`}
           size="lg"
         >
-          <div className="space-y-4">
-            {/* Image Upload */}
-            <div>
-              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Foto del producto</label>
+          <div className="space-y-3">
+            {/* Image Upload - full width al top, mismo estilo detalle */}
+            <div
+              onClick={() => !editImage && document.getElementById('edit-image-input')?.click()}
+              onDrop={handleEditDrop}
+              onDragOver={e => e.preventDefault()}
+              className="relative w-full h-48 rounded-xl overflow-hidden bg-gray-100 dark:bg-slate-800 cursor-pointer"
+            >
               {editImage ? (
-                <div className="relative rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700">
-                  <img src={editImage} alt="Preview" className="w-full h-48 object-cover" />
+                <>
+                  <img src={editImage} alt="Preview" className="w-full h-full object-cover" />
                   <div className="absolute top-2 right-2 flex gap-2">
                     <span className="px-2 py-1 bg-black/60 text-white rounded-md text-xs">{editImageName}</span>
                     <button
-                      onClick={clearEditImage}
+                      onClick={e => { e.stopPropagation(); clearEditImage(); }}
                       className="w-7 h-7 flex items-center justify-center bg-black/60 text-white rounded-md hover:bg-black/80"
                     >
                       <i className="ri-close-line text-sm" />
                     </button>
                   </div>
-                </div>
+                </>
               ) : (
-                <div
-                  onClick={() => document.getElementById('edit-image-input')?.click()}
-                  onDrop={handleEditDrop}
-                  onDragOver={(e) => e.preventDefault()}
-                  className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors border-gray-200 dark:border-slate-700 hover:border-orange-300 dark:hover:border-orange-500"
-                >
-                  <div className="w-10 h-10 mx-auto flex items-center justify-center mb-2">
-                    <i className="ri-upload-cloud-2-line text-gray-400 dark:text-slate-500 text-2xl" />
-                  </div>
-                  <p className="text-sm text-gray-500 dark:text-slate-400">Arrastra una imagen o haz clic para seleccionar</p>
-                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">JPG, PNG, WebP hasta 5MB</p>
-                  <input
-                    id="edit-image-input"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleEditImageSelect}
-                    className="hidden"
-                  />
+                <div className="w-full h-full flex flex-col items-center justify-center">
+                  <i className="ri-upload-cloud-2-line text-gray-400 dark:text-slate-500 text-3xl mb-2" />
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Arrastra o haz clic para cambiar la foto</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">JPG, PNG, WebP · máx 5MB</p>
                 </div>
               )}
+              <input id="edit-image-input" type="file" accept="image/*" onChange={handleEditImageSelect} className="hidden" />
             </div>
 
-            <div>
-              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Nombre</label>
-              <input
-                type="text"
-                placeholder="Nombre del producto..."
-                value={editForm.name}
-                onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Categoría</label>
+            {/* Filas estilo detalle */}
+            <div className="space-y-2">
+              {/* ID (solo lectura) */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                <span className="text-sm text-gray-600 dark:text-slate-400">ID</span>
+                <span className="text-sm font-medium text-gray-800 dark:text-slate-200">{editingProduct.id}</span>
+              </div>
+
+              {/* Nombre */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Nombre</span>
+                <input
+                  type="text"
+                  placeholder="Nombre del producto..."
+                  value={editForm.name}
+                  onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="flex-1 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none placeholder-gray-300 dark:placeholder-slate-600"
+                />
+              </div>
+
+              {/* Categoría */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Categoría</span>
                 <select
                   value={editForm.categoryId}
                   onChange={e => setEditForm(prev => ({ ...prev, categoryId: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
+                  className="flex-1 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none cursor-pointer dark:bg-slate-800"
                 >
                   <option value="">Sin categoría</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Precio (€)</label>
-                <input
-                  type="number"
-                  placeholder="0.00"
-                  value={editForm.price}
-                  onChange={e => setEditForm(prev => ({ ...prev, price: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
-                />
+
+              {/* Precio */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Precio</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-bold text-orange-600">€</span>
+                  <input
+                    type="number"
+                    placeholder="0.00"
+                    value={editForm.price}
+                    onChange={e => setEditForm(prev => ({ ...prev, price: e.target.value }))}
+                    className="w-24 text-sm font-bold text-orange-600 bg-transparent text-right outline-none placeholder-orange-300 dark:placeholder-orange-800"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Stock</label>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={editForm.stock}
-                  onChange={e => setEditForm(prev => ({ ...prev, stock: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
-                />
+
+              {/* Stock */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Stock</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={editForm.stock}
+                    onChange={e => setEditForm(prev => ({ ...prev, stock: e.target.value }))}
+                    className="w-16 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none placeholder-gray-300 dark:placeholder-slate-600"
+                  />
+                  <span className="text-sm text-gray-400 dark:text-slate-500">/</span>
+                  <input
+                    type="number"
+                    placeholder="10"
+                    value={editForm.minStock}
+                    onChange={e => setEditForm(prev => ({ ...prev, minStock: e.target.value }))}
+                    className="w-16 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none placeholder-gray-300 dark:placeholder-slate-600"
+                  />
+                  <span className="text-xs text-gray-400 dark:text-slate-500">mín.</span>
+                </div>
               </div>
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Stock mínimo</label>
-                <input
-                  type="number"
-                  placeholder="10"
-                  value={editForm.minStock}
-                  onChange={e => setEditForm(prev => ({ ...prev, minStock: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Peso (kg)</label>
+
+              {/* Peso */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Peso (kg)</span>
                 <input
                   type="number"
                   placeholder="Ej: 25"
                   value={editForm.weight}
                   onChange={e => setEditForm(prev => ({ ...prev, weight: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
+                  className="flex-1 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none placeholder-gray-300 dark:placeholder-slate-600"
                 />
               </div>
-              <div>
-                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Dimensiones (cm)</label>
+
+              {/* Dimensiones */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg gap-3">
+                <span className="text-sm text-gray-600 dark:text-slate-400 flex-shrink-0">Dimensiones</span>
                 <input
                   type="text"
-                  placeholder="LxAxH"
+                  placeholder="LxAxH (cm)"
                   value={editForm.dimensions}
                   onChange={e => setEditForm(prev => ({ ...prev, dimensions: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
+                  className="flex-1 text-sm font-medium text-gray-800 dark:text-slate-200 bg-transparent text-right outline-none placeholder-gray-300 dark:placeholder-slate-600"
+                />
+              </div>
+
+              {/* Descripción */}
+              <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                <span className="text-sm text-gray-600 dark:text-slate-400 block mb-2">Descripción</span>
+                <textarea
+                  value={editForm.description}
+                  onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full text-sm text-gray-800 dark:text-slate-200 bg-transparent outline-none resize-none placeholder-gray-300 dark:placeholder-slate-600"
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Descripción del producto..."
                 />
               </div>
             </div>
-            <div>
-              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Descripción</label>
-              <textarea
-                value={editForm.description}
-                onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300 resize-none"
-                rows={2}
-                maxLength={500}
-                placeholder="Descripción del producto..."
-              />
-            </div>
+
             {/* Error feedback */}
             {saveError && (
               <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg">
-                <div className="w-4 h-4 flex items-center justify-center mt-0.5 flex-shrink-0">
-                  <i className="ri-error-warning-line text-red-500 text-sm" />
-                </div>
+                <i className="ri-error-warning-line text-red-500 text-sm mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-red-600 dark:text-red-400">{saveError}</p>
               </div>
             )}
