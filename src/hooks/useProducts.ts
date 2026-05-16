@@ -36,7 +36,7 @@ export function useProducts() {
     setError(null);
 
     const [prodResult, catResult] = await Promise.all([
-      supabase.from('product_items').select('*').order('id', { ascending: false }).limit(200),
+      supabase.from('producto_elementos').select('*').order('id', { ascending: false }).limit(200),
       supabase.from('product_categories').select('*').order('sort_order').order('id'),
     ]);
 
@@ -86,7 +86,7 @@ export function useProducts() {
   useEffect(() => {
     const channel = supabase
       .channel('products-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_items' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'producto_elementos' }, () => {
         fetchAll();
       })
       .subscribe();

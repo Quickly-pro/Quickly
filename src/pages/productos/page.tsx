@@ -223,7 +223,7 @@ export default function Productos() {
     setSaveError(null);
 
     const media = uploadedImage ? [{ url: uploadedImage, type: 'image' }] : [];
-    const { error } = await supabase.from('product_items').insert({
+    const { error } = await supabase.from('producto_elementos').insert({
       name: newProduct.name.trim(),
       category_id: newProduct.categoryId ? Number(newProduct.categoryId) : null,
       price: Number(newProduct.price),
@@ -327,7 +327,7 @@ export default function Productos() {
     setSaveError(null);
 
     const media = editImage ? [{ url: editImage, type: 'image' }] : [];
-    const { error } = await supabase.from('product_items').update({
+    const { error } = await supabase.from('producto_elementos').update({
       name: editForm.name.trim(),
       category_id: editForm.categoryId ? Number(editForm.categoryId) : null,
       price: Number(editForm.price),
@@ -353,7 +353,7 @@ export default function Productos() {
   };
 
   const deleteProduct = async (id: number) => {
-    const { error } = await supabase.from('product_items').delete().eq('id', id);
+    const { error } = await supabase.from('producto_elementos').delete().eq('id', id);
     if (!error) {
       setShowProductDetail(false);
       setSelectedProduct(null);
