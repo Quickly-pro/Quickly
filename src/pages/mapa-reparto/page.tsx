@@ -191,6 +191,7 @@ export default function MapaReparto() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locLoading, setLocLoading] = useState(false);
   const [geolocationError, setGeolocationError] = useState<string | null>(null);
+  const [userMapUrl, setUserMapUrl] = useState<string | null>(null);
   const [showRouteStrip, setShowRouteStrip] = useState(true);
 
   const fetchDestinations = useCallback(async () => {
@@ -283,9 +284,13 @@ export default function MapaReparto() {
     setGeolocationError(null);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setUserLocation({ lat, lng });
         setLocLoading(false);
-        addNotification('Ubicación detectada', 'Se ha localizado tu posición actual en el mapa.', 'route');
+        // Centrar el mapa en la ubicación real del usuario
+        setUserMapUrl(`https://maps.google.com/maps?q=${lat},${lng}&output=embed&hl=es&z=16`);
+        addNotification('Ubicación detectada', `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`, 'route');
       },
       (err) => {
         setLocLoading(false);
@@ -416,6 +421,7 @@ export default function MapaReparto() {
     });
     setShowAdd(false);
     setNewDest({ name: '', address: '', phone: '', notes: '' });
+    setUserMapUrl(null); // Volver a mostrar la ruta en el mapa
     addNotification('Destino añadido', `${newDest.name.trim()} añadido al mapa`, 'route');
 
     const payload: any = {
@@ -505,7 +511,8 @@ export default function MapaReparto() {
   };
 
   const addressesKey = useMemo(() => destinations.map(d => d.address).join('|'), [destinations]);
-  const mapUrl = useMemo(() => getMapEmbedUrl(destinations.map(d => d.address)), [addressesKey]);
+  const routeMapUrl = useMemo(() => getMapEmbedUrl(destinations.map(d => d.address)), [addressesKey]);
+  const mapUrl = userMapUrl || routeMapUrl;
   const optimizedUrl = useMemo(() => getOptimizedRouteUrl(destinations.map(d => d.address)), [addressesKey]);
 
   const visitedCount = destinations.filter(d => d.visited).length;
