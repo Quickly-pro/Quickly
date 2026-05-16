@@ -274,55 +274,54 @@ export default function MapaReparto() {
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams, profile.full_name, addNotification, fetchDestinations]);
 
-  // Get user real geolocation
+  // Ref para acceder a userLocation dentro de callbacks sin re-crear la función
+  const userLocationRef = useRef<{ lat: number; lng: number } | null>(null);
+  useEffect(() => { userLocationRef.current = userLocation; }, [userLocation]);
+
+  // Centra el mapa en la ubicación actual (botón Mi ubicación)
   const getUserLocation = useCallback(() => {
+    const cached = userLocationRef.current;
+    if (cached) {
+      // Ya tenemos coordenadas del watchPosition — usar sin petición GPS extra
+      setUserMapUrl(`https://maps.google.com/maps?q=${cached.lat},${cached.lng}&output=embed&hl=es&z=16`);
+      addNotification('Mi ubicación', `Lat ${cached.lat.toFixed(5)}, Lng ${cached.lng.toFixed(5)}`, 'route');
+      return;
+    }
     if (!navigator.geolocation) {
       setGeolocationError('Tu navegador no soporta geolocalización');
       return;
     }
     setLocLoading(true);
     setGeolocationError(null);
+    // Baja precisión = mucho más rápido, sin timeout
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setUserLocation({ lat, lng });
         setLocLoading(false);
-        // Centrar el mapa en la ubicación real del usuario
         setUserMapUrl(`https://maps.google.com/maps?q=${lat},${lng}&output=embed&hl=es&z=16`);
-        addNotification('Ubicación detectada', `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`, 'route');
+        addNotification('Mi ubicación', `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`, 'route');
       },
       (err) => {
         setLocLoading(false);
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            setGeolocationError('Permiso de geolocalización denegado.');
-            break;
-          case err.POSITION_UNAVAILABLE:
-            setGeolocationError('Posición no disponible.');
-            break;
-          case err.TIMEOUT:
-            setGeolocationError('Tiempo de espera agotado.');
-            break;
-          default:
-            setGeolocationError('Error al obtener ubicación.');
+        if (err.code === err.PERMISSION_DENIED) {
+          setGeolocationError('Permiso denegado. Activa la ubicación en tu navegador.');
+        } else {
+          setGeolocationError('No se pudo obtener tu ubicación.');
         }
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
     );
   }, [addNotification]);
 
-  useEffect(() => {
-    getUserLocation();
-  }, [getUserLocation]);
-
-  // Watch position for live tracking
+  // Watch position para tracking en vivo (se ejecuta en segundo plano)
   useEffect(() => {
     if (!navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => {},
-      { enableHighAccuracy: true, maximumAge: 10000 }
+      { enableHighAccuracy: false, maximumAge: 15000, timeout: 30000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
