@@ -16,7 +16,7 @@ interface TimeEntry {
 
 export default function ControlHorario() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
-  const [employees, setEmployees] = useState<{ name: string }[]>([]);
+  const [employees, setEmployees] = useState<{ id?: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('');
@@ -31,7 +31,7 @@ export default function ControlHorario() {
     setLoading(true);
     const [eRes, empRes] = await Promise.all([
       supabase.from('time_tracking').select('*').order('date', { ascending: false }).limit(50),
-      supabase.from('employees').select('name').order('name'),
+      supabase.from('employees').select('id, name').order('name'),
     ]);
     setEntries(eRes.data || []);
     setEmployees(empRes.data || []);
@@ -207,16 +207,26 @@ export default function ControlHorario() {
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-1.5 block">Empleado</label>
-            <select
-              value={form.employee}
-              onChange={(e) => setForm({ ...form, employee: e.target.value })}
-              className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none"
-            >
-              <option value="">Seleccionar...</option>
-              {employees.map((emp) => (
-                <option key={emp.name} value={emp.name}>{emp.name}</option>
-              ))}
-            </select>
+            {employees.length > 0 ? (
+              <select
+                value={form.employee}
+                onChange={(e) => setForm({ ...form, employee: e.target.value })}
+                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none focus:border-orange-400"
+              >
+                <option value="">— Seleccionar empleado —</option>
+                {employees.map((emp) => (
+                  <option key={emp.name} value={emp.name}>{emp.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                placeholder="Escribe el nombre del empleado..."
+                value={form.employee}
+                onChange={(e) => setForm({ ...form, employee: e.target.value })}
+                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none focus:border-orange-400"
+              />
+            )}
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-1.5 block">Fecha</label>
