@@ -459,9 +459,10 @@ export default function Productos() {
     return (
       <div
         key={product.id}
-        className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden hover:shadow-md dark:hover:shadow-slate-800/50 transition-all"
+        className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden hover:shadow-lg dark:hover:shadow-slate-800/60 transition-all flex flex-col"
       >
-        <div className="relative aspect-square bg-gray-50 dark:bg-slate-800 overflow-hidden">
+        {/* Image */}
+        <div className="relative w-full h-44 bg-gray-50 dark:bg-slate-800 overflow-hidden flex-shrink-0">
           <ImageWithFallback
             src={productImage(product)}
             alt={product.name}
@@ -469,7 +470,7 @@ export default function Productos() {
             fallbackClassName="w-full h-full"
           />
           {!isCliente && isLowStock && (
-            <div className="absolute top-2 left-2 px-2 py-1 bg-red-500 text-white rounded-md text-xs font-medium">
+            <div className="absolute top-2 left-2 px-2 py-0.5 bg-red-500 text-white rounded-md text-xs font-medium">
               Stock bajo
             </div>
           )}
@@ -478,67 +479,87 @@ export default function Productos() {
               -{Math.round((1 - (product.discount_price || 0) / product.price) * 100)}%
             </div>
           )}
-          <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/50 text-white rounded-full text-xs font-medium">
-            {catName}
-          </div>
         </div>
-        <div className="p-4">
-          <h3 className="font-semibold text-sm text-gray-800 dark:text-slate-200 line-clamp-2">{product.name}</h3>
-          <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">ID: {product.id}</p>
-          {!isCliente && (
-            <div className="mt-2">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className={`${isLowStock ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>
-                  Stock: {product.stock} / mín {product.min_stock}
-                </span>
-              </div>
-              <div className="w-full h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${isLowStock ? 'bg-red-500' : 'bg-green-500'}`}
-                  style={{ width: `${Math.min(100, product.min_stock > 0 ? (product.stock / (product.min_stock * 3)) * 100 : 0)}%` }}
-                />
+
+        {/* Details */}
+        <div className="flex flex-col flex-1 p-0">
+          {/* Name */}
+          <div className="px-4 pt-3 pb-2">
+            <h3 className="font-semibold text-sm text-gray-800 dark:text-slate-100 line-clamp-2 leading-snug">{product.name}</h3>
+          </div>
+
+          {/* Info rows */}
+          <div className="px-4 space-y-1.5 pb-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400 dark:text-slate-500">ID</span>
+              <span className="text-xs font-medium text-gray-600 dark:text-slate-300">{product.id}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400 dark:text-slate-500">Categoría</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-slate-200 text-right truncate max-w-[60%]">{catName}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400 dark:text-slate-500">Precio</span>
+              <div className="flex items-center gap-1.5">
+                {hasDiscount && (
+                  <span className="text-xs text-gray-400 line-through">€{Number(product.price).toFixed(2)}</span>
+                )}
+                <span className="text-sm font-bold text-orange-500">€{Number(finalPrice).toFixed(2)}</span>
               </div>
             </div>
-          )}
-          <div className="flex items-center justify-between mt-3">
-            <span className="text-lg font-bold text-orange-600">
-              €{Number(finalPrice).toFixed(2)}
-            </span>
-            {hasDiscount && (
-              <span className="text-xs text-gray-400 line-through">€{Number(product.price).toFixed(2)}</span>
+            {!isCliente && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-gray-400 dark:text-slate-500">Stock</span>
+                  <span className={`text-xs font-medium ${isLowStock ? 'text-red-500' : 'text-gray-600 dark:text-slate-300'}`}>
+                    {product.stock} / mín {product.min_stock}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${isLowStock ? 'bg-red-500' : 'bg-green-500'}`}
+                    style={{ width: `${Math.min(100, product.min_stock > 0 ? (product.stock / (product.min_stock * 3)) * 100 : 0)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {product.description && (
+              <p className="text-xs text-gray-400 dark:text-slate-500 line-clamp-2 pt-0.5">{product.description}</p>
             )}
           </div>
-          <div className="flex gap-1 mt-3">
+
+          {/* Actions */}
+          <div className="flex gap-1 px-4 pb-4 mt-auto">
             {isCliente ? (
               <>
                 <button
                   onClick={() => { setSelectedProduct(product); setShowProductDetail(true); }}
-                  className="flex-1 py-1.5 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-md text-xs hover:bg-gray-100 dark:hover:bg-slate-700"
+                  className="flex-1 py-2 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                 >
                   Ver detalle
                 </button>
                 <button
                   onClick={() => addToCart(product)}
                   disabled={product.stock <= 0}
-                  className="flex-1 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-md text-xs hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex-1 py-2 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  Elegir
+                  {product.stock <= 0 ? 'Sin stock' : 'Elegir'}
                 </button>
               </>
             ) : (
               <>
                 <button
                   onClick={() => { setSelectedProduct(product); setShowProductDetail(true); }}
-                  className="flex-1 py-1.5 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-md text-xs hover:bg-gray-100 dark:hover:bg-slate-700"
+                  className="flex-1 py-2 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                 >
                   Ver detalle
                 </button>
                 <button
                   onClick={() => startEdit(product)}
-                  className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-md hover:bg-gray-200 dark:hover:bg-slate-700"
+                  className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
                   title="Editar producto"
                 >
-                  <div className="w-4 h-4 flex items-center justify-center"><i className="ri-pencil-line text-xs" /></div>
+                  <i className="ri-pencil-line text-xs" />
                 </button>
               </>
             )}
