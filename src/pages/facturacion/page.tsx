@@ -41,6 +41,8 @@ export default function Facturacion() {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailAddress, setEmailAddress] = useState('');
   const [emailSent, setEmailSent] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
@@ -276,21 +278,32 @@ export default function Facturacion() {
   };
 
   // --- Email Functionality ---
-  const sendInvoiceEmail = (invoice: any, items: any[], toEmail: string) => {
-    const subject = encodeURIComponent(`Factura ${invoice.invoice_number} - ${invoice.client}`);
-    const body = encodeURIComponent(`Hola,
-
-Adjuntamos la factura ${invoice.invoice_number} de ${invoice.client}.
-
-Fecha: ${invoice.date}
-Vencimiento: ${invoice.due_date}
-Importe: €${Number(invoice.amount).toFixed(2)}
-Estado: ${statusConfig[invoice.status]?.label || invoice.status}
-
-Para cualquier duda, contacte con nosotros.
-
-Saludos.`);
-    window.location.href = `mailto:${toEmail}?subject=${subject}&body=${body}`;
+  const sendInvoiceEmail = async (invoice: any, items: any[], toEmail: string) => {
+    if (!toEmail) return;
+    setEmailSending(true);
+    setEmailError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-invoice-email', {
+        body: {
+          invoice,
+          items,
+          toEmail,
+          companyName: 'Quickly',
+        },
+      });
+      if (error || data?.error) {
+        setEmailError(error?.message || data?.error || 'Error al enviar el email');
+      } else {
+        setEmailSent(true);
+        setShowEmailModal(false);
+        addNotification('Email enviado', `Factura ${invoice.invoice_number} enviada a ${toEmail}`, 'info');
+        setTimeout(() => setEmailSent(false), 4000);
+      }
+    } catch (err: any) {
+      setEmailError(err.message || 'Error inesperado');
+    } finally {
+      setEmailSending(false);
+    }
   };
 
   return (
@@ -602,35 +615,44 @@ Saludos.`);
                 <div className="w-14 h-14 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center mx-auto mb-3">
                   <i className="ri-check-line text-green-600 text-2xl" />
                 </div>
-                <h3 className="text-base font-semibold text-gray-800 dark:text-slate-100 mb-1">Email preparado</h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Se abrio tu cliente de correo con la factura adjunta.</p>
-                <button onClick={() => setShowEmailModal(false)} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600">Cerrar</button>
+                <h3 className="text-base font-semibold text-gray-800 dark:text-slate-100 mb-1">¡Email enviado!</h3>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">La factura {selectedInvoice.invoice_number} fue enviada correctamente.</p>
+                <button onClick={() => { setShowEmailModal(false); setEmailSent(false); }} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600">Cerrar</button>
               </div>
             ) : (
               <>
-                <p className="text-sm text-gray-500 dark:text-slate-400">Introduce la direccion de email del cliente para enviar la factura.</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400">El cliente recibirá un email con el resumen de la factura.</p>
                 <div>
                   <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Email del destinatario</label>
                   <input
                     type="email"
-                    value={emailAddress}
+                    value={emailAddress || clients.find(c => c.name === selectedInvoice.client)?.email || ''}
                     onChange={(e) => setEmailAddress(e.target.value)}
                     placeholder="cliente@empresa.com"
                     className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm outline-none focus:border-orange-300 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </div>
+                {emailError && (
+                  <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg">
+                    <i className="ri-error-warning-line text-red-500 text-sm flex-shrink-0" />
+                    <p className="text-xs text-red-600 dark:text-red-400">{emailError}</p>
+                  </div>
+                )}
                 <div className="flex gap-3">
-                  <button onClick={() => setShowEmailModal(false)} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Cancelar</button>
+                  <button onClick={() => { setShowEmailModal(false); setEmailError(null); }} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Cancelar</button>
                   <button
                     onClick={() => {
                       const to = emailAddress || clients.find(c => c.name === selectedInvoice.client)?.email || '';
                       sendInvoiceEmail(selectedInvoice, getItemsForInvoice(selectedInvoice.id), to);
-                      setEmailSent(true);
                     }}
-                    disabled={!emailAddress && !clients.find(c => c.name === selectedInvoice.client)?.email}
-                    className="flex-1 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50"
+                    disabled={emailSending || (!emailAddress && !clients.find(c => c.name === selectedInvoice.client)?.email)}
+                    className="flex-1 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    Enviar Email
+                    {emailSending ? (
+                      <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Enviando...</>
+                    ) : (
+                      <><i className="ri-send-plane-line" />Enviar Email</>
+                    )}
                   </button>
                 </div>
               </>
