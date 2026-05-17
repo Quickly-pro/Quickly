@@ -115,7 +115,7 @@ export default function Productos() {
     processFile(file);
   };
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('Solo se permiten imágenes (JPG, PNG, WebP)');
       return;
@@ -125,11 +125,19 @@ export default function Productos() {
       return;
     }
     setUploadedImageName(file.name);
+    // Preview inmediato con base64
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setUploadedImage(ev.target?.result as string || null);
-    };
+    reader.onload = (ev) => setUploadedImage(ev.target?.result as string || null);
     reader.readAsDataURL(file);
+
+    // Subir a Supabase Storage
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+    const { error } = await supabase.storage.from('products').upload(path, file, { upsert: true });
+    if (!error) {
+      const { data } = supabase.storage.from('products').getPublicUrl(path);
+      setUploadedImage(data.publicUrl);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -155,7 +163,7 @@ export default function Productos() {
   };
 
   // Edit image handlers
-  const processEditFile = (file: File) => {
+  const processEditFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('Solo se permiten imágenes (JPG, PNG, WebP)');
       return;
@@ -165,11 +173,19 @@ export default function Productos() {
       return;
     }
     setEditImageName(file.name);
+    // Preview inmediato
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setEditImage(ev.target?.result as string || null);
-    };
+    reader.onload = (ev) => setEditImage(ev.target?.result as string || null);
     reader.readAsDataURL(file);
+
+    // Subir a Supabase Storage
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+    const { error } = await supabase.storage.from('products').upload(path, file, { upsert: true });
+    if (!error) {
+      const { data } = supabase.storage.from('products').getPublicUrl(path);
+      setEditImage(data.publicUrl);
+    }
   };
 
   const handleEditImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
