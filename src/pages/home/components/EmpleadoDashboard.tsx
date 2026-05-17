@@ -37,7 +37,7 @@ export default function EmpleadoDashboard() {
       supabase.from('routes').select('id, status, driver, name, start_time').gte('start_time', today),
       supabase.from('route_stops').select('id, status'),
       supabase.from('order_headers').select('id, status, created_at, shipping_total, tax_total, subtotal_items, discount_price').in('status', ['processing', 'shipped']),
-      supabase.from('vehicle_incidents').select('id, status').eq('status', 'abierto'),
+      supabase.from('vehicle_incidents').select('id, status').in('status', ['abierto', 'abierta']),
       supabase.from('calendar_events').select('id, title, start_time').gte('start_time', today).order('start_time').limit(5),
     ]);
 
@@ -48,7 +48,7 @@ export default function EmpleadoDashboard() {
       completedStops: (stops || []).filter((s: any) => s.status === 'completado').length,
       pendingStops: (stops || []).filter((s: any) => s.status !== 'completado').length,
       activeOrders: (orders || []).length,
-      openIncidents: (incs || []).filter((i: any) => i.status === 'abierto').length,
+      openIncidents: (incs || []).filter((i: any) => ['abierto', 'abierta'].includes(i.status)).length,
     });
 
     setTodayRoutes(todayRoutesData.slice(0, 5));

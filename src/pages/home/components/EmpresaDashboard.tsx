@@ -54,7 +54,7 @@ export default function EmpresaDashboard() {
     const lowStockCount = (products || []).filter((p: any) => p.stock !== null && p.min_stock !== null && p.stock < p.min_stock).length;
     const pendingInvoices = (invoices || []).filter((i: any) => i.status === 'pendiente');
     const pendingTotal = pendingInvoices.reduce((sum: number, inv: any) => sum + Number(inv.amount || 0), 0);
-    const cobradas = (invoices || []).filter((i: any) => i.status === 'cobrada');
+    const cobradas = (invoices || []).filter((i: any) => i.status === 'cobrado');
     const cobradasTotal = cobradas.reduce((sum: number, inv: any) => sum + Number(inv.amount || 0), 0);
     const vencidas = (invoices || []).filter((i: any) => i.status === 'vencida');
 
@@ -115,7 +115,7 @@ export default function EmpresaDashboard() {
       totalOrders: orders?.length || 0,
       totalEmployees: employees?.length || 0,
       totalIncidents: incs?.length || 0,
-      openIncidents: (incs || []).filter((i: any) => i.status === 'abierto').length,
+      openIncidents: (incs || []).filter((i: any) => ['abierto', 'abierta'].includes(i.status)).length,
       fuelCost: (fuel || []).reduce((sum: number, f: any) => sum + Number(f.cost || 0), 0),
       totalInventory: (products || []).reduce((sum: number, p: any) => sum + Number(p.stock || 0) * Number(p.price || 0), 0),
     });
