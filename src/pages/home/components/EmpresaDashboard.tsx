@@ -44,7 +44,7 @@ export default function EmpresaDashboard() {
       supabase.from('routes').select('id, status, driver, name, start_time'),
       supabase.from('invoices').select('id, amount, status, invoice_number, client, created_at'),
       supabase.from('product_items').select('id, stock, min_stock, price'),
-      supabase.from('order_headers').select('id, status, created_at, shipping_total, tax_total, subtotal_items, discount_price'),
+      supabase.from('order_headers').select('id, status, total, created_at, shipping_total, tax_total, subtotal_items, discount_price, payment_provider'),
       supabase.from('route_stops').select('id, status'),
       supabase.from('employees').select('id'),
       supabase.from('vehicle_incidents').select('id, status'),
@@ -90,10 +90,10 @@ export default function EmpresaDashboard() {
 
     const activity: any[] = [];
     (invoices || []).slice(0, 3).forEach((inv: any) => activity.push({
-      id: `inv-${inv.id}`, text: `Factura ${inv.invoice_number} para ${inv.client}`, time: 'Hoy', icon: 'ri-file-list-3-line', color: 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400',
+      id: `inv-${inv.id}`, text: `Factura ${inv.invoice_number || inv.id.slice(0, 8)} para ${inv.client || 'cliente'}`, time: 'Hoy', icon: 'ri-file-list-3-line', color: 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400',
     }));
     (routes || []).slice(0, 3).forEach((r: any) => activity.push({
-      id: `route-${r.id}`, text: `Ruta ${r.name} asignada a ${r.driver}`, time: r.start_time ? 'Hoy' : 'Pendiente', icon: 'ri-truck-line', color: 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400',
+      id: `route-${r.id}`, text: `Ruta ${r.name || 'sin nombre'} asignada a ${r.driver || 'conductor'}`, time: r.start_time ? 'Hoy' : 'Pendiente', icon: 'ri-truck-line', color: 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400',
     }));
     (incs || []).slice(0, 2).forEach((inc: any) => activity.push({
       id: `inc-${inc.id}`, text: `Incidencia registrada`, time: 'Hoy', icon: 'ri-error-warning-line', color: 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
@@ -132,8 +132,9 @@ export default function EmpresaDashboard() {
   }, [fetchDashboard]);
 
   const orderTotal = (order: any) => {
-    const base = Number(order.subtotal_items || 0) + Number(order.shipping_total || 0) + Number(order.tax_total || 0) - Number(order.discount_price || 0);
-    return base;
+    const detailed = Number(order.subtotal_items || 0) + Number(order.shipping_total || 0) + Number(order.tax_total || 0) - Number(order.discount_price || 0);
+    // Si no hay desglose usa el campo total directo
+    return detailed > 0 ? detailed : Number(order.total || 0);
   };
 
   const formatDate = (dateStr: string) => {
