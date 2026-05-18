@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import Modal from '@/components/base/Modal';
-import PremiumGate from '@/components/feature/PremiumGate';
 import { supabase } from '@/lib/supabase';
 
 interface Email {
@@ -104,7 +103,6 @@ export default function Email() {
   };
 
   return (
-    <PremiumGate>
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
@@ -281,6 +279,5 @@ export default function Email() {
         )}
       </Modal>
     </div>
-    </PremiumGate>
   );
 }
