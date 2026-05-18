@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import Modal from '@/components/base/Modal';
 import PremiumGate from '@/components/feature/PremiumGate';
+import { supabase } from '@/lib/supabase';
 
 interface Email {
   id: number;
@@ -34,29 +35,63 @@ export default function Email() {
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [composeSent, setComposeSent] = useState(false);
+  const [composeSending, setComposeSending] = useState(false);
+  const [composeError, setComposeError] = useState<string | null>(null);
 
   const filteredEmails = emailList.filter(e => e.folder === activeFolder);
 
-  const handleSendEmail = () => {
-    if (!composeTo || !composeSubject) return;
-    const newEmail: Email = {
-      id: Date.now(),
-      from: composeTo,
-      subject: composeSubject,
-      preview: composeBody,
-      date: new Date().toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }),
-      read: true,
-      folder: 'sent',
-    };
-    setEmailList(prev => [newEmail, ...prev]);
-    setComposeSent(true);
-    setTimeout(() => {
-      setShowCompose(false);
-      setComposeTo('');
-      setComposeSubject('');
-      setComposeBody('');
-      setComposeSent(false);
-    }, 1200);
+  const handleSendEmail = async () => {
+    if (!composeTo || !composeSubject || composeSending) return;
+    setComposeSending(true);
+    setComposeError(null);
+
+    // Leer nombre de empresa desde localStorage (perfil empresa)
+    let companyName = 'Quickly';
+    try {
+      const perfil = localStorage.getItem('empresa-perfil');
+      if (perfil) {
+        const parsed = JSON.parse(perfil);
+        if (parsed?.name) companyName = parsed.name;
+      }
+    } catch { /* ignorar */ }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('send-compose-email', {
+        body: { to: composeTo, subject: composeSubject, body: composeBody, companyName },
+      });
+
+      if (error || !data?.success) {
+        const msg = data?.error || error?.message || 'Error al enviar el email';
+        setComposeError(msg);
+        setComposeSending(false);
+        return;
+      }
+
+      // Añadir a la lista de enviados (UI)
+      const newEmail: Email = {
+        id: Date.now(),
+        from: composeTo,
+        subject: composeSubject,
+        preview: composeBody,
+        date: new Date().toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }),
+        read: true,
+        folder: 'sent',
+      };
+      setEmailList(prev => [newEmail, ...prev]);
+      setComposeSent(true);
+      setComposeSending(false);
+      setTimeout(() => {
+        setShowCompose(false);
+        setComposeTo('');
+        setComposeSubject('');
+        setComposeBody('');
+        setComposeSent(false);
+        setComposeError(null);
+      }, 1500);
+    } catch (err: any) {
+      setComposeError(err.message || 'Error inesperado');
+      setComposeSending(false);
+    }
   };
 
   const handleReply = () => {
@@ -187,15 +222,20 @@ export default function Email() {
           {composeSent && (
             <p className="text-sm text-green-600 flex items-center gap-1"><i className="ri-check-double-line" /> Email enviado correctamente</p>
           )}
+          {composeError && (
+            <p className="text-sm text-red-500 flex items-center gap-1"><i className="ri-error-warning-line" /> {composeError}</p>
+          )}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-            <button onClick={() => setShowCompose(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+            <button onClick={() => { setShowCompose(false); setComposeError(null); }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
             <button
               onClick={handleSendEmail}
-              disabled={!composeTo || !composeSubject || composeSent}
+              disabled={!composeTo || !composeSubject || composeSent || composeSending}
               className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 flex items-center gap-2"
             >
-              <div className="w-4 h-4 flex items-center justify-center"><i className="ri-send-plane-line" /></div>
-              {composeSent ? 'Enviado' : 'Enviar'}
+              <div className="w-4 h-4 flex items-center justify-center">
+                {composeSending ? <i className="ri-loader-4-line animate-spin" /> : <i className="ri-send-plane-line" />}
+              </div>
+              {composeSending ? 'Enviando…' : composeSent ? 'Enviado' : 'Enviar'}
             </button>
           </div>
         </div>
