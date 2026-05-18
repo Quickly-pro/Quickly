@@ -54,14 +54,10 @@ export default function Email() {
     } catch { /* ignorar */ }
 
     try {
-      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-      const supabaseKey = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
-
-      const res = await fetch(`${supabaseUrl}/functions/v1/send-compose-email`, {
+      const res = await fetch('https://irbilfifptefmpudwxee.supabase.co/functions/v1/send-compose-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseKey}`,
         },
         body: JSON.stringify({ to: composeTo, subject: composeSubject, body: composeBody, companyName }),
       });
