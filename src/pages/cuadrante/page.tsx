@@ -114,6 +114,7 @@ export default function Cuadrante() {
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [newEmployeeRole, setNewEmployeeRole] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sendOk, setSendOk] = useState(false);
 
   // Swap modal states
   const [showSwapModal, setShowSwapModal] = useState(false);
@@ -331,6 +332,38 @@ export default function Cuadrante() {
     } catch (err) {
       console.error('Error responding to swap:', err);
     }
+  };
+
+  const handleSendCuadrante = () => {
+    if (displayedEmployees.length === 0) return;
+    const scheduleData = displayedEmployees.map(emp => ({
+      id: emp.id,
+      name: emp.name,
+      role: emp.role,
+      days: Array.from({ length: 7 }).map((_, i) => {
+        const shift = getShift(emp.id, i);
+        return {
+          day: FULL_DAYS[i],
+          date: weekDates[i].getDate(),
+          shift: shift?.shift_type || '',
+          label: shiftLabels[shift?.shift_type || ''] || '—',
+        };
+      }),
+      totalHours: weeklyHours(emp.id),
+    }));
+    const newEntry = {
+      id: Date.now(),
+      weekLabel,
+      weekStartStr,
+      sentAt: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      employees: scheduleData,
+    };
+    try {
+      const existing = JSON.parse(localStorage.getItem('cuadrante-sent') || '[]');
+      localStorage.setItem('cuadrante-sent', JSON.stringify([newEntry, ...existing].slice(0, 20)));
+    } catch { /* ignore */ }
+    setSendOk(true);
+    setTimeout(() => setSendOk(false), 3500);
   };
 
   const addEmployee = async () => {
@@ -566,6 +599,19 @@ export default function Cuadrante() {
         </div>
       )}
 
+      {/* Send cuadrante success toast */}
+      {sendOk && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm text-emerald-700 dark:text-emerald-400">
+          <div className="w-7 h-7 flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/40 rounded-lg flex-shrink-0">
+            <i className="ri-check-double-line text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div>
+            <p className="font-semibold">Cuadrante enviado correctamente</p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">Cada empleado puede consultarlo en su sección <strong>Documentos → Mi cuadrante</strong>.</p>
+          </div>
+        </div>
+      )}
+
       {/* Add employee modal */}
       {isEmpresa && showAddEmployee && (
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-4 space-y-3">
@@ -729,6 +775,18 @@ export default function Cuadrante() {
                 <div className="w-24 h-12 bg-gray-50 dark:bg-slate-800/50 flex items-center justify-center flex-shrink-0">
                   <span className="text-xs font-bold text-gray-500 dark:text-slate-400">Total</span>
                 </div>
+                {isEmpresa && (
+                  <div className="w-48 h-12 flex items-center px-3 flex-shrink-0">
+                    <button
+                      onClick={handleSendCuadrante}
+                      disabled={displayedEmployees.length === 0}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap shadow-sm"
+                    >
+                      <i className="ri-send-plane-line text-xs" />
+                      Enviar cuadrante
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Employee rows */}
@@ -814,6 +872,7 @@ export default function Cuadrante() {
                       {weeklyHours(emp.id)}h
                     </span>
                   </div>
+                  {isEmpresa && <div className="w-48 h-14 flex-shrink-0" />}
                 </div>
               ))}
             </div>
@@ -822,18 +881,7 @@ export default function Cuadrante() {
       </div>}
 
       {/* Footer */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        {isEmpresa && (
-          <button
-            onClick={() => setShowAddEmployee(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg transition-all"
-          >
-            <div className="w-4 h-4 flex items-center justify-center">
-              <i className="ri-add-line" />
-            </div>
-            Añadir empleado
-          </button>
-        )}
+      <div className="flex items-center justify-end">
         <button
           onClick={() => setShowColorCode(!showColorCode)}
           className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-all"
