@@ -187,31 +187,31 @@ export default function Email() {
       >
         <div className="space-y-4">
           <div>
-            <label className="text-sm text-gray-600 block mb-1">Para</label>
+            <label className="text-sm text-gray-300 block mb-1">Para</label>
             <input
               type="email"
               placeholder="email@ejemplo.com"
               value={composeTo}
               onChange={(e) => setComposeTo(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-orange-300"
+              className="w-full px-3 py-2 border border-gray-600 rounded-lg text-sm outline-none focus:border-orange-400 bg-gray-800 text-white placeholder-gray-500"
             />
           </div>
           <div>
-            <label className="text-sm text-gray-600 block mb-1">Asunto</label>
+            <label className="text-sm text-gray-300 block mb-1">Asunto</label>
             <input
               type="text"
               placeholder="Asunto del email..."
               value={composeSubject}
               onChange={(e) => setComposeSubject(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-orange-300"
+              className="w-full px-3 py-2 border border-gray-600 rounded-lg text-sm outline-none focus:border-orange-400 bg-gray-800 text-white placeholder-gray-500"
             />
           </div>
           <div>
-            <label className="text-sm text-gray-600 block mb-1">Mensaje</label>
+            <label className="text-sm text-gray-300 block mb-1">Mensaje</label>
             <textarea
               value={composeBody}
               onChange={(e) => setComposeBody(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-orange-300 resize-none"
+              className="w-full px-3 py-2 border border-gray-600 rounded-lg text-sm outline-none focus:border-orange-400 resize-none bg-gray-800 text-white placeholder-gray-500"
               rows={8}
               placeholder="Escribe tu mensaje..."
               maxLength={500}
