@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120">
+  <rect width="240" height="120" fill="#142328" rx="12"/>
+  <!-- Green "Uber" -->
+  <text x="20" y="78" font-family="'Arial Black',Impact,sans-serif" font-size="52" font-weight="900" fill="white">Uber</text>
+  <!-- Green "Eats" -->
+  <text x="130" y="78" font-family="'Arial Black',Impact,sans-serif" font-size="52" font-weight="900" fill="#06C167">Eats</text>
+</svg>

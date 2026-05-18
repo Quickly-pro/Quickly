@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" fill="#00CCBC" rx="14"/>
+  <!-- Simplified kangaroo/roo shape -->
+  <ellipse cx="105" cy="75" rx="32" ry="38" fill="white"/>
+  <!-- Ear -->
+  <ellipse cx="120" cy="45" rx="10" ry="16" fill="white"/>
+  <!-- Eye -->
+  <circle cx="115" cy="65" r="5" fill="#00CCBC"/>
+  <circle cx="117" cy="63" r="2" fill="white"/>
+  <!-- Tail -->
+  <path d="M73,90 Q50,110 60,130" stroke="white" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <!-- Legs -->
+  <ellipse cx="100" cy="125" rx="18" ry="8" fill="white"/>
+  <rect x="83" y="118" width="36" height="25" fill="white" rx="4"/>
+  <rect x="80" y="138" width="16" height="12" fill="white" rx="4"/>
+  <rect x="104" y="138" width="16" height="12" fill="white" rx="4"/>
+  <!-- deliveroo text -->
+  <text x="100" y="178" font-family="'Arial Black',sans-serif" font-size="16" font-weight="900" fill="white" text-anchor="middle">deliveroo</text>
+</svg>

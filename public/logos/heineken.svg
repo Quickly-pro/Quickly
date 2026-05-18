@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" fill="#007A33" rx="14"/>
+  <!-- White star -->
+  <polygon points="100,22 109,50 138,50 115,67 124,95 100,78 76,95 85,67 62,50 91,50" fill="white"/>
+  <!-- Red star inner -->
+  <polygon points="100,32 107,52 128,52 112,64 119,85 100,72 81,85 88,64 72,52 93,52" fill="#CE1126" opacity="0.7"/>
+  <!-- White Heineken text -->
+  <text x="100" y="145" font-family="'Arial Black',sans-serif" font-size="24" font-weight="900" fill="white" text-anchor="middle" letter-spacing="-0.5">HEINEKEN</text>
+  <!-- White tagline -->
+  <rect x="25" y="152" width="150" height="2" fill="white" opacity="0.5"/>
+</svg>

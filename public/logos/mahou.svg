@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Dark navy background -->
+  <rect width="200" height="200" fill="#002060" rx="14"/>
+  <!-- Gold oval/shield -->
+  <ellipse cx="100" cy="85" rx="65" ry="70" fill="#C9922A"/>
+  <ellipse cx="100" cy="85" rx="58" ry="63" fill="#002060"/>
+  <!-- Gold star -->
+  <polygon points="100,35 107,57 130,57 112,70 119,92 100,79 81,92 88,70 70,57 93,57" fill="#C9922A"/>
+  <!-- Mahou text -->
+  <text x="100" y="152" font-family="Georgia,serif" font-size="26" font-weight="bold" font-style="italic" fill="#C9922A" text-anchor="middle">Mahou</text>
+  <!-- Cerveza -->
+  <text x="100" y="172" font-family="Arial,sans-serif" font-size="11" fill="#C9922A" text-anchor="middle" opacity="0.8" letter-spacing="3">CERVEZA</text>
+</svg>

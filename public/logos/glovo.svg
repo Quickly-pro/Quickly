@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" fill="#FFC244" rx="14"/>
+  <!-- Simplified courier bag / backpack shape -->
+  <rect x="55" y="70" width="90" height="80" fill="white" rx="10"/>
+  <rect x="70" y="58" width="60" height="20" fill="white" rx="8"/>
+  <circle cx="100" cy="90" r="12" fill="#FFC244"/>
+  <rect x="93" y="85" width="14" height="20" fill="#FFC244"/>
+  <!-- glovo text -->
+  <text x="100" y="175" font-family="'Arial Black',sans-serif" font-size="26" font-weight="900" fill="white" text-anchor="middle">glovo</text>
+</svg>

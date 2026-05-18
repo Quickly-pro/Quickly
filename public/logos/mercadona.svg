@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 160">
+  <rect width="220" height="160" fill="white" rx="12" stroke="#E0E0E0" stroke-width="1"/>
+  <!-- Green top bar -->
+  <rect x="0" y="0" width="220" height="55" fill="#00703C" rx="12"/>
+  <rect x="0" y="40" width="220" height="15" fill="#00703C"/>
+  <!-- Shopping cart icon in white -->
+  <circle cx="75" cy="28" r="18" fill="white" opacity="0.2"/>
+  <path d="M62,18 L68,18 L74,38 L92,38 L96,28 L72,28" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="76" cy="43" r="3" fill="white"/>
+  <circle cx="90" cy="43" r="3" fill="white"/>
+  <!-- Mercadona text -->
+  <text x="110" y="110" font-family="'Arial Black',sans-serif" font-size="22" font-weight="900" fill="#00703C" text-anchor="middle">MERCADONA</text>
+  <text x="110" y="135" font-family="Arial,sans-serif" font-size="12" fill="#666" text-anchor="middle">Supermercados</text>
+</svg>

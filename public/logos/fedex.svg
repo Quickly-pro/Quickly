@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100">
+  <rect width="300" height="100" fill="white" rx="10"/>
+  <!-- "Fed" in purple -->
+  <text x="20" y="74" font-family="'Arial Black',Impact,sans-serif" font-size="72" font-weight="900" fill="#4D148C">Fed</text>
+  <!-- "Ex" in orange -->
+  <text x="168" y="74" font-family="'Arial Black',Impact,sans-serif" font-size="72" font-weight="900" fill="#FF6600">Ex</text>
+  <!-- Hidden arrow between E and x (simplified) -->
+  <polygon points="215,72 240,72 228,84" fill="#FF6600"/>
+</svg>

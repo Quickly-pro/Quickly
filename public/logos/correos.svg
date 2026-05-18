@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 160">
+  <rect width="220" height="160" fill="#FFCC00" rx="12"/>
+  <!-- Envelope shape -->
+  <rect x="30" y="40" width="160" height="100" fill="white" rx="6" stroke="#E5A800" stroke-width="2"/>
+  <polygon points="30,40 110,95 190,40" fill="#E5A800"/>
+  <polygon points="30,140 85,95 30,95" fill="#E5A800" opacity="0.4"/>
+  <polygon points="190,140 135,95 190,95" fill="#E5A800" opacity="0.4"/>
+  <!-- Correos text -->
+  <text x="110" y="155" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#333" text-anchor="middle">Correos</text>
+</svg>

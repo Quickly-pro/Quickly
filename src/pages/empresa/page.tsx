@@ -10,31 +10,38 @@ const colorOptions = [
 ];
 
 const PRESET_LOGOS = [
-  {
-    name: 'Mundopan',
-    url: '/logos/mundopan.svg',
-    bg: '#ffffff',
-  },
-  {
-    name: 'KFC',
-    url: '/logos/kfc.svg',
-    bg: '#C8102E',
-  },
-  {
-    name: 'Coca-Cola',
-    url: '/logos/cocacola.svg',
-    bg: '#F40009',
-  },
-  {
-    name: 'Burger King',
-    url: '/logos/burgerking.svg',
-    bg: '#ffffff',
-  },
-  {
-    name: "McDonald's",
-    url: '/logos/mcdonalds.svg',
-    bg: '#DA291C',
-  },
+  // ── Originales ──────────────────────────
+  { name: 'Mundopan',    url: '/logos/mundopan.svg',   bg: '#ffffff' },
+  { name: 'KFC',         url: '/logos/kfc.svg',         bg: '#C8102E' },
+  { name: 'Coca-Cola',   url: '/logos/cocacola.svg',    bg: '#F40009' },
+  { name: 'Burger King', url: '/logos/burgerking.svg',  bg: '#ffffff' },
+  { name: "McDonald's",  url: '/logos/mcdonalds.svg',   bg: '#DA291C' },
+  // ── Mensajería y logística ───────────────
+  { name: 'DHL',         url: '/logos/dhl.svg',         bg: '#FFCC00' },
+  { name: 'FedEx',       url: '/logos/fedex.svg',       bg: '#ffffff' },
+  { name: 'UPS',         url: '/logos/ups.svg',         bg: '#351C15' },
+  { name: 'Amazon',      url: '/logos/amazon.svg',      bg: '#ffffff' },
+  { name: 'SEUR',        url: '/logos/seur.svg',        bg: '#FF6B00' },
+  { name: 'MRW',         url: '/logos/mrw.svg',         bg: '#ffffff' },
+  { name: 'GLS',         url: '/logos/gls.svg',         bg: '#009FE3' },
+  { name: 'Correos',     url: '/logos/correos.svg',     bg: '#FFCC00' },
+  // ── Comida a domicilio ───────────────────
+  { name: 'Glovo',       url: '/logos/glovo.svg',       bg: '#FFC244' },
+  { name: 'Uber Eats',   url: '/logos/ubereats.svg',    bg: '#142328' },
+  { name: 'Just Eat',    url: '/logos/justeat.svg',     bg: '#FF8000' },
+  { name: 'Deliveroo',   url: '/logos/deliveroo.svg',   bg: '#00CCBC' },
+  { name: "Domino's",    url: '/logos/dominos.svg',     bg: '#0063A7' },
+  { name: 'Pizza Hut',   url: '/logos/pizzahut.svg',    bg: '#EE3124' },
+  { name: 'Telepizza',   url: '/logos/telepizza.svg',   bg: '#E31837' },
+  // ── Distribución y retail ────────────────
+  { name: 'Mercadona',   url: '/logos/mercadona.svg',   bg: '#00703C' },
+  { name: 'Carrefour',   url: '/logos/carrefour.svg',   bg: '#ffffff' },
+  { name: 'Lidl',        url: '/logos/lidl.svg',        bg: '#0050AA' },
+  { name: 'IKEA',        url: '/logos/ikea.svg',        bg: '#003087' },
+  { name: 'Zara',        url: '/logos/zara.svg',        bg: '#ffffff' },
+  // ── Bebidas ──────────────────────────────
+  { name: 'Heineken',    url: '/logos/heineken.svg',    bg: '#007A33' },
+  { name: 'Mahou',       url: '/logos/mahou.svg',       bg: '#002060' },
 ];
 
 export default function Empresa() {
@@ -249,7 +256,7 @@ export default function Empresa() {
 
             {/* ── Preset logos ── */}
             <p className="text-xs text-gray-400 dark:text-slate-500 mb-2">Logos predefinidos — haz clic para seleccionar</p>
-            <div className="grid grid-cols-5 gap-2 mb-3">
+            <div className="grid grid-cols-5 gap-2 mb-3 max-h-64 overflow-y-auto pr-1">
               {PRESET_LOGOS.map((preset) => {
                 const activeUrl = logoPreview || editForm.logo;
                 const isSelected = activeUrl === preset.url;

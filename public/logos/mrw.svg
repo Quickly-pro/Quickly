@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 120">
+  <rect width="220" height="120" fill="white" rx="10" stroke="#E0E0E0" stroke-width="1"/>
+  <!-- Red bar top -->
+  <rect x="0" y="0" width="220" height="35" fill="#E30613" rx="10"/>
+  <rect x="0" y="20" width="220" height="15" fill="#E30613"/>
+  <!-- MRW text bold -->
+  <text x="110" y="88" font-family="'Arial Black',Impact,sans-serif" font-size="58" font-weight="900" fill="#1A1A1A" text-anchor="middle" letter-spacing="2">MRW</text>
+</svg>

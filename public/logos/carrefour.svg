@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 160">
+  <rect width="220" height="160" fill="white" rx="12"/>
+  <!-- Blue left arrow -->
+  <polygon points="18,80 68,30 68,55 88,55 88,105 68,105 68,130" fill="#004A97"/>
+  <!-- Red right arrow -->
+  <polygon points="202,80 152,30 152,55 132,55 132,105 152,105 152,130" fill="#EE3124"/>
+  <!-- White "C" gap in the middle creates the C shape -->
+  <!-- carrefour text -->
+  <text x="110" y="148" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="#004A97" text-anchor="middle" letter-spacing="1">CARREFOUR</text>
+</svg>
