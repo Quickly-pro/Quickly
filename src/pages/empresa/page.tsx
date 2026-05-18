@@ -9,6 +9,34 @@ const colorOptions = [
   '#f59e0b', '#ec4899', '#06b6d4', '#6366f1', '#84cc16',
 ];
 
+const PRESET_LOGOS = [
+  {
+    name: 'Mundopan',
+    url: 'https://pbs.twimg.com/profile_images/884756751817531392/JXXv9eVo_400x400.jpg',
+    bg: '#f5f0cc',
+  },
+  {
+    name: 'KFC',
+    url: 'https://upload.wikimedia.org/wikipedia/en/thumb/b/bf/KFC_logo.svg/200px-KFC_logo.svg.png',
+    bg: '#c8102e',
+  },
+  {
+    name: 'Coca-Cola',
+    url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/400px-Coca-Cola_logo.svg.png',
+    bg: '#f40009',
+  },
+  {
+    name: 'Burger King',
+    url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Burger_King_logo_%281999%29.svg/200px-Burger_King_logo_%281999%29.svg.png',
+    bg: '#ffffff',
+  },
+  {
+    name: "McDonald's",
+    url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/McDonald%27s_logo.svg/200px-McDonald%27s_logo.svg.png',
+    bg: '#DA291C',
+  },
+];
+
 export default function Empresa() {
   const { data: company, update } = useCompany();
   const [showEdit, setShowEdit] = useState(false);
@@ -213,15 +241,68 @@ export default function Empresa() {
         size="lg"
       >
         <div className="space-y-4">
-          {/* Logo Upload */}
+          {/* Logo section */}
           <div>
-            <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1.5">Logo de la empresa</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-200 block mb-2">
+              Logo de la empresa
+            </label>
+
+            {/* ── Preset logos ── */}
+            <p className="text-xs text-gray-400 dark:text-slate-500 mb-2">Logos predefinidos — haz clic para seleccionar</p>
+            <div className="grid grid-cols-5 gap-2 mb-3">
+              {PRESET_LOGOS.map((preset) => {
+                const activeUrl = logoPreview || editForm.logo;
+                const isSelected = activeUrl === preset.url;
+                return (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() => { setLogoPreview(preset.url); setLogoName(preset.name); }}
+                    title={preset.name}
+                    className={`relative rounded-xl border-2 p-2 flex flex-col items-center gap-1.5 transition-all
+                      ${isSelected
+                        ? 'border-orange-400 ring-2 ring-orange-200 dark:ring-orange-900/40 bg-orange-50 dark:bg-orange-900/20'
+                        : 'border-gray-200 dark:border-slate-600 hover:border-orange-300 dark:hover:border-orange-500 bg-white dark:bg-slate-800'
+                      }`}
+                  >
+                    <div
+                      className="w-full h-10 rounded-lg overflow-hidden flex items-center justify-center"
+                      style={{ backgroundColor: preset.bg }}
+                    >
+                      <img
+                        src={preset.url}
+                        alt={preset.name}
+                        className="w-full h-full object-contain p-1"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-gray-500 dark:text-slate-400 text-center leading-tight font-medium truncate w-full">
+                      {preset.name}
+                    </span>
+                    {isSelected && (
+                      <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center shadow-sm">
+                        <i className="ri-check-line text-white text-[10px]" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ── Divider ── */}
+            <div className="flex items-center gap-3 my-3">
+              <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
+              <span className="text-xs text-gray-400 dark:text-slate-500 whitespace-nowrap">o sube tu propio logo</span>
+              <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
+            </div>
+
+            {/* ── Preview / Upload ── */}
             {logoPreview || editForm.logo ? (
               <div className="relative rounded-xl overflow-hidden border border-gray-200 dark:border-slate-600">
                 <img
                   src={logoPreview || editForm.logo}
                   alt="Logo preview"
-                  className="w-full h-32 object-contain bg-gray-50 dark:bg-slate-800 p-2"
+                  className="w-full h-28 object-contain bg-gray-50 dark:bg-slate-800 p-2"
                 />
                 <div className="absolute top-2 right-2 flex gap-2">
                   {logoName && (
@@ -242,12 +323,10 @@ export default function Empresa() {
                 onDrop={handleLogoDrop}
                 onDragOver={(e) => { e.preventDefault(); setIsDraggingLogo(true); }}
                 onDragLeave={(e) => { e.preventDefault(); setIsDraggingLogo(false); }}
-                className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors
+                className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors
                   ${isDraggingLogo ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/10' : 'border-gray-200 dark:border-slate-600 hover:border-orange-300 dark:hover:border-orange-500'}`}
               >
-                <div className="w-10 h-10 mx-auto flex items-center justify-center mb-2">
-                  <i className="ri-image-add-line text-gray-400 dark:text-slate-500 text-2xl" />
-                </div>
+                <i className="ri-image-add-line text-gray-400 dark:text-slate-500 text-2xl mb-1" />
                 <p className="text-sm text-gray-500 dark:text-slate-400">Arrastra o haz clic para subir logo</p>
                 <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">JPG, PNG hasta 5MB</p>
                 <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoSelect} className="hidden" />
