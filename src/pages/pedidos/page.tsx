@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import Modal from '@/components/base/Modal';
+import { useNavigate } from 'react-router-dom';
 
 const statusConfig: Record<string, { label: string; color: string; darkColor: string }> = {
   pending_payment: { label: 'Pendiente Pago', color: 'bg-amber-50 text-amber-600', darkColor: 'dark:bg-amber-900/20 dark:text-amber-400' },
@@ -37,7 +38,9 @@ const paymentOptions = [
 const ITEMS_PER_PAGE = 10;
 
 export default function Pedidos() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'client' | 'factory'>('client');
+  const [updatingOrderStatus, setUpdatingOrderStatus] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [showNewFactoryOrder, setShowNewFactoryOrder] = useState(false);
   const [showOrderDetail, setShowOrderDetail] = useState(false);
@@ -61,6 +64,8 @@ export default function Pedidos() {
   // New order form
   const [newFactoryOrder, setNewFactoryOrder] = useState({ factory: '', product: '', qty: '', unitPrice: '', expectedDelivery: '' });
   const [newOrderForm, setNewOrderForm] = useState({ clientId: '', currency: 'EUR', payment: 'manual', notes: '' });
+  const [createOrderError, setCreateOrderError] = useState('');
+  const [creatingOrder, setCreatingOrder] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -89,10 +94,20 @@ export default function Pedidos() {
   const getItemsForOrder = (orderId: number) => orderItems.filter(i => i.order_id === orderId);
 
   const getClientName = (order: any) => {
-    const cid = order.customer_id;
+    const cid = order.client_id || order.customer_id;
     if (!cid) return order.recipient?.name || 'Sin nombre';
-    const found = clientsList.find(c => String(c.id) === String(cid) || String(c.id) === String(cid).replace(/[^0-9]/g, ''));
+    const found = clientsList.find(c => String(c.id) === String(cid));
     return found?.name || order.recipient?.name || 'Sin nombre';
+  };
+
+  const updateOrderStatus = async (orderId: string | number, newStatus: string) => {
+    setUpdatingOrderStatus(true);
+    const { error } = await supabase.from('order_headers').update({ status: newStatus }).eq('id', orderId);
+    setUpdatingOrderStatus(false);
+    if (!error) {
+      setSelectedOrder((prev: any) => prev ? { ...prev, status: newStatus } : null);
+      fetchOrders();
+    }
   };
 
   const totalAmount = (order: any) => {
@@ -182,18 +197,23 @@ export default function Pedidos() {
   useClickOutside(newFactoryOrderRef, () => setShowNewFactoryOrder(false), showNewFactoryOrder);
 
   const createOrder = async () => {
-    if (!newOrderForm.clientId) return;
+    if (!newOrderForm.clientId) { setCreateOrderError('Selecciona un cliente para continuar'); return; }
+    setCreatingOrder(true);
+    setCreateOrderError('');
     const { error } = await supabase.from('order_headers').insert({
-      customer_id: newOrderForm.clientId,
-      currency: newOrderForm.currency,
+      client_id: newOrderForm.clientId,
       payment_provider: newOrderForm.payment,
-      customer_notes: newOrderForm.notes || null,
+      notes: newOrderForm.notes || null,
       status: 'pending_payment',
     });
+    setCreatingOrder(false);
     if (!error) {
       setShowNewOrder(false);
+      setCreateOrderError('');
       setNewOrderForm({ clientId: '', currency: 'EUR', payment: 'manual', notes: '' });
       fetchOrders();
+    } else {
+      setCreateOrderError(error.message || 'Error al crear el pedido');
     }
   };
 
@@ -561,10 +581,10 @@ export default function Pedidos() {
               </div>
             </div>
 
-            {selectedOrder.customer_notes && (
+            {(selectedOrder.customer_notes || selectedOrder.notes) && (
               <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
                 <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">Notas del cliente</p>
-                <p className="text-sm text-amber-800 dark:text-amber-300">{selectedOrder.customer_notes}</p>
+                <p className="text-sm text-amber-800 dark:text-amber-300">{selectedOrder.customer_notes || selectedOrder.notes}</p>
               </div>
             )}
 
@@ -615,12 +635,39 @@ export default function Pedidos() {
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <button className="flex-1 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 flex items-center justify-center gap-2">
-                <div className="w-4 h-4 flex items-center justify-center"><i className="ri-truck-line" /></div>
-                Actualizar Estado
-              </button>
-              <button className="flex-1 py-2.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center gap-2">
+            <div className="space-y-3 pt-2">
+              <div>
+                <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1.5">Cambiar estado del pedido</label>
+                <div className="flex gap-2">
+                  <select
+                    defaultValue={selectedOrder.status}
+                    id="order-status-select"
+                    className="flex-1 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 dark:bg-slate-800 outline-none"
+                  >
+                    {Object.entries(statusConfig).map(([val, cfg]) => (
+                      <option key={val} value={val}>{cfg.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => {
+                      const sel = document.getElementById('order-status-select') as HTMLSelectElement;
+                      if (sel) updateOrderStatus(selectedOrder.id, sel.value);
+                    }}
+                    disabled={updatingOrderStatus}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+                  >
+                    {updatingOrderStatus ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <i className="ri-truck-line" />}
+                    Actualizar Estado
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowOrderDetail(false);
+                  navigate('/facturacion', { state: { fromOrder: selectedOrder, clientName: getClientName(selectedOrder) } });
+                }}
+                className="w-full py-2.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center gap-2"
+              >
                 <div className="w-4 h-4 flex items-center justify-center"><i className="ri-file-text-line" /></div>
                 Generar Factura
               </button>
@@ -684,9 +731,18 @@ export default function Pedidos() {
               placeholder="Instrucciones especiales..."
             />
           </div>
+          {createOrderError && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg">
+              <i className="ri-error-warning-line text-red-500 text-sm flex-shrink-0" />
+              <p className="text-xs text-red-600 dark:text-red-400">{createOrderError}</p>
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-700">
-            <button onClick={() => setShowNewOrder(false)} className="px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Cancelar</button>
-            <button onClick={createOrder} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600">Crear Pedido</button>
+            <button onClick={() => { setShowNewOrder(false); setCreateOrderError(''); }} className="px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Cancelar</button>
+            <button onClick={createOrder} disabled={creatingOrder} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 flex items-center gap-2">
+              {creatingOrder && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              Crear Pedido
+            </button>
           </div>
         </div>
       </Modal>

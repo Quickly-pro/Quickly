@@ -64,6 +64,7 @@ export default function Facturacion() {
 
   const [cobroInvoiceId, setCobroInvoiceId] = useState<number | null>(null);
   const [cobroMethod, setCobroMethod] = useState('Efectivo');
+  const [sentReminders, setSentReminders] = useState<Set<number>>(new Set());
 
   const invoiceDetailRef = useRef<HTMLDivElement>(null);
   const pdfModalRef = useRef<HTMLDivElement>(null);
@@ -541,7 +542,17 @@ export default function Facturacion() {
                   <div key={inv.id} className="border border-red-100 dark:border-red-900/30 rounded-lg p-3 bg-red-50/20 dark:bg-red-900/10 hover:bg-red-50/40 dark:hover:bg-red-900/20 cursor-pointer" onClick={() => { setSelectedInvoice(inv); setShowInvoiceDetail(true); }}>
                     <div className="flex items-center justify-between"><span className="font-medium text-sm text-gray-800 dark:text-slate-100">{inv.client}</span><span className="text-sm font-semibold text-red-600">€{Number(inv.amount).toFixed(2)}</span></div>
                     <p className="text-xs text-red-400 dark:text-red-400/70 mt-1">{inv.invoice_number} . Vencio: {inv.due_date}</p>
-                    <button className="mt-2 text-xs text-orange-600 hover:underline">Enviar recordatorio</button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (sentReminders.has(inv.id)) return;
+                        setSentReminders(prev => new Set(prev).add(inv.id));
+                        addNotification('Recordatorio enviado', `Recordatorio de pago enviado para factura ${inv.invoice_number} (${inv.client} — €${Number(inv.amount).toFixed(2)})`, 'invoice');
+                      }}
+                      className={`mt-2 text-xs hover:underline ${sentReminders.has(inv.id) ? 'text-green-600 cursor-default' : 'text-orange-600'}`}
+                    >
+                      {sentReminders.has(inv.id) ? '✓ Recordatorio enviado' : 'Enviar recordatorio'}
+                    </button>
                   </div>
                 ))}
               </div>

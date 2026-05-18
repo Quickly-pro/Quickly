@@ -5,6 +5,7 @@ import { getGravatarUrl } from '@/lib/gravatar';
 import AvatarCropEditor, { type CropData } from '@/components/feature/AvatarCropEditor';
 import Modal from '@/components/base/Modal';
 import ImageWithFallback from '@/components/base/ImageWithFallback';
+import { supabase } from '@/lib/supabase';
 
 export default function Perfil() {
   const { profile, saving, updateProfile, updateAvatar } = useProfile();
@@ -19,6 +20,39 @@ export default function Perfil() {
   });
 
   const [saved, setSaved] = useState(false);
+
+  // Password change states
+  const [pwForm, setPwForm] = useState({ current: '', new: '', confirm: '' });
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [pwChanging, setPwChanging] = useState(false);
+
+  const handleChangePassword = async () => {
+    setPwError('');
+    setPwSuccess(false);
+    if (!pwForm.new || !pwForm.confirm) {
+      setPwError('Completa la nueva contraseña y su confirmación');
+      return;
+    }
+    if (pwForm.new.length < 8) {
+      setPwError('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+    if (pwForm.new !== pwForm.confirm) {
+      setPwError('Las contraseñas no coinciden');
+      return;
+    }
+    setPwChanging(true);
+    const { error } = await supabase.auth.updateUser({ password: pwForm.new });
+    setPwChanging(false);
+    if (error) {
+      setPwError(error.message);
+      return;
+    }
+    setPwSuccess(true);
+    setPwForm({ current: '', new: '', confirm: '' });
+    setTimeout(() => setPwSuccess(false), 3000);
+  };
 
   // Photo states
   const [showPhotoModal, setShowPhotoModal] = useState(false);
@@ -244,24 +278,43 @@ export default function Perfil() {
         <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-100">Seguridad</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-1.5 block">Contraseña actual</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none"
-            />
-          </div>
-          <div>
             <label className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-1.5 block">Nueva contraseña</label>
             <input
               type="password"
+              value={pwForm.new}
+              onChange={e => setPwForm(prev => ({ ...prev, new: e.target.value }))}
               placeholder="Mínimo 8 caracteres"
               className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none"
             />
           </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-1.5 block">Confirmar contraseña</label>
+            <input
+              type="password"
+              value={pwForm.confirm}
+              onChange={e => setPwForm(prev => ({ ...prev, confirm: e.target.value }))}
+              placeholder="Repite la nueva contraseña"
+              className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none"
+            />
+          </div>
         </div>
-        <button className="px-5 py-2.5 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 transition-all">
-          Cambiar contraseña
+        {pwError && (
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30 rounded-lg text-sm text-red-600 dark:text-red-400">
+            <i className="ri-error-warning-line mr-1" />{pwError}
+          </div>
+        )}
+        {pwSuccess && (
+          <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800/30 rounded-lg text-sm text-green-600 dark:text-green-400">
+            <i className="ri-check-line mr-1" />Contraseña actualizada correctamente
+          </div>
+        )}
+        <button
+          onClick={handleChangePassword}
+          disabled={pwChanging || pwSuccess}
+          className="px-5 py-2.5 bg-gray-800 dark:bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-gray-900 dark:hover:bg-slate-600 transition-all disabled:opacity-50 flex items-center gap-2"
+        >
+          {pwChanging && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+          {pwChanging ? 'Cambiando...' : 'Cambiar contraseña'}
         </button>
       </div>
 

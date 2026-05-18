@@ -40,7 +40,7 @@ interface ChatMessage {
 }
 
 export default function Asistente() {
-  const [conversations] = useState<Conversation[]>(demoConversations);
+  const [conversations, setConversations] = useState<Conversation[]>(demoConversations);
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -259,6 +259,7 @@ export default function Asistente() {
             {conversations.map((conv) => (
               <button
                 key={conv.id}
+                onClick={() => setMessages([])}
                 className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700/50 transition-all text-left"
               >
                 <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
@@ -266,7 +267,10 @@ export default function Asistente() {
                 </div>
                 <span className="truncate flex-1">{conv.title}</span>
                 {conv.date !== 'Hoy' && conv.date !== 'Ayer' && (
-                  <button className="w-5 h-5 flex items-center justify-center text-gray-400 dark:text-slate-500 hover:text-red-500">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConversations(prev => prev.filter(c => c.id !== conv.id)); }}
+                    className="w-5 h-5 flex items-center justify-center text-gray-400 dark:text-slate-500 hover:text-red-500"
+                  >
                     <i className="ri-delete-bin-line text-xs" />
                   </button>
                 )}

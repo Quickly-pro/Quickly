@@ -22,10 +22,10 @@ interface Employee {
   department?: string;
   phone: string;
   email: string;
-  photo: string;
-  joined: string;
-  hours_this_month: number;
-  routes_completed: number;
+  avatar_url: string;
+  joined?: string;
+  hours_this_month?: number;
+  routes_completed?: number;
   supervisor_id?: number | null;
 }
 
@@ -109,11 +109,12 @@ export default function Empleados() {
   const addEmployee = async () => {
     if (!newEmployee.name) return;
     const { error } = await supabase.from('employees').insert([{
-      ...newEmployee,
-      photo: 'https://readdy.ai/api/search-image?query=professional%20corporate%20employee%20headshot%20portrait%20neutral%20background%20warm%20lighting&width=200&height=200&seq=98&orientation=squarish',
-      joined: today,
-      hours_this_month: 0,
-      routes_completed: 0,
+      name: newEmployee.name,
+      role: newEmployee.role,
+      phone: newEmployee.phone,
+      email: newEmployee.email,
+      supervisor_id: newEmployee.supervisor_id,
+      avatar_url: 'https://readdy.ai/api/search-image?query=professional%20corporate%20employee%20headshot%20portrait%20neutral%20background%20warm%20lighting&width=200&height=200&seq=98&orientation=squarish',
     }]);
     if (!error) {
       setShowNewEmployee(false);
@@ -174,7 +175,7 @@ export default function Empleados() {
   const updateEmployeePhoto = async () => {
     if (!editPhotoFor || !photoPreview) return;
     setUploadingPhoto(true);
-    await supabase.from('employees').update({ photo: photoPreview }).eq('id', editPhotoFor.id);
+    await supabase.from('employees').update({ avatar_url: photoPreview }).eq('id', editPhotoFor.id);
     setUploadingPhoto(false);
     setEditPhotoFor(null);
     setPhotoPreview('');
@@ -246,7 +247,7 @@ export default function Empleados() {
       >
         <div className="flex items-center gap-2 mb-2">
           <ImageWithFallback
-            src={emp.photo}
+            src={emp.avatar_url}
             alt={emp.name}
             className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
             fallbackClassName="w-9 h-9 rounded-lg flex-shrink-0"
@@ -265,8 +266,8 @@ export default function Empleados() {
           </div>
         )}
         <div className="flex items-center gap-3 mt-1.5 text-[10px] text-gray-400 dark:text-slate-500">
-          <span><i className="ri-route-line mr-0.5" />{emp.routes_completed}</span>
-          <span><i className="ri-time-line mr-0.5" />{emp.hours_this_month}h</span>
+          <span><i className="ri-route-line mr-0.5" />{emp.routes_completed ?? 0}</span>
+          <span><i className="ri-time-line mr-0.5" />{emp.hours_this_month ?? 0}h</span>
         </div>
       </div>
     );
@@ -371,13 +372,13 @@ export default function Empleados() {
               <div className="flex items-center gap-3 mb-4">
                 <div className="relative">
                   <ImageWithFallback
-                    src={emp.photo}
+                    src={emp.avatar_url}
                     alt={emp.name}
                     className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
                     fallbackClassName="w-14 h-14 rounded-xl flex-shrink-0"
                   />
                   <button
-                    onClick={(e) => { e.stopPropagation(); setEditPhotoFor(emp); setPhotoPreview(emp.photo); }}
+                    onClick={(e) => { e.stopPropagation(); setEditPhotoFor(emp); setPhotoPreview(emp.avatar_url || ''); }}
                     className="absolute -bottom-1 -right-1 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center hover:bg-orange-600 shadow-sm"
                     title="Cambiar foto"
                   >
@@ -400,8 +401,8 @@ export default function Empleados() {
                 </div>
               </div>
               <div className="mt-4 pt-3 border-t border-gray-50 dark:border-slate-700 grid grid-cols-2 gap-2 text-xs">
-                <div><p className="text-gray-400 dark:text-slate-500">Horas mes</p><p className="font-medium text-gray-700 dark:text-slate-300">{emp.hours_this_month}h</p></div>
-                <div><p className="text-gray-400 dark:text-slate-500">Rutas</p><p className="font-medium text-gray-700 dark:text-slate-300">{emp.routes_completed}</p></div>
+                <div><p className="text-gray-400 dark:text-slate-500">Horas mes</p><p className="font-medium text-gray-700 dark:text-slate-300">{emp.hours_this_month ?? 0}h</p></div>
+                <div><p className="text-gray-400 dark:text-slate-500">Rutas</p><p className="font-medium text-gray-700 dark:text-slate-300">{emp.routes_completed ?? 0}</p></div>
               </div>
               <div className="mt-3 flex gap-2">
                 <button onClick={(e) => { e.stopPropagation(); setShowVideoFor(emp.name); }} className="flex-1 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center gap-1.5">
@@ -749,7 +750,7 @@ export default function Empleados() {
           <div className="space-y-5">
             <div className="flex items-center gap-4">
               <ImageWithFallback
-                src={selectedEmployee.photo}
+                src={selectedEmployee.avatar_url}
                 alt={selectedEmployee.name}
                 className="w-20 h-20 rounded-xl object-cover"
                 fallbackClassName="w-20 h-20 rounded-xl"
@@ -761,9 +762,9 @@ export default function Empleados() {
               </div>
             </div>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg"><span className="text-sm text-gray-600 dark:text-slate-300">Fecha de ingreso</span><span className="text-sm text-gray-800 dark:text-slate-100">{selectedEmployee.joined}</span></div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg"><span className="text-sm text-gray-600 dark:text-slate-300">Horas este mes</span><span className="text-sm font-medium text-gray-800 dark:text-slate-100">{selectedEmployee.hours_this_month}h</span></div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg"><span className="text-sm text-gray-600 dark:text-slate-300">Rutas completadas</span><span className="text-sm font-medium text-gray-800 dark:text-slate-100">{selectedEmployee.routes_completed}</span></div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg"><span className="text-sm text-gray-600 dark:text-slate-300">Fecha de ingreso</span><span className="text-sm text-gray-800 dark:text-slate-100">{selectedEmployee.joined || '-'}</span></div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg"><span className="text-sm text-gray-600 dark:text-slate-300">Horas este mes</span><span className="text-sm font-medium text-gray-800 dark:text-slate-100">{selectedEmployee.hours_this_month ?? 0}h</span></div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg"><span className="text-sm text-gray-600 dark:text-slate-300">Rutas completadas</span><span className="text-sm font-medium text-gray-800 dark:text-slate-100">{selectedEmployee.routes_completed ?? 0}</span></div>
             </div>
             <div className="flex gap-2">
               <a href={`tel:${selectedEmployee.phone}`} className="flex-1 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 flex items-center justify-center gap-2">
@@ -834,7 +835,7 @@ export default function Empleados() {
               <div className="w-28 h-28 rounded-xl bg-gray-100 dark:bg-slate-800 flex items-center justify-center">
                 {editPhotoFor && (
                   <ImageWithFallback
-                    src={editPhotoFor.photo}
+                    src={editPhotoFor.avatar_url}
                     alt={editPhotoFor.name}
                     className="w-28 h-28 rounded-xl object-cover opacity-40"
                     fallbackClassName="w-28 h-28 rounded-xl opacity-40"

@@ -96,8 +96,7 @@ export default function Calendario() {
         .select('*')
         .gte('date', start)
         .lte('date', end)
-        .order('date')
-        .order('time'),
+        .order('date'),
       supabase
         .from('vehicle_maintenance')
         .select('*')

@@ -29,7 +29,44 @@ export default function Email() {
   const composeRef = useRef<HTMLDivElement>(null);
   useClickOutside(composeRef, () => setShowCompose(false), showCompose);
 
-  const filteredEmails = emails.filter(e => e.folder === activeFolder);
+  const [emailList, setEmailList] = useState<Email[]>(emails);
+  const [composeTo, setComposeTo] = useState('');
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeBody, setComposeBody] = useState('');
+  const [composeSent, setComposeSent] = useState(false);
+
+  const filteredEmails = emailList.filter(e => e.folder === activeFolder);
+
+  const handleSendEmail = () => {
+    if (!composeTo || !composeSubject) return;
+    const newEmail: Email = {
+      id: Date.now(),
+      from: composeTo,
+      subject: composeSubject,
+      preview: composeBody,
+      date: new Date().toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }),
+      read: true,
+      folder: 'sent',
+    };
+    setEmailList(prev => [newEmail, ...prev]);
+    setComposeSent(true);
+    setTimeout(() => {
+      setShowCompose(false);
+      setComposeTo('');
+      setComposeSubject('');
+      setComposeBody('');
+      setComposeSent(false);
+    }, 1200);
+  };
+
+  const handleReply = () => {
+    if (!selectedEmail) return;
+    setShowEmailDetail(false);
+    setComposeTo(selectedEmail.from);
+    setComposeSubject(`Re: ${selectedEmail.subject}`);
+    setComposeBody('');
+    setShowCompose(true);
+  };
 
   return (
     <PremiumGate>
@@ -118,21 +155,47 @@ export default function Email() {
         <div className="space-y-4">
           <div>
             <label className="text-sm text-gray-600 block mb-1">Para</label>
-            <input type="email" placeholder="email@ejemplo.com" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-orange-300" />
+            <input
+              type="email"
+              placeholder="email@ejemplo.com"
+              value={composeTo}
+              onChange={(e) => setComposeTo(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-orange-300"
+            />
           </div>
           <div>
             <label className="text-sm text-gray-600 block mb-1">Asunto</label>
-            <input type="text" placeholder="Asunto del email..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-orange-300" />
+            <input
+              type="text"
+              placeholder="Asunto del email..."
+              value={composeSubject}
+              onChange={(e) => setComposeSubject(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-orange-300"
+            />
           </div>
           <div>
             <label className="text-sm text-gray-600 block mb-1">Mensaje</label>
-            <textarea className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-orange-300 resize-none" rows={8} placeholder="Escribe tu mensaje..." maxLength={500} />
+            <textarea
+              value={composeBody}
+              onChange={(e) => setComposeBody(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-orange-300 resize-none"
+              rows={8}
+              placeholder="Escribe tu mensaje..."
+              maxLength={500}
+            />
           </div>
+          {composeSent && (
+            <p className="text-sm text-green-600 flex items-center gap-1"><i className="ri-check-double-line" /> Email enviado correctamente</p>
+          )}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button onClick={() => setShowCompose(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-            <button className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 flex items-center gap-2">
+            <button
+              onClick={handleSendEmail}
+              disabled={!composeTo || !composeSubject || composeSent}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 flex items-center gap-2"
+            >
               <div className="w-4 h-4 flex items-center justify-center"><i className="ri-send-plane-line" /></div>
-              Enviar
+              {composeSent ? 'Enviado' : 'Enviar'}
             </button>
           </div>
         </div>
@@ -164,10 +227,15 @@ export default function Email() {
               >
                 Cerrar
               </button>
-              <button className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 flex items-center gap-2">
-                <i className="ri-reply-line" />
-                Responder
-              </button>
+              {selectedEmail.folder === 'inbox' && (
+                <button
+                  onClick={handleReply}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 flex items-center gap-2"
+                >
+                  <i className="ri-reply-line" />
+                  Responder
+                </button>
+              )}
             </div>
           </div>
         )}

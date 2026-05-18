@@ -15,6 +15,8 @@ export default function Rutas() {
   const [routeStops, setRouteStops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newRoute, setNewRoute] = useState({ name: '', driver: '', vehicle: '', start_time: '', estimated_end: '' });
+  const [addRouteError, setAddRouteError] = useState('');
+  const [addingRoute, setAddingRoute] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const updateStatusRef = useRef<HTMLDivElement>(null);
   const newRouteRef = useRef<HTMLDivElement>(null);
@@ -55,18 +57,41 @@ export default function Rutas() {
     return route.driver?.toLowerCase().includes(profile.full_name.toLowerCase());
   };
 
+  const optimizeOrder = async () => {
+    if (!selectedRoute) return;
+    const stops = getStopsForRoute(selectedRoute.id);
+    if (stops.length < 2) return;
+    // Sort stops alphabetically by address as a simple optimization
+    const sorted = [...stops].sort((a: any, b: any) =>
+      (a.address || a.client || '').localeCompare(b.address || b.client || '')
+    );
+    await Promise.all(
+      sorted.map((stop: any, idx: number) =>
+        supabase.from('route_stops').update({ order_num: idx + 1 }).eq('id', stop.id)
+      )
+    );
+    addNotification('Ruta optimizada', `Las paradas de "${selectedRoute.name}" han sido reordenadas`, 'route');
+    fetchRoutes();
+  };
+
   const addRoute = async () => {
-    if (!newRoute.name) return;
+    if (!newRoute.name) { setAddRouteError('El nombre de la ruta es obligatorio'); return; }
+    setAddingRoute(true);
+    setAddRouteError('');
     const { error } = await supabase.from('routes').insert([{
       ...newRoute,
       status: 'planificada',
       date: new Date().toISOString().split('T')[0],
     }]);
+    setAddingRoute(false);
     if (!error) {
       addNotification('Nueva ruta creada', `Se creó la ruta "${newRoute.name}" asignada a ${newRoute.driver}`, 'route');
       setShowNewRoute(false);
+      setAddRouteError('');
       setNewRoute({ name: '', driver: '', vehicle: '', start_time: '', estimated_end: '' });
       fetchRoutes();
+    } else {
+      setAddRouteError(error.message || 'Error al crear la ruta');
     }
   };
 
@@ -230,7 +255,10 @@ export default function Rutas() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-800 dark:text-slate-100">Paradas - {selectedRoute.name}</h3>
                 {isEmpresa && (
-                  <button className="text-xs text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1">
+                  <button
+                    onClick={optimizeOrder}
+                    className="text-xs text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1"
+                  >
                     <i className="ri-route-line" /> Optimizar orden
                   </button>
                 )}
@@ -345,11 +373,18 @@ export default function Rutas() {
               <input type="time" value={newRoute.estimated_end} onChange={e => setNewRoute({...newRoute, estimated_end: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-300" />
             </div>
           </div>
+          {addRouteError && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg">
+              <i className="ri-error-warning-line text-red-500 text-sm flex-shrink-0" />
+              <p className="text-xs text-red-600 dark:text-red-400">{addRouteError}</p>
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-700">
-            <button onClick={() => setShowNewRoute(false)} className="px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">
+            <button onClick={() => { setShowNewRoute(false); setAddRouteError(''); }} className="px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">
               Cancelar
             </button>
-            <button onClick={addRoute} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600">
+            <button onClick={addRoute} disabled={addingRoute} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 flex items-center gap-2">
+              {addingRoute && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               Crear Ruta
             </button>
           </div>

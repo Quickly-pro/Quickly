@@ -7,7 +7,7 @@ interface Employee {
   id: number;
   name: string;
   role: string;
-  photo?: string;
+  avatar_url?: string;
   hours_this_month: number;
 }
 
@@ -104,7 +104,7 @@ function shiftTypeToLabel(type: string): string {
 export default function Cuadrante() {
   const { isEmpresa } = useRole();
   const { profile } = useProfile();
-  const [viewMode] = useState<'weekly'>('weekly');
+  const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('weekly');
   const [weekOffset, setWeekOffset] = useState(0);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -385,12 +385,14 @@ export default function Cuadrante() {
           {/* View toggle */}
           <div className="flex rounded-lg bg-gray-100 dark:bg-slate-800 p-1">
             <button
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap bg-blue-500 text-white`}
+              onClick={() => setViewMode('weekly')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${viewMode === 'weekly' ? 'bg-blue-500 text-white' : 'text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200'}`}
             >
               Semanal
             </button>
             <button
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap text-gray-600 dark:text-slate-400`}
+              onClick={() => setViewMode('monthly')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${viewMode === 'monthly' ? 'bg-blue-500 text-white' : 'text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200'}`}
             >
               Mensual
             </button>
@@ -676,8 +678,25 @@ export default function Cuadrante() {
         </div>
       )}
 
+      {/* Monthly view placeholder */}
+      {viewMode === 'monthly' && (
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-12 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+            <i className="ri-calendar-2-line text-2xl text-blue-500" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-slate-100 mb-2">Vista mensual</h3>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">La vista mensual del cuadrante está disponible próximamente.</p>
+          <button
+            onClick={() => setViewMode('weekly')}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-all"
+          >
+            Volver a vista semanal
+          </button>
+        </div>
+      )}
+
       {/* Schedule grid */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
+      {viewMode === 'weekly' && <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-500 dark:text-slate-400">
             <div className="w-6 h-6 mx-auto mb-2 animate-spin border-2 border-gray-300 border-t-blue-500 rounded-full" />
@@ -717,8 +736,8 @@ export default function Cuadrante() {
                 <div key={emp.id} className="flex border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors">
                   {/* Employee info */}
                   <div className="w-52 h-14 border-r border-gray-200 dark:border-slate-700 flex items-center gap-3 px-4 flex-shrink-0">
-                    {emp.photo ? (
-                      <img src={emp.photo} alt={emp.name || ''} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                    {emp.avatar_url ? (
+                      <img src={emp.avatar_url} alt={emp.name || ''} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
                     ) : (
                       <div className="w-9 h-9 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
                         {(emp.name || '?').charAt(0).toUpperCase()}
@@ -800,7 +819,7 @@ export default function Cuadrante() {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Footer */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

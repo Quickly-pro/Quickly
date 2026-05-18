@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import Modal from '@/components/base/Modal';
 import { useTheme } from '@/hooks/useTheme';
+import { supabase } from '@/lib/supabase';
 
 export default function Configuracion() {
   const navigate = useNavigate();
@@ -54,10 +55,12 @@ export default function Configuracion() {
     }, 1500);
   };
 
-  const handlePasswordChange = () => {
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const handlePasswordChange = async () => {
     setPasswordError('');
     setPasswordSuccess(false);
-    if (!passwordForm.current || !passwordForm.new || !passwordForm.confirm) {
+    if (!passwordForm.new || !passwordForm.confirm) {
       setPasswordError('Todos los campos son obligatorios');
       return;
     }
@@ -67,6 +70,13 @@ export default function Configuracion() {
     }
     if (passwordForm.new !== passwordForm.confirm) {
       setPasswordError('Las contraseñas no coinciden');
+      return;
+    }
+    setChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: passwordForm.new });
+    setChangingPassword(false);
+    if (error) {
+      setPasswordError(error.message);
       return;
     }
     setPasswordSuccess(true);
@@ -392,10 +402,11 @@ export default function Configuracion() {
             </button>
             <button
               onClick={handlePasswordChange}
-              disabled={passwordSuccess}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 whitespace-nowrap"
+              disabled={passwordSuccess || changingPassword}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 whitespace-nowrap flex items-center gap-2"
             >
-              Guardar contrasena
+              {changingPassword && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {changingPassword ? 'Guardando...' : 'Guardar contrasena'}
             </button>
           </div>
         </div>

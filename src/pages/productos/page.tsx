@@ -35,6 +35,8 @@ export default function Productos() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
+  const [cartSubmitting, setCartSubmitting] = useState(false);
+  const [cartOrdered, setCartOrdered] = useState(false);
 
   // Admin state (hidden for cliente)
   const [showNewProduct, setShowNewProduct] = useState(false);
@@ -938,16 +940,37 @@ export default function Productos() {
                   <span className="font-bold text-orange-600">€{cartTotal.toFixed(2)}</span>
                 </div>
                 <button
-                  onClick={() => {
-                    // In real app this would create an order and redirect
-                    alert('Pedido enviado. Próximamente: integración con checkout de pedidos.');
-                    setCart([]);
-                    setShowCart(false);
+                  disabled={cartSubmitting}
+                  onClick={async () => {
+                    if (cartSubmitting || cart.length === 0) return;
+                    setCartSubmitting(true);
+                    const notes = cart.map(i => `${i.qty}x ${i.name} (€${i.price.toFixed(2)})`).join(', ');
+                    const { error } = await supabase.from('order_headers').insert({
+                      status: 'pending_payment',
+                      notes,
+                      total: cartTotal,
+                    });
+                    setCartSubmitting(false);
+                    if (!error) {
+                      addNotification('Pedido realizado', `Tu pedido de €${cartTotal.toFixed(2)} ha sido enviado`, 'route');
+                      setCartOrdered(true);
+                      setTimeout(() => {
+                        setCart([]);
+                        setShowCart(false);
+                        setCartOrdered(false);
+                        navigate('/pedidos');
+                      }, 1500);
+                    }
                   }}
-                  className="w-full py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-70 flex items-center justify-center gap-2"
                 >
-                  <i className="ri-check-line" />
-                  Confirmar pedido
+                  {cartSubmitting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : cartOrdered ? (
+                    <><i className="ri-check-double-line" /> ¡Pedido enviado!</>
+                  ) : (
+                    <><i className="ri-check-line" /> Confirmar pedido</>
+                  )}
                 </button>
               </div>
             </>

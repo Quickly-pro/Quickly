@@ -48,12 +48,22 @@ const rowBg = (idx: number) => {
   return palette[idx % palette.length];
 };
 
-export default function HojaPedidos() {
-  const { isEmpresa } = useRole();
-  const [rows, setRows] = useState<OrderRow[]>([
+const LS_KEY = 'hoja-pedidos-rows';
+
+function loadRows(): OrderRow[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) return JSON.parse(raw) as OrderRow[];
+  } catch { /* ignore */ }
+  return [
     ...sampleData,
     ...Array.from({ length: INITIAL_ROWS - sampleData.length }).map((_, i) => defaultRow(sampleData.length + i + 1)),
-  ]);
+  ];
+}
+
+export default function HojaPedidos() {
+  const { isEmpresa } = useRole();
+  const [rows, setRows] = useState<OrderRow[]>(loadRows);
   const [editingCell, setEditingCell] = useState<{ rowId: number; field: keyof OrderRow } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
@@ -85,6 +95,9 @@ export default function HojaPedidos() {
   };
 
   const handleSave = () => {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(rows));
+    } catch { /* ignore quota errors */ }
     setSavedMessage('Hoja de pedidos guardada correctamente');
     setTimeout(() => setSavedMessage(''), 3000);
   };

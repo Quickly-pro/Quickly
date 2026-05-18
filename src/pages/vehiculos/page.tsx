@@ -87,6 +87,8 @@ export default function Vehiculos() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetail, setShowDetail] = useState<MaintenanceRecord | null>(null);
   const [editModal, setEditModal] = useState<MaintenanceRecord | null>(null);
+  const [addError, setAddError] = useState('');
+  const [adding, setAdding] = useState(false);
 
   const [form, setForm] = useState({
     vehicle_name: '',
@@ -202,7 +204,10 @@ export default function Vehiculos() {
   });
 
   const handleAdd = async () => {
-    if (!form.vehicle_name || !form.scheduled_date) return;
+    if (!form.vehicle_name) { setAddError('El nombre del vehículo es obligatorio'); return; }
+    if (!form.scheduled_date) { setAddError('La fecha programada es obligatoria'); return; }
+    setAdding(true);
+    setAddError('');
     const { error } = await supabase.from('vehicle_maintenance').insert({
       vehicle_name: form.vehicle_name,
       maintenance_type: form.maintenance_type,
@@ -218,8 +223,10 @@ export default function Vehiculos() {
       recurrence_months: form.recurrence_months ? Number(form.recurrence_months) : null,
       alert_email: form.alert_email || null,
     });
+    setAdding(false);
     if (!error) {
       setShowAddModal(false);
+      setAddError('');
       setForm({
         vehicle_name: '', maintenance_type: 'cambio_aceite', description: '', scheduled_date: '',
         scheduled_km: '', current_km: '', cost_estimate: '', mechanic: '', notes: '',
@@ -227,6 +234,8 @@ export default function Vehiculos() {
       });
       fetchData();
       addNotification('Mantenimiento programado', `${form.vehicle_name}: ${maintenanceTypeConfig[form.maintenance_type]?.label || form.maintenance_type} para el ${form.scheduled_date}`, 'maintenance');
+    } else {
+      setAddError(error.message || 'Error al programar el mantenimiento');
     }
   };
 
@@ -865,13 +874,20 @@ export default function Vehiculos() {
               className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none resize-none"
             />
           </div>
+          {addError && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg">
+              <i className="ri-error-warning-line text-red-500 text-sm flex-shrink-0" />
+              <p className="text-xs text-red-600 dark:text-red-400">{addError}</p>
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-slate-700">
-            <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg">Cancelar</button>
+            <button onClick={() => { setShowAddModal(false); setAddError(''); }} className="px-4 py-2 text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg">Cancelar</button>
             <button
               onClick={handleAdd}
-              disabled={!form.vehicle_name || !form.scheduled_date}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50"
+              disabled={adding}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2"
             >
+              {adding && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               Programar
             </button>
           </div>
