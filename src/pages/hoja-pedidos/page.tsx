@@ -13,6 +13,7 @@ interface OrderRow {
   cant3: string;
   product4: string;
   cant4: string;
+  clientNote?: string;
 }
 
 const INITIAL_ROWS = 20;
@@ -68,10 +69,15 @@ export default function HojaPedidos() {
   const [editValue, setEditValue] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
 
+  // Note popover state
+  const [notePopover, setNotePopover] = useState<number | null>(null);
+  const [noteEdit, setNoteEdit] = useState('');
+  const [notePos, setNotePos] = useState({ top: 0, left: 0 });
+
   const handleCellClick = (row: OrderRow, field: keyof OrderRow) => {
     if (!isEmpresa) return;
     setEditingCell({ rowId: row.id, field });
-    setEditValue(String(row[field]));
+    setEditValue(String(row[field] ?? ''));
   };
 
   const handleCellSave = () => {
@@ -86,6 +92,37 @@ export default function HojaPedidos() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleCellSave();
     if (e.key === 'Escape') setEditingCell(null);
+  };
+
+  const handleNoteOpen = (e: React.MouseEvent<HTMLButtonElement>, row: OrderRow) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Clamp horizontally so popover doesn't go off screen
+    const popoverW = 288;
+    let left = rect.left;
+    if (left + popoverW > window.innerWidth - 12) {
+      left = window.innerWidth - popoverW - 12;
+    }
+    // Place below button, or above if not enough space below
+    const popoverH = 230;
+    let top = rect.bottom + 8;
+    if (top + popoverH > window.innerHeight - 12) {
+      top = rect.top - popoverH - 8;
+    }
+    setNotePos({ top, left });
+    setNotePopover(row.id);
+    setNoteEdit(row.clientNote || '');
+  };
+
+  const handleNoteSave = () => {
+    if (notePopover === null) return;
+    setRows(prev => prev.map(r => r.id === notePopover ? { ...r, clientNote: noteEdit } : r));
+    setNotePopover(null);
+  };
+
+  const handleNoteKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') setNotePopover(null);
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleNoteSave();
   };
 
   const addRows = () => {
@@ -123,6 +160,47 @@ export default function HojaPedidos() {
       ) : (
         <span className="truncate">{row[field] || ''}</span>
       )}
+    </div>
+  );
+
+  // Special render for the CLIENTE cell — includes the + note button
+  const renderClientCell = (row: OrderRow) => (
+    <div className="w-36 h-10 border-r border-gray-100 dark:border-slate-800 flex items-center px-2 gap-1 flex-shrink-0 group relative">
+      {/* Editable client name */}
+      <div
+        className={`flex-1 min-w-0 text-xs text-gray-600 dark:text-slate-300 ${isEmpresa ? 'cursor-text' : 'cursor-default select-none'}`}
+        onClick={() => handleCellClick(row, 'employee')}
+      >
+        {isEditing(row, 'employee') ? (
+          <input
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleCellSave}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            className="w-full bg-white dark:bg-slate-800 border border-orange-300 rounded px-1 py-0.5 text-xs outline-none"
+          />
+        ) : (
+          <span className="truncate block">{row.employee || ''}</span>
+        )}
+      </div>
+
+      {/* Note button */}
+      <button
+        onClick={(e) => handleNoteOpen(e, row)}
+        title={row.clientNote ? 'Ver / editar nota del cliente' : 'Añadir nota del cliente'}
+        className={`flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold transition-all duration-150
+          ${row.clientNote
+            ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-500 dark:text-orange-400 opacity-100'
+            : 'opacity-0 group-hover:opacity-100 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:text-orange-500 dark:hover:text-orange-400'
+          }`}
+      >
+        {row.clientNote
+          ? <i className="ri-sticky-note-line text-[10px]" />
+          : <span className="text-[11px] leading-none">+</span>
+        }
+      </button>
     </div>
   );
 
@@ -170,7 +248,7 @@ export default function HojaPedidos() {
         </div>
       )}
 
-      {/* Read-only banner for empleado */}
+      {/* Read-only banner */}
       {!isEmpresa && (
         <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-700 dark:text-amber-400">
           <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
@@ -220,7 +298,7 @@ export default function HojaPedidos() {
                 <div className="w-10 h-10 bg-gray-50 dark:bg-slate-800/30 border-r border-gray-200 dark:border-slate-700 flex items-center justify-center text-xs text-gray-400 dark:text-slate-500 flex-shrink-0">
                   {idx + 2}
                 </div>
-                {renderCell(row, 'employee')}
+                {renderClientCell(row)}
                 {renderCell(row, 'date')}
                 {renderCell(row, 'product1')}
                 {renderCell(row, 'cant1')}
@@ -239,8 +317,97 @@ export default function HojaPedidos() {
         <div className="w-4 h-4 flex items-center justify-center">
           <i className="ri-information-line" />
         </div>
-        {isEmpresa ? 'Haz clic en cualquier celda para editarla. Pulsa Enter para guardar.' : 'Solo consulta. Sin edición disponible para tu rol.'}
+        {isEmpresa
+          ? 'Haz clic en cualquier celda para editarla. Pasa el ratón por un cliente y pulsa + para añadir notas.'
+          : 'Solo consulta. Sin edición disponible para tu rol.'}
       </div>
+
+      {/* Note popover — fixed overlay */}
+      {notePopover !== null && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setNotePopover(null)}
+          />
+          {/* Popover */}
+          <div
+            className="fixed z-50 w-72 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-2xl p-4"
+            style={{ top: notePos.top, left: notePos.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-orange-100 dark:bg-orange-900/40 rounded-lg flex items-center justify-center">
+                  <i className="ri-sticky-note-line text-orange-500 dark:text-orange-400 text-sm" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 leading-tight">Nota del cliente</p>
+                  {rows.find(r => r.id === notePopover)?.employee && (
+                    <p className="text-[11px] text-gray-400 dark:text-slate-500 leading-tight">
+                      {rows.find(r => r.id === notePopover)?.employee}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setNotePopover(null)}
+                className="w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <i className="ri-close-line text-sm" />
+              </button>
+            </div>
+
+            {/* Textarea */}
+            <textarea
+              value={noteEdit}
+              onChange={(e) => setNoteEdit(e.target.value)}
+              onKeyDown={handleNoteKeyDown}
+              placeholder="Ej: Sin gluten, bien maduro, entregar antes de las 10h, dejar en portería..."
+              rows={4}
+              autoFocus
+              className="w-full text-xs border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2.5 bg-gray-50 dark:bg-slate-700/50 text-gray-700 dark:text-slate-300 placeholder-gray-400 dark:placeholder-slate-500 resize-none focus:outline-none focus:border-orange-400 dark:focus:border-orange-500 transition-colors"
+            />
+
+            <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1.5 mb-3">
+              Ctrl+Enter para guardar · Esc para cerrar
+            </p>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between">
+              {/* Delete note if exists */}
+              {rows.find(r => r.id === notePopover)?.clientNote && (
+                <button
+                  onClick={() => {
+                    setRows(prev => prev.map(r => r.id === notePopover ? { ...r, clientNote: '' } : r));
+                    setNotePopover(null);
+                  }}
+                  className="text-[11px] text-red-400 hover:text-red-600 dark:hover:text-red-400 transition-colors flex items-center gap-1"
+                >
+                  <i className="ri-delete-bin-line text-xs" />
+                  Eliminar nota
+                </button>
+              )}
+              <div className="flex gap-2 ml-auto">
+                <button
+                  onClick={() => setNotePopover(null)}
+                  className="px-3 py-1.5 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleNoteSave}
+                  className="px-4 py-1.5 text-xs bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors flex items-center gap-1.5"
+                >
+                  <i className="ri-check-line text-xs" />
+                  Guardar nota
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
