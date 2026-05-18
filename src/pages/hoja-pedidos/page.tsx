@@ -204,7 +204,7 @@ export default function HojaPedidos() {
               <div className="w-10 h-10 bg-gray-50 dark:bg-slate-800/50 border-r border-gray-200 dark:border-slate-700 flex items-center justify-center text-xs font-medium text-gray-500 dark:text-slate-400 flex-shrink-0">
                 1
               </div>
-              {['EMPLEADO', 'FECHA', 'PRODUCTO 1', 'CANT. 1', 'PRODUCTO 2', 'CANT. 2', 'PRODUCTO 3', 'CANT. 3', 'PRODUCTO 4'].map((header) => (
+              {['CLIENTE', 'FECHA', 'PRODUCTO 1', 'CANT. 1', 'PRODUCTO 2', 'CANT. 2', 'PRODUCTO 3', 'CANT. 3', 'PRODUCTO 4'].map((header) => (
                 <div
                   key={header}
                   className="w-36 h-10 border-r border-gray-200 dark:border-slate-700 flex items-center px-3 text-xs font-bold text-gray-700 dark:text-slate-200 flex-shrink-0"
