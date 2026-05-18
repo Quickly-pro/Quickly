@@ -182,7 +182,7 @@ export default function Facturacion() {
     setShowNewInvoice(true);
   };
 
-  const createInvoice = async () => {
+  const createInvoice = async (sendEmail = false) => {
     setInvoiceFormError('');
     if (!invoiceClient) { setInvoiceFormError('Selecciona un cliente'); return; }
     if (!invoiceDate) { setInvoiceFormError('Indica la fecha de emisión'); return; }
@@ -190,7 +190,7 @@ export default function Facturacion() {
     if (lines.length === 0 || lines.every(l => !l.product.trim())) { setInvoiceFormError('Añade al menos una línea de producto'); return; }
     setCreatingInvoice(true);
     const invNum = `F-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(3, '0')}`;
-    const { data, error } = await supabase.from('invoices').insert([{
+    const invoicePayload = {
       invoice_number: invNum,
       client: invoiceClient,
       date: invoiceDate,
@@ -201,18 +201,40 @@ export default function Facturacion() {
       status: 'pendiente',
       payment_method: invoicePaymentMethod,
       notes: invoiceNotes || null,
-    }]).select();
+    };
+    const { data, error } = await supabase.from('invoices').insert([invoicePayload]).select();
     if (!error && data) {
       const invoiceId = data[0].id;
-      await supabase.from('invoice_items').insert(lines.map(l => ({
+      const itemsPayload = lines.map(l => ({
         invoice_id: invoiceId,
         product: l.product || 'Producto',
         description: l.description || '',
         qty: l.qty,
         price: l.unitPrice,
         total: l.qty * l.unitPrice * (1 - l.discount / 100),
-      })));
-      addNotification('Nueva factura creada', `Factura ${invNum} para ${invoiceClient} - €${total.toFixed(2)}`, 'invoice');
+      }));
+      await supabase.from('invoice_items').insert(itemsPayload);
+
+      // Send email if requested
+      if (sendEmail) {
+        const clientEmail = clients.find(c => c.name === invoiceClient)?.email;
+        if (clientEmail) {
+          await supabase.functions.invoke('send-invoice-email', {
+            body: {
+              invoice: { ...invoicePayload, id: invoiceId },
+              items: itemsPayload,
+              toEmail: clientEmail,
+              companyName: 'Quickly',
+            },
+          });
+          addNotification('Factura enviada por email', `Factura ${invNum} enviada a ${clientEmail}`, 'invoice');
+        } else {
+          addNotification('Factura creada', `${invNum} creada pero el cliente no tiene email registrado`, 'invoice');
+        }
+      } else {
+        addNotification('Nueva factura creada', `Factura ${invNum} para ${invoiceClient} - €${total.toFixed(2)}`, 'invoice');
+      }
+
       setShowNewInvoice(false);
       setInvoiceFormError('');
       setCreatingInvoice(false);
@@ -785,7 +807,14 @@ export default function Facturacion() {
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
               <button onClick={() => { setShowNewInvoice(false); setInvoiceFormError(''); }} disabled={creatingInvoice} className="px-5 py-2.5 border border-slate-600 rounded-lg text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-40">Cancelar</button>
-              <button onClick={createInvoice} disabled={creatingInvoice} className="px-5 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+              <button onClick={() => createInvoice(true)} disabled={creatingInvoice} className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+                {creatingInvoice ? (
+                  <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Enviando...</>
+                ) : (
+                  <><i className="ri-mail-send-line" />Crear y Enviar Email</>
+                )}
+              </button>
+              <button onClick={() => createInvoice(false)} disabled={creatingInvoice} className="px-5 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
                 {creatingInvoice ? (
                   <>
                     <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
