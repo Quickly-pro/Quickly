@@ -36,6 +36,8 @@ export default function Clientes() {
   const [newClient, setNewClient] = useState({
     name: '', contact: '', phone: '', email: '', address: '', status: 'activo', notes: ''
   });
+  const [saveClientError, setSaveClientError] = useState<string | null>(null);
+  const [savingClient, setSavingClient] = useState(false);
 
   // Photo upload state for new client
   const [clientPhoto, setClientPhoto] = useState<string | null>(null);
@@ -89,18 +91,29 @@ export default function Clientes() {
   };
 
   const addClient = async () => {
-    if (!newClient.name) return;
-    const avatarUrl = clientPhoto || 'https://readdy.ai/api/search-image?query=modern%20business%20storefront%20professional%20signage%20clean%20urban%20background%20minimalist&width=200&height=200&seq=99&orientation=squarish';
+    if (!newClient.name) { setSaveClientError('El nombre del negocio es obligatorio'); return; }
+    setSavingClient(true);
+    setSaveClientError(null);
     const { error } = await supabase.from('clients').insert([{
-      ...newClient,
-      avatar: avatarUrl,
+      name: newClient.name,
+      contact: newClient.contact || null,
+      phone: newClient.phone || null,
+      email: newClient.email || null,
+      address: newClient.address || null,
+      status: newClient.status || 'activo',
+      notes: newClient.notes || null,
+      avatar_url: clientPhoto || null,
       total_spent: 0,
     }]);
+    setSavingClient(false);
     if (!error) {
       setShowNewClient(false);
+      setSaveClientError(null);
       setNewClient({ name: '', contact: '', phone: '', email: '', address: '', status: 'activo', notes: '' });
       clearPhoto();
       fetchClients();
+    } else {
+      setSaveClientError(error.message || 'Error al guardar el cliente');
     }
   };
 
@@ -722,12 +735,18 @@ export default function Clientes() {
             <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Notas</label>
             <textarea placeholder="Notas adicionales..." value={newClient.notes} onChange={e => setNewClient({...newClient, notes: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-300 resize-none" rows={2} maxLength={500} />
           </div>
+          {saveClientError && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg">
+              <i className="ri-error-warning-line text-red-500 text-sm flex-shrink-0" />
+              <p className="text-xs text-red-600 dark:text-red-400">{saveClientError}</p>
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-700">
-            <button onClick={() => setShowNewClient(false)} className="px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">
+            <button onClick={() => { setShowNewClient(false); setSaveClientError(null); }} className="px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">
               Cancelar
             </button>
-            <button onClick={addClient} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600">
-              Guardar Cliente
+            <button onClick={addClient} disabled={savingClient} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">
+              {savingClient ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</> : 'Guardar Cliente'}
             </button>
           </div>
         </div>
