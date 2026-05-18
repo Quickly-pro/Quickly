@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import Modal from '@/components/base/Modal';
-import { supabase } from '@/lib/supabase';
 
 interface Email {
   id: number;
@@ -55,12 +54,22 @@ export default function Email() {
     } catch { /* ignorar */ }
 
     try {
-      const { data, error } = await supabase.functions.invoke('send-compose-email', {
-        body: { to: composeTo, subject: composeSubject, body: composeBody, companyName },
+      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+      const supabaseKey = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-compose-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ to: composeTo, subject: composeSubject, body: composeBody, companyName }),
       });
 
-      if (error || !data?.success) {
-        const msg = data?.error || error?.message || 'Error al enviar el email';
+      const data = await res.json();
+
+      if (!res.ok || !data?.success) {
+        const msg = data?.error || 'Error al enviar el email';
         setComposeError(msg);
         setComposeSending(false);
         return;
@@ -88,7 +97,7 @@ export default function Email() {
         setComposeError(null);
       }, 1500);
     } catch (err: any) {
-      setComposeError(err.message || 'Error inesperado');
+      setComposeError(err.message || 'Error inesperado al conectar con el servidor');
       setComposeSending(false);
     }
   };
