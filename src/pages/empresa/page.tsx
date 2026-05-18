@@ -12,27 +12,27 @@ const colorOptions = [
 const PRESET_LOGOS = [
   {
     name: 'Mundopan',
-    url: 'https://pbs.twimg.com/profile_images/884756751817531392/JXXv9eVo_400x400.jpg',
-    bg: '#f5f0cc',
+    url: '/logos/mundopan.svg',
+    bg: '#ffffff',
   },
   {
     name: 'KFC',
-    url: 'https://upload.wikimedia.org/wikipedia/en/thumb/b/bf/KFC_logo.svg/200px-KFC_logo.svg.png',
-    bg: '#c8102e',
+    url: '/logos/kfc.svg',
+    bg: '#C8102E',
   },
   {
     name: 'Coca-Cola',
-    url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/400px-Coca-Cola_logo.svg.png',
-    bg: '#f40009',
+    url: '/logos/cocacola.svg',
+    bg: '#F40009',
   },
   {
     name: 'Burger King',
-    url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Burger_King_logo_%281999%29.svg/200px-Burger_King_logo_%281999%29.svg.png',
+    url: '/logos/burgerking.svg',
     bg: '#ffffff',
   },
   {
     name: "McDonald's",
-    url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/McDonald%27s_logo.svg/200px-McDonald%27s_logo.svg.png',
+    url: '/logos/mcdonalds.svg',
     bg: '#DA291C',
   },
 ];

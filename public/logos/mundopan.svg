@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- White background -->
+  <rect width="200" height="200" fill="white" rx="16"/>
+  <!-- Yellow wave shape (background) -->
+  <ellipse cx="100" cy="130" rx="88" ry="42" fill="#E8C800"/>
+  <!-- Black yin-yang / penguin shape -->
+  <circle cx="100" cy="82" r="62" fill="#1a1a1a"/>
+  <!-- White inner half-circle (yin-yang style) -->
+  <path d="M100,20 A62,62 0 0,1 100,144 A31,31 0 0,0 100,82 A31,31 0 0,1 100,20" fill="white"/>
+  <!-- Small eye -->
+  <circle cx="100" cy="55" r="7" fill="#1a1a1a"/>
+  <circle cx="103" cy="53" r="2.5" fill="white"/>
+  <!-- Mundopan text on yellow band -->
+  <text x="100" y="138" font-family="Georgia,'Times New Roman',serif" font-size="18" font-weight="bold" font-style="italic" fill="#1a1a1a" text-anchor="middle">Mundopan</text>
+  <!-- Tagline -->
+  <text x="100" y="168" font-family="Arial,sans-serif" font-size="10" fill="#1a1a1a" text-anchor="middle">a domicilio</text>
+  <text x="100" y="183" font-family="Arial,sans-serif" font-size="9" fill="#444" text-anchor="middle">Para gente con miga</text>
+</svg>

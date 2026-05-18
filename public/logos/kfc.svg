@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 200">
+  <!-- Red background -->
+  <rect width="220" height="200" fill="#C8102E" rx="16"/>
+  <!-- Colonel silhouette hint (simplified oval head + collar) -->
+  <ellipse cx="110" cy="58" rx="28" ry="30" fill="#F5E6C8"/>
+  <rect x="82" y="82" width="56" height="40" fill="#F5E6C8" rx="4"/>
+  <!-- Black tie/bow -->
+  <polygon points="102,88 118,88 112,100 108,100" fill="#1a1a1a"/>
+  <ellipse cx="110" cy="100" rx="6" ry="4" fill="#1a1a1a"/>
+  <!-- Red body hint -->
+  <rect x="85" y="105" width="50" height="20" fill="#C8102E"/>
+  <!-- KFC text -->
+  <text x="110" y="168" font-family="'Arial Black',Impact,sans-serif" font-size="52" font-weight="900" fill="white" text-anchor="middle" letter-spacing="2">KFC</text>
+</svg>

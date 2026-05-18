@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Red background -->
+  <rect width="200" height="200" fill="#DA291C" rx="16"/>
+  <!-- Golden Arches — two parabolic arches forming an M -->
+  <!-- Left arch -->
+  <path d="M28,165 L28,80 Q28,30 68,30 Q98,30 98,80 L98,165"
+        fill="none" stroke="#FFC72C" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Right arch -->
+  <path d="M102,165 L102,80 Q102,30 132,30 Q172,30 172,80 L172,165"
+        fill="none" stroke="#FFC72C" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- McDonald's text -->
+  <text x="100" y="190" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="white" text-anchor="middle">McDonald's</text>
+</svg>
