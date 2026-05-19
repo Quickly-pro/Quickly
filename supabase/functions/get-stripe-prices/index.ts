@@ -31,11 +31,20 @@ serve(async (req) => {
       if (!product) return null;
 
       const lookupKey = price.lookup_key || "";
+      const productName = (price.product as any)?.name?.toLowerCase() || "";
+      const unitAmount = price.unit_amount || 0; // en céntimos
       let plan = "premium";
       let period = "monthly";
 
+      // 1º: usar lookup_key si está configurado
       if (lookupKey.includes("enterprise")) plan = "enterprise";
       else if (lookupKey.includes("premium")) plan = "premium";
+      // 2º: usar nombre del producto
+      else if (productName.includes("enterprise")) plan = "enterprise";
+      else if (productName.includes("premium")) plan = "premium";
+      // 3º: usar precio como heurística (>= 4000 céntimos = enterprise)
+      else if (unitAmount >= 4000) plan = "enterprise";
+      else plan = "premium";
 
       if (lookupKey.includes("annual")) period = "annual";
       else if (lookupKey.includes("monthly")) period = "monthly";
