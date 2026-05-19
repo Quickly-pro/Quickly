@@ -119,6 +119,7 @@ export default function UpgradePremium() {
     ];
 
     return basePlans.map((plan) => {
+      const priceObj = getPrice(plan.id, annual);
       const periodKey = annual ? 'annual' : 'monthly';
       // Siempre usar precios hardcodeados para display
       const amount = displayPrices[plan.id]?.[periodKey] || 0;
@@ -126,9 +127,9 @@ export default function UpgradePremium() {
       const yearAmount = displayPrices[plan.id]?.annual ?? 0;
       const hasDiscount = monthAmount > 0 && yearAmount > 0 && yearAmount < monthAmount * 12;
 
-      // SIEMPRE usar los price IDs hardcodeados — no confiar en get-stripe-prices
-      // (la función puede mezclar plans si los precios de Stripe no tienen lookup_key)
-      const priceId = FALLBACK_PRICE_IDS[plan.id]?.[periodKey];
+      // Usar price ID de la API (ya corregida para mapear por nombre de producto)
+      // con fallback al hardcodeado si la API no responde
+      const priceId = priceObj?.id || FALLBACK_PRICE_IDS[plan.id]?.[periodKey];
 
       return {
         ...plan,
