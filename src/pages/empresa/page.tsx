@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { useCompany } from '@/hooks/useCompany';
+import { useRole } from '@/hooks/useRole';
 import Modal from '@/components/base/Modal';
 import ImageWithFallback from '@/components/base/ImageWithFallback';
 
@@ -46,6 +47,7 @@ const PRESET_LOGOS = [
 
 export default function Empresa() {
   const { data: company, update } = useCompany();
+  const { isCliente } = useRole();
   const [showEdit, setShowEdit] = useState(false);
   const editModalRef = useRef<HTMLDivElement>(null);
   useClickOutside(editModalRef, () => setShowEdit(false), showEdit);
@@ -121,18 +123,24 @@ export default function Empresa() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Información de la Empresa</h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Datos y configuración de la empresa</p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">
+            {isCliente ? 'Mi Proveedor' : 'Información de la Empresa'}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+            {isCliente ? 'Datos de contacto de tu empresa proveedora' : 'Datos y configuración de la empresa'}
+          </p>
         </div>
-        <button
-          onClick={openEdit}
-          className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-all flex items-center gap-2 whitespace-nowrap"
-        >
-          <div className="w-4 h-4 flex items-center justify-center">
-            <i className="ri-pencil-line" />
-          </div>
-          Editar
-        </button>
+        {!isCliente && (
+          <button
+            onClick={openEdit}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-all flex items-center gap-2 whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center">
+              <i className="ri-pencil-line" />
+            </div>
+            Editar
+          </button>
+        )}
       </div>
 
       {/* Company Card */}
@@ -149,6 +157,7 @@ export default function Empresa() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
             <div className="space-y-3">
+              {!isCliente && (
               <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
                 <div className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-700 rounded-lg flex-shrink-0">
                   <i className="ri-building-line text-gray-500 dark:text-slate-400" />
@@ -158,6 +167,7 @@ export default function Empresa() {
                   <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{company.cif}</p>
                 </div>
               </div>
+              )}
               <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
                 <div className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-700 rounded-lg flex-shrink-0">
                   <i className="ri-map-pin-line text-gray-500 dark:text-slate-400" />
@@ -212,8 +222,8 @@ export default function Empresa() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Stats — solo empresa */}
+      {!isCliente && <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-gray-100 dark:border-slate-700">
           <div className="w-10 h-10 rounded-lg bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center mb-3">
             <i className="ri-team-line text-orange-600 text-lg" />
@@ -242,7 +252,7 @@ export default function Empresa() {
           <div className="w-6 h-6 rounded-full mb-1" style={{ backgroundColor: company.brandColor }} />
           <p className="text-sm text-gray-500 dark:text-slate-400">Color de marca</p>
         </div>
-      </div>
+      </div>}
 
       {/* Edit Modal */}
       <Modal

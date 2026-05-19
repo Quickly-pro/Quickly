@@ -74,6 +74,7 @@ export const ROUTE_PERMISSIONS: Record<UserRole, string[]> = {
     '/productos',
     '/pedidos',
     '/facturacion',
+    '/empresa',
     '/comunicacion',
     '/notificaciones',
     '/perfil',
@@ -165,6 +166,8 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   { path: '/productos',      label: 'Productos',           icon: 'ri-box-3-line',             section: 'MIS PEDIDOS',         roles: ['cliente'] },
   { path: '/pedidos',        label: 'Mis Pedidos',         icon: 'ri-shopping-cart-2-line',   section: 'MIS PEDIDOS',         roles: ['cliente'] },
   { path: '/facturacion',    label: 'Mis Facturas',        icon: 'ri-bill-line',              section: 'MIS PEDIDOS',         roles: ['cliente'] },
+
+  { path: '/empresa',        label: 'Mi Proveedor',        icon: 'ri-building-2-line',        section: 'EMPRESA',             roles: ['cliente'] },
 
   { path: '/comunicacion',   label: 'Chat',                icon: 'ri-chat-3-line',            section: 'COMUNICACIÓN',        roles: ['cliente'] },
   { path: '/notificaciones', label: 'Notificaciones',      icon: 'ri-notification-3-line',    section: 'COMUNICACIÓN',        roles: ['cliente'] },
