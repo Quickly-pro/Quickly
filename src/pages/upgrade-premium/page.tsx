@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
 import { usePremium } from '@/hooks/usePremium';
 
 interface StripePrice {
@@ -55,13 +54,14 @@ export default function UpgradePremium() {
     const fetchPrices = async () => {
       setPricesLoading(true);
       try {
-        const { data, error } = await supabase.functions.invoke('get-stripe-prices', { body: {} });
-        if (!error && data?.prices) {
+        const res = await fetch(
+          'https://irbilfifptefmpudwxee.supabase.co/functions/v1/get-stripe-prices',
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+        );
+        const data = await res.json();
+        if (res.ok && data?.prices) {
           setPrices(data.prices);
         }
-        // Si la edge function no está desplegada o Stripe no está configurado,
-        // simplemente no rellenamos prices y los planes muestran los precios
-        // hardcodeados. No mostramos error al usuario.
       } catch {
         // silencioso — usamos precios hardcodeados como fallback
       } finally {
@@ -151,27 +151,27 @@ export default function UpgradePremium() {
 
       const verify = async () => {
         try {
-          const { data, error } = await supabase.functions.invoke(
-            'verify-stripe-subscription',
-            { body: { sessionId } }
+          const res = await fetch(
+            'https://irbilfifptefmpudwxee.supabase.co/functions/v1/verify-stripe-subscription',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId }),
+            }
           );
+          const data = await res.json();
 
-          if (error || !data?.success) {
+          if (!res.ok || !data?.success) {
             setErrorMsg(
-              error?.message ||
-                data?.error ||
+              data?.error ||
                 'No se pudo verificar el pago. Contacta con soporte si crees que fue cobrado.'
             );
           } else {
-            setSuccessMsg(
-              'Pago completado correctamente! Tu suscripción está activa.'
-            );
+            setSuccessMsg('Pago completado correctamente! Tu suscripción está activa.');
             refetch?.();
           }
         } catch (err: any) {
-          setErrorMsg(
-            err.message || 'Error verificando el pago. Intenta recargar la página.'
-          );
+          setErrorMsg(err.message || 'Error verificando el pago. Intenta recargar la página.');
         }
       };
 
@@ -192,18 +192,23 @@ export default function UpgradePremium() {
     setSuccessMsg(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
-        body: {
-          plan: planId,
-          annual,
-          userId: user.id,
-          email: user.email,
-          priceId,
-        },
-      });
+      const res = await fetch(
+        'https://irbilfifptefmpudwxee.supabase.co/functions/v1/create-stripe-checkout',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            plan: planId,
+            annual,
+            userId: user.id,
+            email: user.email,
+          }),
+        }
+      );
+      const data = await res.json();
 
-      if (error || !data?.url) {
-        throw new Error(error?.message || 'No se pudo crear la sesión de pago');
+      if (!res.ok || !data?.url) {
+        throw new Error(data?.error || 'No se pudo crear la sesión de pago');
       }
 
       window.location.href = data.url;
