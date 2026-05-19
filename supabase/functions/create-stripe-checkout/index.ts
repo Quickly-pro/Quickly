@@ -12,10 +12,10 @@ const corsHeaders = {
 
 // Hardcoded Stripe Price IDs — verified manually from Stripe dashboard
 const PRICE_MAP: Record<string, string> = {
-  premium_monthly:    "price_1TVAN7Ps4Jcmx8yrRzGWR1hI",
-  premium_annual:     "price_1TXTKTPs4Jcmx8yrsBco7NXH",
-  enterprise_monthly: "price_1TXwAUPs4Jcmx8yrtMbKq5D8",
-  enterprise_annual:  "price_1TXwBLPs4Jcmx8yrfV4uzGAh",
+  premium_monthly:    "price_1TYoltPs4Jcmx8yryUNE0Y6G",
+  premium_annual:     "price_1TYonlPs4Jcmx8yrEFH1W1i1",
+  enterprise_monthly: "price_1TYooHPs4Jcmx8yr2Z0D4OQP",
+  enterprise_annual:  "price_1TYooqPs4Jcmx8yr4KSRoBBM",
 };
 
 serve(async (req) => {

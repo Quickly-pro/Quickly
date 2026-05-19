@@ -88,12 +88,12 @@ export default function UpgradePremium() {
   // Si más adelante despliegas la edge function `get-stripe-prices`, estos se usan solo como fallback.
   const FALLBACK_PRICE_IDS: Record<string, Record<string, string | undefined>> = {
     premium: {
-      monthly: 'price_1TVAN7Ps4Jcmx8yrRzGWR1hI',
-      annual: 'price_1TXTKTPs4Jcmx8yrsBco7NXH',
+      monthly: 'price_1TYoltPs4Jcmx8yryUNE0Y6G',
+      annual:  'price_1TYonlPs4Jcmx8yrEFH1W1i1',
     },
     enterprise: {
-      monthly: 'price_1TXwAUPs4Jcmx8yrtMbKq5D8',
-      annual: 'price_1TXwBLPs4Jcmx8yrfV4uzGAh',
+      monthly: 'price_1TYooHPs4Jcmx8yr2Z0D4OQP',
+      annual:  'price_1TYooqPs4Jcmx8yr4KSRoBBM',
     },
   };
 
