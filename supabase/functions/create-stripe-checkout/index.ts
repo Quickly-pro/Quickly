@@ -4,46 +4,82 @@ import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 const STRIPE_SECRET = Deno.env.get("STRIPE_SECRET_KEY") || "";
 const stripe = new Stripe(STRIPE_SECRET, { apiVersion: "2023-10-16", httpClient: Stripe.createFetchHttpClient() });
 
-const PRICE_MAP: Record<string, string> = {
-  premium_monthly: Deno.env.get("STRIPE_PRICE_PREMIUM_MONTHLY") || "",
-  premium_annual: Deno.env.get("STRIPE_PRICE_PREMIUM_ANNUAL") || "",
-  enterprise_monthly: Deno.env.get("STRIPE_PRICE_ENTERPRISE_MONTHLY") || "",
-  enterprise_annual: Deno.env.get("STRIPE_PRICE_ENTERPRISE_ANNUAL") || "",
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
 };
+
+// Lookup price from Stripe by matching product name — this is the source of truth.
+// We ignore any priceId passed by the frontend to avoid stale/wrong IDs.
+async function findPriceId(plan: string, annual: boolean): Promise<string | null> {
+  try {
+    const prices = await stripe.prices.list({
+      active: true,
+      type: "recurring",
+      expand: ["data.product"],
+      limit: 50,
+    });
+
+    const interval = annual ? "year" : "month";
+
+    // Filter prices whose product name clearly matches the requested plan.
+    // We prefer products whose name starts with "quickly" to skip old/test products.
+    const candidates = prices.data.filter((price: any) => {
+      const product = price.product as any;
+      if (!product || product.deleted) return false;
+      const name = (product.name || "").toLowerCase();
+      const priceInterval = price.recurring?.interval;
+      if (priceInterval !== interval) return false;
+
+      if (plan === "enterprise") {
+        return name.includes("enterprise");
+      } else {
+        // premium: must include "premium" but NOT "enterprise"
+        return name.includes("premium") && !name.includes("enterprise");
+      }
+    });
+
+    if (candidates.length === 0) return null;
+
+    // Prefer products whose name starts with "quickly" (the current products)
+    const preferred = candidates.find((price: any) => {
+      const name = ((price.product as any)?.name || "").toLowerCase();
+      return name.startsWith("quickly");
+    });
+
+    return (preferred || candidates[0]).id;
+  } catch {
+    return null;
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
-      },
-    });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
     const body = await req.json();
-    const { plan, annual, userId, email, priceId: directPriceId } = body;
+    const { plan, annual, userId, email } = body;
 
     if (!plan || !userId) {
-      return new Response(JSON.stringify({ error: "Missing plan or userId" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Missing plan or userId" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
 
-    let priceId = directPriceId;
-    if (!priceId) {
-      const key = `${plan}_${annual ? "annual" : "monthly"}`;
-      priceId = PRICE_MAP[key];
-    }
+    // Always resolve price server-side — never trust the client-supplied priceId
+    const priceId = await findPriceId(plan, !!annual);
 
     if (!priceId) {
       const period = annual ? "anual" : "mensual";
       return new Response(
         JSON.stringify({
-          error: `El precio ${period} de ${plan} no está configurado. Añade la variable STRIPE_PRICE_${plan.toUpperCase()}_${annual ? "ANNUAL" : "MONTHLY"} en los secrets de Supabase.`,
+          error: `No se encontró el precio ${period} del plan ${plan} en Stripe. Verifica que el producto esté activo.`,
         }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
@@ -71,18 +107,12 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ url: session.url, sessionId: session.id }), {
       status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
 });
