@@ -10,50 +10,33 @@ serve(async (req) => {
       status: 204,
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
       },
     });
   }
 
   try {
-    // Search for active prices that are recurring (subscription mode)
     const prices = await stripe.prices.list({
       active: true,
       type: "recurring",
       expand: ["data.product"],
-      limit: 10,
+      limit: 20,
     });
 
-    const products: Record<string, any> = {};
     const formatted = prices.data.map((price: any) => {
       const product = price.product as any;
-      if (!product) return null;
+      if (!product || product.deleted) return null;
 
-      const lookupKey = price.lookup_key || "";
-      const productName = (price.product as any)?.name?.toLowerCase() || "";
-      const unitAmount = price.unit_amount || 0; // en céntimos
-      let plan = "premium";
-      let period = "monthly";
+      const productName = (product.name || "").toLowerCase();
+      // Only return premium prices — skip anything with "enterprise" in the name
+      if (!productName.includes("premium")) return null;
 
-      // 1º: usar lookup_key si está configurado
-      if (lookupKey.includes("enterprise")) plan = "enterprise";
-      else if (lookupKey.includes("premium")) plan = "premium";
-      // 2º: usar nombre del producto
-      else if (productName.includes("enterprise")) plan = "enterprise";
-      else if (productName.includes("premium")) plan = "premium";
-      // 3º: usar precio como heurística (>= 4000 céntimos = enterprise)
-      else if (unitAmount >= 4000) plan = "enterprise";
-      else plan = "premium";
-
-      if (lookupKey.includes("annual")) period = "annual";
-      else if (lookupKey.includes("monthly")) period = "monthly";
-      else if (price.recurring?.interval === "year") period = "annual";
-      else if (price.recurring?.interval === "month") period = "monthly";
+      const period = price.recurring?.interval === "year" ? "annual" : "monthly";
 
       return {
         id: price.id,
-        plan,
+        plan: "premium",
         period,
         unitAmount: price.unit_amount || 0,
         currency: price.currency,
@@ -63,15 +46,7 @@ serve(async (req) => {
       };
     }).filter(Boolean);
 
-    // Group by plan
-    const grouped = { premium: { monthly: null as any, annual: null as any }, enterprise: { monthly: null as any, annual: null as any } };
-    for (const item of formatted) {
-      if (grouped[item.plan]) {
-        grouped[item.plan][item.period] = item;
-      }
-    }
-
-    return new Response(JSON.stringify({ prices: formatted, grouped }), {
+    return new Response(JSON.stringify({ prices: formatted }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",

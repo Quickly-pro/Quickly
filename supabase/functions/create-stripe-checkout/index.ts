@@ -10,12 +10,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
 };
 
-// Hardcoded Stripe Price IDs — verified manually from Stripe dashboard
+// Stripe Price IDs — verified manually from Stripe dashboard
 const PRICE_MAP: Record<string, string> = {
-  premium_monthly:    "price_1TYoltPs4Jcmx8yryUNE0Y6G",
-  premium_annual:     "price_1TYonlPs4Jcmx8yrEFH1W1i1",
-  enterprise_monthly: "price_1TYooHPs4Jcmx8yr2Z0D4OQP",
-  enterprise_annual:  "price_1TYooqPs4Jcmx8yr4KSRoBBM",
+  premium_monthly: "price_1TYoltPs4Jcmx8yryUNE0Y6G",
+  premium_annual:  "price_1TYonlPs4Jcmx8yrEFH1W1i1",
 };
 
 serve(async (req) => {
@@ -27,19 +25,20 @@ serve(async (req) => {
     const body = await req.json();
     const { plan, annual, userId, email } = body;
 
-    if (!plan || !userId) {
-      return new Response(JSON.stringify({ error: "Missing plan or userId" }), {
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Missing userId" }), {
         status: 400,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
-    const key = `${plan}_${annual ? "annual" : "monthly"}`;
+    // Only premium plan is supported
+    const key = `premium_${annual ? "annual" : "monthly"}`;
     const priceId = PRICE_MAP[key];
 
     if (!priceId) {
       return new Response(
-        JSON.stringify({ error: `Precio no configurado para: ${key}` }),
+        JSON.stringify({ error: "Precio no configurado." }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -63,7 +62,7 @@ serve(async (req) => {
       mode: "subscription",
       success_url: `${Deno.env.get("SITE_URL") || "http://localhost:5173"}/upgrade-premium?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${Deno.env.get("SITE_URL") || "http://localhost:5173"}/upgrade-premium?canceled=true`,
-      metadata: { supabase_user_id: userId, plan },
+      metadata: { supabase_user_id: userId, plan: "premium" },
     });
 
     return new Response(JSON.stringify({ url: session.url, sessionId: session.id }), {

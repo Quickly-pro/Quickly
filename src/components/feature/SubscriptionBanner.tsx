@@ -24,7 +24,7 @@ export default function SubscriptionBanner({ variant = 'compact' }: Subscription
           </div>
           <div>
             <p className="text-sm font-medium text-amber-800 dark:text-amber-400">
-              Premium activo — {plan === 'enterprise' ? 'Enterprise' : 'Premium'}
+              Plan Premium activo
             </p>
             {periodEnd && (
               <p className="text-xs text-amber-600 dark:text-amber-400">

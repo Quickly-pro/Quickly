@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export type SubscriptionStatus = 'active' | 'inactive' | 'trial' | 'cancelled' | 'expired';
-export type SubscriptionPlan = 'free' | 'premium' | 'enterprise';
+export type SubscriptionPlan = 'free' | 'premium';
 
 export interface Subscription {
   id: number;
