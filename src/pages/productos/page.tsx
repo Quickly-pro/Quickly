@@ -220,7 +220,7 @@ export default function Productos() {
     return data;
   }, [products, filterCategory, categories, searchText]);
 
-  const lowStockProducts = useMemo(() => products.filter(p => p.stock < p.min_stock), [products]);
+  const lowStockProducts = useMemo(() => products.filter(p => p.min_stock > 0 && p.stock < p.min_stock), [products]);
   const totalInventoryValue = useMemo(() => products.reduce((sum, p) => sum + p.stock * p.price, 0), [products]);
 
   const groupedByCategory = useMemo(() => {
@@ -526,8 +526,7 @@ export default function Productos() {
     );
   };
 
-  // Productos actualmente bajo stock mínimo
-  const lowStockProducts = products.filter(p => p.min_stock > 0 && p.stock < p.min_stock);
+
 
   return (
     <div className="space-y-6">
