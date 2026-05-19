@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { playNotificationSound } from '@/utils/sound';
 
 interface Toast {
   id: number;
@@ -15,9 +16,18 @@ export function useArrivalToasts() {
   const pushToast = (vehicleName: string, destination: string, color: string) => {
     const id = ++toastId;
     setToasts(prev => [...prev, { id, vehicleName, destination, color }]);
+    playNotificationSound('arrival');
+    // Browser notification (if permission granted)
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification(`🚛 ${vehicleName} ha llegado`, {
+        body: `Destino: ${destination}`,
+        icon: '/favicon.ico',
+        tag: `arrival-${id}`,
+      });
+    }
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 5000);
+    }, 6000);
   };
 
   const removeToast = (id: number) => {

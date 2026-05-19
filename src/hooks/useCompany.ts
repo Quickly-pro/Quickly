@@ -17,6 +17,11 @@ export interface CompanyData {
   employees: number;
   clients: number;
   monthlyRevenue: number;
+  // Métodos de pago para facturas
+  paymentBizum?: string;   // número de teléfono Bizum
+  paymentIban?: string;    // IBAN para transferencia
+  paymentPaypal?: string;  // email o link de PayPal
+  paymentStripe?: string;  // link de pago de Stripe
 }
 
 const STORAGE_KEY = 'quickly_company_data';

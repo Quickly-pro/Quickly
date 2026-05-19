@@ -194,6 +194,13 @@ export default function MapaReparto() {
   const [userMapUrl, setUserMapUrl] = useState<string | null>(null);
   const [showRouteStrip, setShowRouteStrip] = useState(true);
 
+  // Solicitar permiso de notificaciones del navegador al cargar
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   const fetchDestinations = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase

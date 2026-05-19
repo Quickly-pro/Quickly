@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { invoice, items, toEmail, companyName } = await req.json();
+    const { invoice, items, toEmail, companyName, paymentInfo } = await req.json();
 
     if (!invoice || !toEmail) {
       return new Response(JSON.stringify({ error: "Faltan datos requeridos" }), {
@@ -47,6 +47,39 @@ serve(async (req) => {
     const company = companyName || "Quickly";
     const statusText = statusLabel[invoice.status] || invoice.status;
     const statusBadgeColor = statusColor[invoice.status] || "#64748b";
+    const totalAmount = Number(invoice.amount || 0).toFixed(2);
+
+    // ── Sección de métodos de pago ──
+    const pi = paymentInfo || {};
+    const hasPayment = pi.bizum || pi.iban || pi.paypal || pi.stripe;
+    const paymentSection = hasPayment ? `
+    <div style="margin-bottom:28px;padding:24px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;">
+      <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#0f172a;">💳 Opciones de pago</p>
+      <p style="margin:0 0 16px;font-size:13px;color:#64748b;">Importe: <strong>€${totalAmount}</strong> · Elige cómo pagar:</p>
+      <table cellpadding="0" cellspacing="0">
+        <tr>
+          ${pi.bizum ? `<td style="padding-right:10px;padding-bottom:10px;">
+            <a href="https://bizum.es" style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;background:#0049e0;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">
+              📱 Bizum &nbsp;<strong>${pi.bizum}</strong>
+            </a>
+          </td>` : ''}
+          ${pi.paypal ? `<td style="padding-right:10px;padding-bottom:10px;">
+            <a href="${pi.paypal.startsWith('http') ? pi.paypal : 'https://' + pi.paypal}" style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;background:#003087;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">
+              🅿️ PayPal
+            </a>
+          </td>` : ''}
+          ${pi.stripe ? `<td style="padding-right:10px;padding-bottom:10px;">
+            <a href="${pi.stripe}" style="display:inline-flex;align-items:center;gap:6px;padding:12px 20px;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:700;">
+              💳 Pagar con tarjeta →
+            </a>
+          </td>` : ''}
+        </tr>
+      </table>
+      ${pi.iban ? `<div style="margin-top:12px;padding:12px;background:#fff;border-radius:8px;border:1px solid #e2e8f0;">
+        <p style="margin:0;font-size:12px;color:#64748b;">🏦 Transferencia bancaria</p>
+        <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#0f172a;font-family:monospace;">${pi.iban}</p>
+      </div>` : ''}
+    </div>` : '';
 
     const html = `<!DOCTYPE html>
 <html lang="es">
@@ -162,6 +195,9 @@ serve(async (req) => {
                 <p style="margin:0; font-size:14px; color:#78350f; line-height:1.6;">${invoice.notes}</p>
               </div>
               ` : ""}
+
+              <!-- Payment options -->
+              ${paymentSection}
 
               <p style="margin:0; font-size:14px; color:#94a3b8; line-height:1.6;">
                 Si tienes alguna pregunta sobre esta factura, responde a este email o contacta con nosotros.

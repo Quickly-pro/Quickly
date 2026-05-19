@@ -306,20 +306,33 @@ export default function Facturacion() {
     setEmailSending(true);
     setEmailError(null);
     try {
-      const { data, error } = await supabase.functions.invoke('send-invoice-email', {
-        body: {
-          invoice,
-          items,
-          toEmail,
-          companyName: 'Quickly',
-        },
+      // Leer nombre y métodos de pago desde perfil de empresa
+      let companyName = 'Quickly';
+      let paymentInfo: Record<string, string> = {};
+      try {
+        const stored = localStorage.getItem('quickly_company_data');
+        if (stored) {
+          const p = JSON.parse(stored);
+          if (p?.name) companyName = p.name;
+          if (p?.paymentBizum) paymentInfo.bizum = p.paymentBizum;
+          if (p?.paymentIban) paymentInfo.iban = p.paymentIban;
+          if (p?.paymentPaypal) paymentInfo.paypal = p.paymentPaypal;
+          if (p?.paymentStripe) paymentInfo.stripe = p.paymentStripe;
+        }
+      } catch { /* ignorar */ }
+
+      const res = await fetch('https://irbilfifptefmpudwxee.supabase.co/functions/v1/send-invoice-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoice, items, toEmail, companyName, paymentInfo }),
       });
-      if (error || data?.error) {
-        setEmailError(error?.message || data?.error || 'Error al enviar el email');
+      const data = await res.json();
+      if (!res.ok || data?.error) {
+        setEmailError(data?.error || 'Error al enviar el email');
       } else {
         setEmailSent(true);
         setShowEmailModal(false);
-        addNotification('Email enviado', `Factura ${invoice.invoice_number} enviada a ${toEmail}`, 'info');
+        addNotification('Email enviado', `Factura ${invoice.invoice_number} enviada a ${toEmail}`, 'invoice');
         setTimeout(() => setEmailSent(false), 4000);
       }
     } catch (err: any) {

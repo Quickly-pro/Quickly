@@ -106,6 +106,10 @@ export default function Empresa() {
       website: editForm.website,
       brandColor: editForm.brandColor,
       logo: logoPreview || company.logo,
+      paymentBizum: editForm.paymentBizum,
+      paymentIban: editForm.paymentIban,
+      paymentPaypal: editForm.paymentPaypal,
+      paymentStripe: editForm.paymentStripe,
     });
     setTimeout(() => {
       setIsSaving(false);
@@ -399,6 +403,63 @@ export default function Empresa() {
               />
             </div>
           </div>
+          {/* ── Métodos de pago ── */}
+          <div className="border-t border-gray-100 dark:border-slate-700 pt-4">
+            <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-3 flex items-center gap-2">
+              <i className="ri-bank-card-line text-orange-500" /> Métodos de pago (aparecen en facturas)
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 rounded-lg flex-shrink-0">
+                  <i className="ri-smartphone-line text-blue-600 text-sm" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Bizum – nº de teléfono (ej: 612345678)"
+                  value={editForm.paymentBizum || ''}
+                  onChange={(e) => setEditForm(f => ({ ...f, paymentBizum: e.target.value }))}
+                  className="flex-1 px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 flex items-center justify-center bg-green-100 dark:bg-green-900/30 rounded-lg flex-shrink-0">
+                  <i className="ri-bank-line text-green-600 text-sm" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="IBAN – transferencia bancaria (ej: ES12 3456...)"
+                  value={editForm.paymentIban || ''}
+                  onChange={(e) => setEditForm(f => ({ ...f, paymentIban: e.target.value }))}
+                  className="flex-1 px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 flex items-center justify-center bg-sky-100 dark:bg-sky-900/30 rounded-lg flex-shrink-0">
+                  <i className="ri-paypal-line text-sky-600 text-sm" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="PayPal – email o link (ej: paypal.me/tuempresa)"
+                  value={editForm.paymentPaypal || ''}
+                  onChange={(e) => setEditForm(f => ({ ...f, paymentPaypal: e.target.value }))}
+                  className="flex-1 px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 flex items-center justify-center bg-purple-100 dark:bg-purple-900/30 rounded-lg flex-shrink-0">
+                  <i className="ri-secure-payment-line text-purple-600 text-sm" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Stripe – link de pago (ej: buy.stripe.com/...)"
+                  value={editForm.paymentStripe || ''}
+                  onChange={(e) => setEditForm(f => ({ ...f, paymentStripe: e.target.value }))}
+                  className="flex-1 px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
           <div>
             <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Color de marca</label>
             <div className="flex gap-2 flex-wrap">

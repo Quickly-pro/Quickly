@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { playNotificationSound } from '@/utils/sound';
 import { supabase } from '@/lib/supabase';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { useNotificationsContext } from '@/context/NotificationsContext';
@@ -50,8 +51,15 @@ export default function Incidencias() {
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [availableVehicles, setAvailableVehicles] = useState<string[]>([]);
   const { addNotification } = useNotificationsContext();
+  const [successToast, setSuccessToast] = useState<string | null>(null);
   const [newIncident, setNewIncident] = useState({ vehicle: '', type: 'Pinchazo', description: '', assigned_to: '' });
   const [newFuel, setNewFuel] = useState({ vehicle: '', employee: '', liters: '', cost: '', station: '' });
+
+  const showSuccessToast = (msg: string) => {
+    setSuccessToast(msg);
+    playNotificationSound('success');
+    setTimeout(() => setSuccessToast(null), 3500);
+  };
 
   const newIncidentRef = useRef<HTMLDivElement>(null);
   const incidentDetailRef = useRef<HTMLDivElement>(null);
@@ -227,6 +235,7 @@ export default function Incidencias() {
         `Incidencia ${newIncident.type} de ${newIncident.vehicle} registrada con estado Abierta`,
         'system'
       );
+      showSuccessToast(`✅ Incidencia de ${newIncident.vehicle} registrada correctamente`);
       setShowNewIncident(false);
       setNewIncident({ vehicle: '', type: 'Pinchazo', description: '', assigned_to: '' });
       clearIncidentPhoto();
@@ -258,6 +267,7 @@ export default function Incidencias() {
         `Ticket de ${newFuel.vehicle}: ${newFuel.liters}L por €${Number(newFuel.cost).toFixed(2)}`,
         'system'
       );
+      showSuccessToast(`⛽ Ticket de combustible de ${newFuel.vehicle} guardado`);
       setShowNewFuel(false);
       setNewFuel({ vehicle: '', employee: '', liters: '', cost: '', station: '' });
       clearFuelPhoto();
@@ -287,6 +297,16 @@ export default function Incidencias() {
 
   return (
     <div className="space-y-6">
+      {/* Success toast */}
+      {successToast && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-3 bg-green-500 text-white px-4 py-3 rounded-xl shadow-lg animate-[slideIn_0.3s_ease-out] min-w-[280px]">
+          <i className="ri-checkbox-circle-line text-xl flex-shrink-0" />
+          <p className="text-sm font-medium">{successToast}</p>
+          <button onClick={() => setSuccessToast(null)} className="ml-auto w-5 h-5 flex items-center justify-center opacity-70 hover:opacity-100">
+            <i className="ri-close-line" />
+          </button>
+        </div>
+      )}
       {/* Monthly Summary Banner */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
