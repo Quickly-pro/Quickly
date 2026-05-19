@@ -1,146 +1,31 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { usePremium } from '@/hooks/usePremium';
 
-interface StripePrice {
-  id: string;
-  plan: string;
-  period: string;
-  unitAmount: number;
-  currency: string;
-  interval: string;
-  productName: string;
-  productDescription: string;
-}
-
-const defaultFeatures: Record<string, string[]> = {
-  premium: [
-    'Asistente IA con consultas ilimitadas',
-    'Estadísticas y reportes avanzados',
-    'Gestión de incidencias de vehículo',
-    'Control de combustible completo',
-    'Hoja de cálculo con exportación',
-    'Correo electrónico integrado',
-    'Soporte prioritario por email',
-  ],
-  enterprise: [
-    'Todo lo de Premium',
-    'Usuarios ilimitados',
-    'API de integración',
-    'Reportes personalizados',
-    'Onboarding dedicado',
-    'Soporte telefónico 24/7',
-    'SLA garantizado',
-  ],
-};
+const premiumFeatures = [
+  'Asistente IA con consultas ilimitadas',
+  'Estadísticas y reportes avanzados',
+  'Gestión de incidencias de vehículo',
+  'Control de combustible completo',
+  'Hoja de cálculo con exportación',
+  'Correo electrónico integrado',
+  'Soporte prioritario por email',
+];
 
 export default function UpgradePremium() {
   const [annual, setAnnual] = useState(false);
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [prices, setPrices] = useState<StripePrice[]>([]);
-  const [pricesLoading, setPricesLoading] = useState(true);
-  const [pricesError, setPricesError] = useState<string | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { refetch } = usePremium();
   const verifiedRef = useRef(false);
 
-  // Fetch real Stripe prices (opcional — si falla, se usan los precios hardcodeados)
-  useEffect(() => {
-    const fetchPrices = async () => {
-      setPricesLoading(true);
-      try {
-        const res = await fetch(
-          'https://irbilfifptefmpudwxee.supabase.co/functions/v1/get-stripe-prices',
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
-        );
-        const data = await res.json();
-        if (res.ok && data?.prices) {
-          setPrices(data.prices);
-        }
-      } catch {
-        // silencioso — usamos precios hardcodeados como fallback
-      } finally {
-        setPricesError(null);
-        setPricesLoading(false);
-      }
-    };
-    fetchPrices();
-  }, []);
-
-  // Helper to get price for a plan/period
-  const getPrice = (planId: string, isAnnual: boolean) => {
-    const period = isAnnual ? 'annual' : 'monthly';
-    return prices.find(p => p.plan === planId && p.period === period);
-  };
-
-  // Hardcoded display prices for Premium; Enterprise uses Stripe prices
-  const displayPrices: Record<string, Record<string, number>> = {
-    premium: { monthly: 25, annual: 240 }, // 240€/año = 25€ × 12 × 0.8 (-20%)
-    enterprise: { monthly: 50, annual: 480 },
-  };
-
-  // Price IDs de Stripe configurados manualmente (fallback si la edge function no responde).
-  // Si más adelante despliegas la edge function `get-stripe-prices`, estos se usan solo como fallback.
-  const FALLBACK_PRICE_IDS: Record<string, Record<string, string | undefined>> = {
-    premium: {
-      monthly: 'price_1TYoltPs4Jcmx8yryUNE0Y6G',
-      annual:  'price_1TYonlPs4Jcmx8yrEFH1W1i1',
-    },
-    enterprise: {
-      monthly: 'price_1TYooHPs4Jcmx8yr2Z0D4OQP',
-      annual:  'price_1TYooqPs4Jcmx8yr4KSRoBBM',
-    },
-  };
-
-  // Build plans dynamically: Premium uses hardcoded prices, Enterprise uses Stripe prices with fallback
-  const plans = useMemo(() => {
-    const basePlans = [
-      {
-        id: 'premium',
-        name: 'Premium',
-        description: 'Para empresas que quieren crecer',
-        features: defaultFeatures.premium,
-        cta: 'Suscribirse ahora',
-        popular: true,
-      },
-      {
-        id: 'enterprise',
-        name: 'Enterprise',
-        description: 'Para flotas grandes y equipos',
-        features: defaultFeatures.enterprise,
-        cta: 'Suscribirse ahora',
-        popular: false,
-      },
-    ];
-
-    return basePlans.map((plan) => {
-      const priceObj = getPrice(plan.id, annual);
-      const periodKey = annual ? 'annual' : 'monthly';
-      // Siempre usar precios hardcodeados para display
-      const amount = displayPrices[plan.id]?.[periodKey] || 0;
-      const monthAmount = displayPrices[plan.id]?.monthly ?? 0;
-      const yearAmount = displayPrices[plan.id]?.annual ?? 0;
-      const hasDiscount = monthAmount > 0 && yearAmount > 0 && yearAmount < monthAmount * 12;
-
-      // Usar price ID de la API (ya corregida para mapear por nombre de producto)
-      // con fallback al hardcodeado si la API no responde
-      const priceId = priceObj?.id || FALLBACK_PRICE_IDS[plan.id]?.[periodKey];
-
-      return {
-        ...plan,
-        price: String(Math.round(amount)),
-        period: annual ? '/año' : '/mes',
-        priceId,
-        hasDiscount,
-      };
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prices, annual]);
+  const price = annual ? 240 : 25;
+  const period = annual ? '/año' : '/mes';
 
   useEffect(() => {
     const success = searchParams.get('success') === 'true';
@@ -167,7 +52,7 @@ export default function UpgradePremium() {
                 'No se pudo verificar el pago. Contacta con soporte si crees que fue cobrado.'
             );
           } else {
-            setSuccessMsg('Pago completado correctamente! Tu suscripción está activa.');
+            setSuccessMsg('¡Pago completado! Tu suscripción Premium está activa.');
             refetch?.();
           }
         } catch (err: any) {
@@ -181,13 +66,13 @@ export default function UpgradePremium() {
     }
   }, [searchParams, refetch]);
 
-  const handleSubscribe = async (planId: string, priceId: string | undefined) => {
+  const handleSubscribe = async () => {
     if (!user) {
       navigate('/login?redirect=/upgrade-premium');
       return;
     }
 
-    setLoadingPlan(planId);
+    setLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
@@ -198,7 +83,7 @@ export default function UpgradePremium() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            plan: planId,
+            plan: 'premium',
             annual,
             userId: user.id,
             email: user.email,
@@ -215,12 +100,12 @@ export default function UpgradePremium() {
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al iniciar el pago. Inténtalo de nuevo.');
     } finally {
-      setLoadingPlan(null);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
+    <div className="space-y-8 max-w-lg mx-auto">
       {(successMsg || errorMsg) && (
         <div
           className={`rounded-xl p-4 text-sm font-medium ${
@@ -233,151 +118,92 @@ export default function UpgradePremium() {
         </div>
       )}
 
+      {/* Header */}
       <div className="text-center">
         <div className="w-16 h-16 bg-amber-50 dark:bg-amber-900/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <div className="w-8 h-8 flex items-center justify-center">
-            <i className="ri-vip-crown-line text-amber-500 text-2xl" />
-          </div>
+          <i className="ri-vip-crown-line text-amber-500 text-2xl" />
         </div>
         <h1 className="text-3xl font-bold text-gray-800 dark:text-slate-100 mb-2">
           Desbloquea todo el potencial
         </h1>
-        <p className="text-sm text-gray-500 dark:text-slate-400 max-w-lg mx-auto">
+        <p className="text-sm text-gray-500 dark:text-slate-400 max-w-md mx-auto">
           El plan gratuito cubre lo básico. Premium te da las herramientas que necesitas para escalar tu negocio de reparto.
         </p>
 
+        {/* Toggle mensual / anual */}
         <div className="flex items-center justify-center gap-3 mt-5">
-          <span
-            className={`text-sm ${
-              !annual
-                ? 'text-gray-800 dark:text-slate-100 font-medium'
-                : 'text-gray-400 dark:text-slate-500'
-            }`}
-          >
+          <span className={`text-sm ${!annual ? 'text-gray-800 dark:text-slate-100 font-medium' : 'text-gray-400 dark:text-slate-500'}`}>
             Mensual
           </span>
           <button
             onClick={() => setAnnual(!annual)}
-            className={`relative w-12 h-6 rounded-full transition-all ${
-              annual ? 'bg-amber-500' : 'bg-gray-200 dark:bg-slate-700'
-            }`}
+            className={`relative w-12 h-6 rounded-full transition-all ${annual ? 'bg-amber-500' : 'bg-gray-200 dark:bg-slate-700'}`}
           >
             <div
-              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                annual ? 'translate-x-6' : ''
-              }`}
+              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${annual ? 'translate-x-6' : ''}`}
             />
           </button>
-          <span
-            className={`text-sm ${
-              annual
-                ? 'text-gray-800 dark:text-slate-100 font-medium'
-                : 'text-gray-400 dark:text-slate-500'
-            }`}
-          >
-            Anual{' '}
-            <span className="text-amber-600 dark:text-amber-400 font-medium">-20%</span>
+          <span className={`text-sm ${annual ? 'text-gray-800 dark:text-slate-100 font-medium' : 'text-gray-400 dark:text-slate-500'}`}>
+            Anual <span className="text-amber-600 dark:text-amber-400 font-medium">-20%</span>
           </span>
         </div>
       </div>
 
-      {pricesLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-          <span className="ml-3 text-sm text-gray-500">Cargando precios...</span>
+      {/* Tarjeta Premium */}
+      <div className="relative rounded-2xl border border-amber-200 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-900/10 p-6">
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-amber-500 text-white text-xs font-semibold rounded-full">
+          Plan Premium
         </div>
-      ) : pricesError ? (
-        <div className="text-center py-6 text-sm text-red-500">{pricesError}</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {plans.map((plan) => {
-            const isLoading = loadingPlan === plan.id;
 
-            return (
-              <div
-                key={plan.id}
-                className={`relative rounded-2xl border p-6 transition-all ${
-                  plan.popular
-                    ? 'border-amber-200 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-900/10'
-                    : 'border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900'
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-amber-500 text-white text-xs font-semibold rounded-full">
-                    Más popular
-                  </div>
-                )}
+        <div className="mb-4 mt-1">
+          <h3 className="text-lg font-bold text-gray-800 dark:text-slate-100">Premium</h3>
+          <p className="text-xs text-gray-400 dark:text-slate-400 mt-1">Para empresas que quieren crecer</p>
+        </div>
 
-                <div className="mb-4">
-                  <h3 className="text-lg font-bold text-gray-800 dark:text-slate-100">
-                    {plan.name}
-                  </h3>
-                  <p className="text-xs text-gray-400 dark:text-slate-400 mt-1">
-                    {plan.description}
-                  </p>
-                </div>
+        <div className="mb-5">
+          <span className="text-4xl font-bold text-gray-800 dark:text-slate-100">€{price}</span>
+          <span className="text-sm text-gray-400 dark:text-slate-400">{period}</span>
+          {!annual && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+              Ahorra un 20% eligiendo el plan anual (€240/año)
+            </p>
+          )}
+          {annual && (
+            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+              Estás ahorrando €60 respecto al plan mensual
+            </p>
+          )}
+        </div>
 
-                <div className="mb-5">
-                  <span className="text-3xl font-bold text-gray-800 dark:text-slate-100">
-                    €{plan.price}
-                  </span>
-                  <span className="text-sm text-gray-400 dark:text-slate-400">{plan.period}</span>
-                  {annual && plan.hasDiscount && (
-                    <span className="ml-2 text-xs text-green-600 font-medium">
-                      Ahorras con anual
-                    </span>
-                  )}
-                  {!annual && plan.hasDiscount && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      Ahorra un 20% eligiendo el plan anual (€{displayPrices[plan.id]?.annual}/año)
-                    </p>
-                  )}
-                </div>
-
-                <ul className="space-y-2.5 mb-6">
-                  {plan.features.map((f, i) => (
-                    <li
-                      key={i}
-                      className="flex items-start gap-2.5 text-sm text-gray-600 dark:text-slate-300"
-                    >
-                      <div className="w-4 h-4 flex items-center justify-center mt-0.5 flex-shrink-0">
-                        <i className="ri-check-line text-green-500 text-xs" />
-                      </div>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  onClick={() => handleSubscribe(plan.id, plan.priceId)}
-                  disabled={isLoading || (plan.id !== 'premium' && !plan.priceId)}
-                  className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-                    plan.popular
-                      ? 'bg-amber-500 text-white hover:bg-amber-600 disabled:bg-amber-300'
-                      : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 disabled:opacity-50'
-                  }`}
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Procesando...
-                    </>
-                  ) : plan.id !== 'premium' && !plan.priceId ? (
-                    'Próximamente'
-                  ) : (
-                    <>
-                      <div className="w-4 h-4 flex items-center justify-center">
-                        <i className="ri-secure-payment-line" />
-                      </div>
-                      {plan.cta}
-                    </>
-                  )}
-                </button>
+        <ul className="space-y-2.5 mb-6">
+          {premiumFeatures.map((f, i) => (
+            <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600 dark:text-slate-300">
+              <div className="w-4 h-4 flex items-center justify-center mt-0.5 flex-shrink-0">
+                <i className="ri-check-line text-green-500 text-xs" />
               </div>
-            );
-          })}
-        </div>
-      )}
+              {f}
+            </li>
+          ))}
+        </ul>
+
+        <button
+          onClick={handleSubscribe}
+          disabled={loading}
+          className="w-full py-3 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-amber-500 text-white hover:bg-amber-600 disabled:bg-amber-300"
+        >
+          {loading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Procesando...
+            </>
+          ) : (
+            <>
+              <i className="ri-secure-payment-line" />
+              Suscribirse ahora
+            </>
+          )}
+        </button>
+      </div>
 
       <div className="text-center">
         <button
