@@ -10,49 +10,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
 };
 
-// Lookup price from Stripe by matching product name — this is the source of truth.
-// We ignore any priceId passed by the frontend to avoid stale/wrong IDs.
-async function findPriceId(plan: string, annual: boolean): Promise<string | null> {
-  try {
-    const prices = await stripe.prices.list({
-      active: true,
-      type: "recurring",
-      expand: ["data.product"],
-      limit: 50,
-    });
-
-    const interval = annual ? "year" : "month";
-
-    // Filter prices whose product name clearly matches the requested plan.
-    // We prefer products whose name starts with "quickly" to skip old/test products.
-    const candidates = prices.data.filter((price: any) => {
-      const product = price.product as any;
-      if (!product || product.deleted) return false;
-      const name = (product.name || "").toLowerCase();
-      const priceInterval = price.recurring?.interval;
-      if (priceInterval !== interval) return false;
-
-      if (plan === "enterprise") {
-        return name.includes("enterprise");
-      } else {
-        // premium: must include "premium" but NOT "enterprise"
-        return name.includes("premium") && !name.includes("enterprise");
-      }
-    });
-
-    if (candidates.length === 0) return null;
-
-    // Prefer products whose name starts with "quickly" (the current products)
-    const preferred = candidates.find((price: any) => {
-      const name = ((price.product as any)?.name || "").toLowerCase();
-      return name.startsWith("quickly");
-    });
-
-    return (preferred || candidates[0]).id;
-  } catch {
-    return null;
-  }
-}
+// Hardcoded Stripe Price IDs — verified manually from Stripe dashboard
+const PRICE_MAP: Record<string, string> = {
+  premium_monthly:    "price_1TVAN7Ps4Jcmx8yrRzGWR1hI",
+  premium_annual:     "price_1TXTKTPs4Jcmx8yrsBco7NXH",
+  enterprise_monthly: "price_1TXwAUPs4Jcmx8yrtMbKq5D8",
+  enterprise_annual:  "price_1TXwBLPs4Jcmx8yrfV4uzGAh",
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -70,15 +34,12 @@ serve(async (req) => {
       });
     }
 
-    // Always resolve price server-side — never trust the client-supplied priceId
-    const priceId = await findPriceId(plan, !!annual);
+    const key = `${plan}_${annual ? "annual" : "monthly"}`;
+    const priceId = PRICE_MAP[key];
 
     if (!priceId) {
-      const period = annual ? "anual" : "mensual";
       return new Response(
-        JSON.stringify({
-          error: `No se encontró el precio ${period} del plan ${plan} en Stripe. Verifica que el producto esté activo.`,
-        }),
+        JSON.stringify({ error: `Precio no configurado para: ${key}` }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
