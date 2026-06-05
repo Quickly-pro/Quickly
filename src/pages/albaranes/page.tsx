@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import Modal from '@/components/base/Modal';
+import SignaturePad from '@/components/base/SignaturePad';
 import { useRole } from '@/hooks/useRole';
 import { useNotificationsContext } from '@/context/NotificationsContext';
 import {
@@ -108,7 +109,7 @@ export default function Albaranes() {
             ...x,
             status: 'entregado',
             deliveredAt: new Date().toISOString(),
-            deliveredBy: deliveredBy || x.driver || 'Repartidor',
+            deliveredBy: deliveredBy || x.driver || 'Conductor',
             signature: signatureName || x.signature,
             notes: notes ? (x.notes ? x.notes + ' · ' : '') + notes : x.notes,
           }
@@ -148,10 +149,11 @@ export default function Albaranes() {
     setSelected(null);
   };
 
-  const signAlbaran = (a: Albaran, name: string) => {
-    setList(prev => prev.map(x => x.id === a.id ? { ...x, signature: name } : x));
+  const signAlbaran = (a: Albaran, name: string, sigData?: string) => {
+    const sigValue = sigData || name;
+    setList(prev => prev.map(x => x.id === a.id ? { ...x, signature: sigValue, signatureName: name } : x));
     // Actualiza también el albarán abierto en el modal de detalle para que la firma se vea al instante.
-    setSelected(prev => (prev && prev.id === a.id ? { ...prev, signature: name } : prev));
+    setSelected(prev => (prev && prev.id === a.id ? { ...prev, signature: sigValue, signatureName: name } : prev));
     addNotification('Albarán firmado', `${a.id} firmado por ${name}`, 'route');
     setShowSign(null);
   };
@@ -175,7 +177,7 @@ export default function Albaranes() {
     lines.push(`Subtotal: ${formatCurrency(a.subtotal)}`);
     lines.push(`IVA: ${formatCurrency(a.tax)}`);
     lines.push(`TOTAL: ${formatCurrency(a.total)}`);
-    if (a.driver) lines.push(`Repartidor: ${a.driver}`);
+    if (a.driver) lines.push(`Conductor: ${a.driver}`);
     if (a.deliveredAt) lines.push(`Entregado: ${formatDateTime(a.deliveredAt)}`);
     if (a.signature) lines.push(`Firma: ${a.signature}`);
     if (a.notes) lines.push(`Notas: ${a.notes}`);
@@ -218,7 +220,7 @@ export default function Albaranes() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 print:hidden">
         <KpiCard icon="ri-time-line" color="amber" label="Pendientes" value={String(kpis.pendientes)} />
-        <KpiCard icon="ri-truck-line" color="blue" label="En reparto" value={String(kpis.enReparto)} />
+        <KpiCard icon="ri-truck-line" color="blue" label="En tránsito" value={String(kpis.enReparto)} />
         <KpiCard icon="ri-check-double-line" color="green" label="Entregados" value={String(kpis.entregados)} />
         <KpiCard icon="ri-money-euro-circle-line" color="purple" label="Total" value={formatCurrency(kpis.total)} />
       </div>
@@ -230,7 +232,7 @@ export default function Albaranes() {
             <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Buscar por nº, cliente o repartidor..."
+              placeholder="Buscar por nº, cliente o conductor..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
@@ -246,18 +248,24 @@ export default function Albaranes() {
               <option key={s} value={s}>{STATUS_LABEL[s]}</option>
             ))}
           </select>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
-            className="px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
-          />
-          <input
-            type="date"
-            value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-            className="px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
-          />
+          <label className="flex flex-col gap-0.5">
+            <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1"><i className="ri-calendar-line" /> Desde</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+          </label>
+          <label className="flex flex-col gap-0.5">
+            <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1"><i className="ri-calendar-line" /> Hasta</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+          </label>
         </div>
         {(search || statusFilter !== 'todos' || dateFrom || dateTo) && (
           <button
@@ -277,7 +285,7 @@ export default function Albaranes() {
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-slate-300">Nº</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-slate-300">Cliente</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-slate-300 hidden md:table-cell">Repartidor</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-slate-300 hidden md:table-cell">Conductor</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-slate-300 hidden lg:table-cell">Fecha</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-slate-300">Estado</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-600 dark:text-slate-300">Total</th>
@@ -384,7 +392,7 @@ export default function Albaranes() {
                 {selected.clientEmail && <p className="text-xs text-gray-500 dark:text-slate-400"><i className="ri-mail-line mr-1" />{selected.clientEmail}</p>}
               </DetailBlock>
               <DetailBlock title="Reparto" icon="ri-truck-line">
-                <p className="text-sm"><span className="text-gray-500 dark:text-slate-400">Repartidor:</span> <span className="font-medium text-gray-700 dark:text-slate-200">{selected.driver || '—'}</span></p>
+                <p className="text-sm"><span className="text-gray-500 dark:text-slate-400">Conductor:</span> <span className="font-medium text-gray-700 dark:text-slate-200">{selected.driver || '—'}</span></p>
                 <p className="text-sm"><span className="text-gray-500 dark:text-slate-400">Vehículo:</span> <span className="font-medium text-gray-700 dark:text-slate-200">{selected.vehicle || '—'}</span></p>
                 <p className="text-sm"><span className="text-gray-500 dark:text-slate-400">Emitido:</span> <span className="text-gray-700 dark:text-slate-200">{formatDate(selected.date)}</span></p>
                 <p className="text-sm"><span className="text-gray-500 dark:text-slate-400">Entrega prevista:</span> <span className="text-gray-700 dark:text-slate-200">{formatDate(selected.deliveryDate)}</span></p>
@@ -452,7 +460,15 @@ export default function Albaranes() {
             )}
             {selected.signature && (
               <div className="p-3 bg-green-50/60 dark:bg-green-900/10 border border-green-200 dark:border-green-800/30 rounded-lg text-sm text-green-800 dark:text-green-200">
-                <span className="font-medium">✍️ Firmado por:</span> {selected.signature}
+                <span className="font-medium">✍️ Firmado</span>
+                {selected.signature.startsWith('data:') ? (
+                  <div className="mt-2">
+                    <img src={selected.signature} alt="Firma" className="h-16 object-contain bg-white rounded border border-green-200 dark:border-green-800/30 p-1" />
+                    {(selected as any).signatureName && <p className="text-xs mt-1 text-green-700 dark:text-green-400">{(selected as any).signatureName}</p>}
+                  </div>
+                ) : (
+                  <span> por: {selected.signature}</span>
+                )}
               </div>
             )}
             {selected.invoiceId && (
@@ -566,7 +582,7 @@ export default function Albaranes() {
       >
         {showSign && (
           <SignForm
-            onConfirm={(name) => signAlbaran(showSign, name)}
+            onConfirm={(name, sigData) => signAlbaran(showSign, name, sigData)}
             onCancel={() => setShowSign(null)}
           />
         )}
@@ -640,34 +656,71 @@ function DeliverForm({
   onCancel: () => void;
 }) {
   const [deliveredBy, setDeliveredBy] = useState(albaran.driver || '');
-  const [signature, setSignature] = useState('');
+  const [signatureName, setSignatureName] = useState('');
+  const [signatureData, setSignatureData] = useState('');
+  const [showPad, setShowPad] = useState(false);
   const [notes, setNotes] = useState('');
+
+  const handleConfirm = () => {
+    // Guardar tanto la imagen de la firma como el nombre
+    const sigValue = signatureData || signatureName;
+    onConfirm(deliveredBy, sigValue, notes);
+  };
 
   return (
     <div className="space-y-4">
       <div className="p-3 bg-green-50/60 dark:bg-green-900/10 border border-green-200 dark:border-green-800/30 rounded-lg text-sm text-green-800 dark:text-green-200">
-        Vas a marcar el albarán <span className="font-mono font-bold">{albaran.id}</span> de <span className="font-medium">{albaran.client}</span> como ENTREGADO. La empresa recibirá una notificación.
+        Vas a marcar el albarán <span className="font-mono font-bold">{albaran.id}</span> de <span className="font-medium">{albaran.client}</span> como ENTREGADO.
       </div>
+
       <div>
-        <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Repartidor que entrega</label>
+        <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Conductor que entrega</label>
         <input
           type="text"
           value={deliveredBy}
           onChange={e => setDeliveredBy(e.target.value)}
-          placeholder="Nombre del repartidor"
+          placeholder="Nombre del conductor"
           className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-green-400"
         />
       </div>
+
+      {/* Firma digital */}
       <div>
-        <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Firma del receptor (nombre)</label>
-        <input
-          type="text"
-          value={signature}
-          onChange={e => setSignature(e.target.value)}
-          placeholder="Ej: Antonio Pérez (Jefe de cocina)"
-          className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-green-400"
-        />
+        <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Firma del receptor</label>
+        {showPad ? (
+          <SignaturePad
+            label="Dibuja la firma del receptor:"
+            onSave={(data) => { setSignatureData(data); setShowPad(false); }}
+            onCancel={() => setShowPad(false)}
+          />
+        ) : signatureData ? (
+          <div className="border border-green-200 dark:border-green-800/40 rounded-xl overflow-hidden bg-white dark:bg-slate-800 p-2">
+            <img src={signatureData} alt="Firma" className="h-20 object-contain mx-auto" />
+            <div className="flex justify-center mt-2">
+              <button type="button" onClick={() => { setSignatureData(''); setShowPad(true); }}
+                className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1">
+                <i className="ri-delete-bin-line" /> Repetir firma
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={signatureName}
+              onChange={e => setSignatureName(e.target.value)}
+              placeholder="Nombre del receptor (ej: Ana García)"
+              className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-green-400"
+            />
+            <button type="button" onClick={() => setShowPad(true)}
+              className="px-3 py-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800/30 rounded-lg text-sm font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 flex items-center gap-1.5 whitespace-nowrap">
+              <i className="ri-pen-nib-line" />
+              Firma digital
+            </button>
+          </div>
+        )}
       </div>
+
       <div>
         <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Observaciones (opcional)</label>
         <textarea
@@ -678,15 +731,18 @@ function DeliverForm({
           className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-green-400 resize-none"
         />
       </div>
-      <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium">Cancelar</button>
-        <button
-          onClick={() => onConfirm(deliveredBy, signature, notes)}
-          className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium inline-flex items-center gap-1"
-        >
-          <i className="ri-check-double-line" /> Confirmar entrega
-        </button>
-      </div>
+
+      {!showPad && (
+        <div className="flex justify-end gap-2">
+          <button onClick={onCancel} className="px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium">Cancelar</button>
+          <button
+            onClick={handleConfirm}
+            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium inline-flex items-center gap-1"
+          >
+            <i className="ri-check-double-line" /> Confirmar entrega
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -719,30 +775,75 @@ function RejectForm({ onConfirm, onCancel }: { onConfirm: (reason: string) => vo
   );
 }
 
-function SignForm({ onConfirm, onCancel }: { onConfirm: (name: string) => void; onCancel: () => void }) {
+function SignForm({ onConfirm, onCancel }: { onConfirm: (name: string, sigData?: string) => void; onCancel: () => void }) {
   const [name, setName] = useState('');
+  const [signatureData, setSignatureData] = useState('');
+  const [showPad, setShowPad] = useState(false);
+
+  const handleConfirm = () => {
+    if (!name.trim() && !signatureData) return;
+    onConfirm(name.trim(), signatureData || undefined);
+  };
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500 dark:text-slate-400">
-        Introduce el nombre completo de la persona que firma el albarán.
+        Nombre de quien firma y/o firma digital del albarán.
       </p>
-      <input
-        type="text"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        placeholder="Nombre y apellidos"
-        className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
-      />
-      <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium">Cancelar</button>
-        <button
-          onClick={() => name.trim() && onConfirm(name.trim())}
-          disabled={!name.trim()}
-          className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-40"
-        >
-          Firmar
-        </button>
+
+      <div>
+        <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Nombre del firmante</label>
+        <input
+          type="text"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Nombre y apellidos"
+          className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
+        />
       </div>
+
+      <div>
+        <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Firma digital</label>
+        {showPad ? (
+          <SignaturePad
+            label="Dibuja tu firma:"
+            onSave={(data) => { setSignatureData(data); setShowPad(false); }}
+            onCancel={() => setShowPad(false)}
+          />
+        ) : signatureData ? (
+          <div className="border border-orange-200 dark:border-orange-800/40 rounded-xl overflow-hidden bg-white dark:bg-slate-800 p-2">
+            <img src={signatureData} alt="Firma" className="h-20 object-contain mx-auto" />
+            <div className="flex justify-center mt-2">
+              <button type="button" onClick={() => { setSignatureData(''); setShowPad(true); }}
+                className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1">
+                <i className="ri-delete-bin-line" /> Repetir firma
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowPad(true)}
+            className="w-full px-3 py-2.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800/30 rounded-lg text-sm font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 flex items-center justify-center gap-2"
+          >
+            <i className="ri-pen-nib-line" />
+            Dibujar firma digital
+          </button>
+        )}
+      </div>
+
+      {!showPad && (
+        <div className="flex justify-end gap-2">
+          <button onClick={onCancel} className="px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium">Cancelar</button>
+          <button
+            onClick={handleConfirm}
+            disabled={!name.trim() && !signatureData}
+            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-40 inline-flex items-center gap-1"
+          >
+            <i className="ri-pen-nib-line" /> Firmar
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -803,8 +904,8 @@ function CreateAlbaranModal({
           <Input label="Email" value={clientEmail} onChange={setClientEmail} placeholder="email@cliente.com" />
           <Input label="Fecha emisión" value={date} onChange={setDate} type="date" />
           <Input label="Fecha entrega" value={deliveryDate} onChange={setDeliveryDate} type="date" />
-          <Input label="Repartidor" value={driver} onChange={setDriver} placeholder="Asignado a..." />
-          <Input label="Vehículo" value={vehicle} onChange={setVehicle} placeholder="Furgoneta / matrícula" />
+          <Input label="Conductor" value={driver} onChange={setDriver} placeholder="Nombre del conductor..." />
+          <Input label="Vehículo" value={vehicle} onChange={setVehicle} placeholder="Matrícula / Camión / Trailer..." />
         </div>
 
         <div>

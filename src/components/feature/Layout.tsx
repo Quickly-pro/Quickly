@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 import PageTransition from './PageTransition';
 import RoleGuard from './RoleGuard';
 import ErrorBoundary from '@/components/base/ErrorBoundary';
+import PageSkeleton from '@/components/base/PageSkeleton';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Layout() {
@@ -27,19 +28,21 @@ export default function Layout() {
   // Si no hay usuario y no está en login, mostrar layout sin sidebar
   // (las rutas protegidas redirigirán a login si es necesario)
   return (
-    <div className="min-h-screen bg-gray-50/50 flex dark:bg-slate-950">
+    <div className="min-h-screen bg-gray-50/50 flex dark:bg-[#020817] futuristic-bg">
       {user && <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />}
-      <div className={`flex-1 flex flex-col min-w-0 dark:bg-slate-950 transition-all duration-300
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 relative z-10
         ${user ? (collapsed ? 'md:ml-16' : 'md:ml-64') : ''}`}>
         <Navbar />
-        <main className="relative flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 dark:bg-slate-950 min-w-0">
-          <PageTransition>
-            <RoleGuard>
-              <ErrorBoundary key={location.pathname}>
-                <Outlet />
-              </ErrorBoundary>
-            </RoleGuard>
-          </PageTransition>
+        <main className="relative flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 min-w-0">
+          <Suspense fallback={<PageSkeleton />}>
+            <PageTransition>
+              <RoleGuard>
+                <ErrorBoundary key={location.pathname}>
+                  <Outlet />
+                </ErrorBoundary>
+              </RoleGuard>
+            </PageTransition>
+          </Suspense>
         </main>
       </div>
     </div>

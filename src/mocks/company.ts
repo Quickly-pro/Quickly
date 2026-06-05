@@ -8,7 +8,7 @@ export const companyInfo = {
   phone: '+34 912 345 678',
   email: 'info@quickly.es',
   website: 'www.quickly.es',
-  logo: 'https://static.readdy.ai/image/cd6101a5b75cc4d1ea08021147541bde/4d8ea097db74c93575cbe24fdfc5bded.png',
+  logo: '/logo.png',
   brandColor: '#f97316',
   founded: '2018',
   employees: 12,

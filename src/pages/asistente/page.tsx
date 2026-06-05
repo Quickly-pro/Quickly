@@ -26,8 +26,10 @@ interface QuickAction {
 const quickActions: QuickAction[] = [
   { icon: 'ri-group-line', label: 'Ver mis clientes activos', color: 'bg-blue-50 text-blue-600' },
   { icon: 'ri-box-3-line', label: 'Alertas de stock bajo', color: 'bg-red-50 text-red-600' },
-  { icon: 'ri-bill-line', label: 'Facturas pendientes', color: 'bg-amber-50 text-amber-600' },
-  { icon: 'ri-map-2-line', label: 'Rutas de hoy', color: 'bg-green-50 text-green-600' },
+  { icon: 'ri-bill-line', label: 'Facturas pendientes de cobro', color: 'bg-amber-50 text-amber-600' },
+  { icon: 'ri-bar-chart-box-line', label: 'Dame un resumen general', color: 'bg-green-50 text-green-600' },
+  { icon: 'ri-map-2-line', label: 'Rutas y entregas de hoy', color: 'bg-purple-50 text-purple-600' },
+  { icon: 'ri-team-line', label: 'Estado del equipo', color: 'bg-cyan-50 text-cyan-600' },
 ];
 
 interface ChatMessage {
@@ -203,23 +205,58 @@ export default function Asistente() {
       time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
     };
     addMessage(userMsg);
+    const query = inputValue;
     setInputValue('');
     setIsLoading(true);
 
     try {
-      const result = await processQuery(inputValue);
+      // Intentar con la edge function de IA (Claude API)
+      let aiText = '';
+      let dataCards: ChatMessage['dataCards'];
+
+      try {
+        const res = await fetch(
+          'https://irbilfifptefmpudwxee.supabase.co/functions/v1/ai-assistant',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: query }),
+          }
+        );
+        if (res.ok) {
+          const json = await res.json();
+          aiText = json.text;
+        }
+      } catch { /* fall through to local */ }
+
+      // Si la edge function no respondió, usar procesamiento local
+      if (!aiText) {
+        const result = await processQuery(query);
+        aiText = result.text;
+        dataCards = result.dataCards;
+      }
+
       const aiMsg: ChatMessage = {
         id: Date.now() + 1,
-        text: result.text,
+        text: aiText,
         isUser: false,
         time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-        dataCards: result.dataCards,
+        dataCards,
       };
       addMessage(aiMsg);
+
+      // Guardar conversación en historial
+      setConversations(prev => {
+        const title = query.length > 40 ? query.slice(0, 37) + '...' : query;
+        const existing = prev.find(c => c.title === title);
+        if (existing) return prev;
+        return [{ id: Date.now(), title, date: 'Hoy' }, ...prev.slice(0, 20)];
+      });
+
     } catch {
       const fallbackMsg: ChatMessage = {
         id: Date.now() + 1,
-        text: 'Lo siento, hubo un error consultando los datos. Inténtalo de nuevo en un momento.',
+        text: 'Lo siento, hubo un error consultando los datos. Inténtalo de nuevo.\nSorry, there was an error. Please try again.',
         isUser: false,
         time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
       };
@@ -313,8 +350,11 @@ export default function Asistente() {
                   </div>
                 </div>
                 <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-2">¿En qué puedo ayudarte?</h2>
-                <p className="text-sm text-gray-500 dark:text-slate-400 text-center max-w-md mb-8">
-                  Soy tu asistente inteligente. Puedo responder dudas, consultar datos de clientes, rutas, facturas y ayudarte a automatizar tareas de tu empresa.
+                <p className="text-sm text-gray-500 dark:text-slate-400 text-center max-w-md mb-2">
+                  Soy tu asistente inteligente con acceso a los datos de tu empresa. Puedo analizar clientes, facturas, stock, rutas y empleados, y ayudarte a tomar decisiones.
+                </p>
+                <p className="text-xs text-gray-400 dark:text-slate-500 mb-8">
+                  I also speak English, French, German, Portuguese, Italian and more. Just write in your language.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg w-full px-4">

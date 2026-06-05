@@ -168,7 +168,7 @@ export const albaranes: Albaran[] = [
 
 export const STATUS_LABEL: Record<AlbaranStatus, string> = {
   pendiente: 'Pendiente',
-  'en-reparto': 'En reparto',
+  'en-reparto': 'En tránsito',
   entregado: 'Entregado',
   rechazado: 'Rechazado',
   facturado: 'Facturado',

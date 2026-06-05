@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { usePremium } from '@/hooks/usePremium';
+import { useRole } from '@/hooks/useRole';
 
 interface PremiumGateProps {
   children: React.ReactNode;
@@ -8,6 +9,7 @@ interface PremiumGateProps {
 
 export default function PremiumGate({ children, fallback }: PremiumGateProps) {
   const { isPremium, loading, isTrial, trialDaysLeft } = usePremium();
+  const { isCliente, isEmpleado } = useRole();
   const navigate = useNavigate();
 
   if (loading) {
@@ -18,10 +20,30 @@ export default function PremiumGate({ children, fallback }: PremiumGateProps) {
     );
   }
 
+  // Empleados y clientes: sin acceso a funciones premium
+  if (isCliente || isEmpleado) {
+    if (fallback) return <>{fallback}</>;
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] px-4">
+        <div className="max-w-sm w-full text-center">
+          <div className="w-16 h-16 bg-gray-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <i className="ri-lock-line text-gray-400 dark:text-slate-500 text-2xl" />
+          </div>
+          <h2 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-2">Acceso restringido</h2>
+          <p className="text-sm text-gray-500 dark:text-slate-400">
+            Esta sección sólo está disponible para cuentas de empresa.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Empresa con premium activo: acceso total
   if (isPremium) {
     return <>{children}</>;
   }
 
+  // Empresa sin premium: pantalla de upgrade
   if (fallback) {
     return <>{fallback}</>;
   }
@@ -70,8 +92,8 @@ export default function PremiumGate({ children, fallback }: PremiumGateProps) {
               <i className="ri-check-line text-green-500 text-sm" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-slate-200">Gestión de flota</p>
-              <p className="text-xs text-gray-400 dark:text-slate-500">Incidencias de vehículo y control de combustible</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-slate-200">Gestión de flota completa</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500">Camiones, trailers, furgonetas y motos — incidencias y combustible</p>
             </div>
           </div>
           <div className="flex items-start gap-3">

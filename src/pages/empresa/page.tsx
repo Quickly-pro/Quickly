@@ -71,8 +71,29 @@ export default function Empresa() {
       return;
     }
     setLogoName(file.name);
+    // Redimensionar y comprimir antes de guardar para evitar base64 corruptos
     const reader = new FileReader();
-    reader.onload = (ev) => setLogoPreview(ev.target?.result as string || null);
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 300; // máx 300×300
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          const ratio = Math.min(MAX / width, MAX / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+        // PNG para logos con transparencia, calidad alta
+        const dataUrl = canvas.toDataURL('image/png');
+        setLogoPreview(dataUrl);
+      };
+      img.src = ev.target?.result as string;
+    };
     reader.readAsDataURL(file);
   };
 

@@ -82,11 +82,14 @@ export default function HojaPedidos() {
 
   const handleCellSave = () => {
     if (!editingCell) return;
-    setRows(prev => prev.map(r => {
+    const newRows = rows.map(r => {
       if (r.id !== editingCell.rowId) return r;
       return { ...r, [editingCell.field]: editValue };
-    }));
+    });
+    setRows(newRows);
     setEditingCell(null);
+    // Auto-sync para Hoja de Ruta
+    try { localStorage.setItem(LS_KEY, JSON.stringify(newRows)); } catch { /* ignore */ }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -116,8 +119,10 @@ export default function HojaPedidos() {
 
   const handleNoteSave = () => {
     if (notePopover === null) return;
-    setRows(prev => prev.map(r => r.id === notePopover ? { ...r, clientNote: noteEdit } : r));
+    const newRows = rows.map(r => r.id === notePopover ? { ...r, clientNote: noteEdit } : r);
+    setRows(newRows);
     setNotePopover(null);
+    try { localStorage.setItem(LS_KEY, JSON.stringify(newRows)); } catch { /* ignore */ }
   };
 
   const handleNoteKeyDown = (e: React.KeyboardEvent) => {

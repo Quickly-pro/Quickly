@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import Modal from '@/components/base/Modal';
 import { useNavigate } from 'react-router-dom';
+import ChatWidget from '@/components/feature/ChatWidget';
 
 const statusConfig: Record<string, { label: string; color: string; darkColor: string }> = {
   pending_payment: { label: 'Pendiente Pago', color: 'bg-amber-50 text-amber-600', darkColor: 'dark:bg-amber-900/20 dark:text-amber-400' },
@@ -305,20 +306,24 @@ export default function Pedidos() {
               >
                 {paymentOptions.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
-              <input
-                type="date"
-                value={filterDateFrom}
-                onChange={e => { setFilterDateFrom(e.target.value); setCurrentPage(1); }}
-                className="px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
-                title="Desde"
-              />
-              <input
-                type="date"
-                value={filterDateTo}
-                onChange={e => { setFilterDateTo(e.target.value); setCurrentPage(1); }}
-                className="px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
-                title="Hasta"
-              />
+              <label className="flex flex-col gap-0.5">
+                <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1"><i className="ri-calendar-line" /> Desde</span>
+                <input
+                  type="date"
+                  value={filterDateFrom}
+                  onChange={e => { setFilterDateFrom(e.target.value); setCurrentPage(1); }}
+                  className="px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
+                />
+              </label>
+              <label className="flex flex-col gap-0.5">
+                <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1"><i className="ri-calendar-line" /> Hasta</span>
+                <input
+                  type="date"
+                  value={filterDateTo}
+                  onChange={e => { setFilterDateTo(e.target.value); setCurrentPage(1); }}
+                  className="px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
+                />
+              </label>
               {activeFilterCount > 0 && (
                 <button
                   onClick={clearFilters}
@@ -786,6 +791,7 @@ export default function Pedidos() {
           </div>
         </div>
       </Modal>
+      <ChatWidget />
     </div>
   );
 }

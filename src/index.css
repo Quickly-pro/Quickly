@@ -4,22 +4,24 @@
 
 @layer base {
   /* Dark mode overrides for gray classes that lack explicit dark variants */
-  .dark .text-gray-800 { color: rgb(241 245 249); }   /* slate-100 */
-  .dark .text-gray-700 { color: rgb(226 232 240); }   /* slate-200 */
-  .dark .text-gray-600 { color: rgb(203 213 225); }   /* slate-300 */
-  .dark .text-gray-500 { color: rgb(148 163 184); }  /* slate-400 */
-  .dark .text-gray-400 { color: rgb(148 163 184); }  /* slate-400 */
-  .dark .text-gray-300 { color: rgb(203 213 225); }   /* slate-300 */
-  .dark .bg-white    { background-color: rgb(15 23 42); }   /* slate-900 */
-  .dark .bg-gray-50  { background-color: rgb(15 23 42); }   /* slate-900 */
-  .dark .bg-gray-100 { background-color: rgb(30 41 59); }   /* slate-800 */
-  .dark .bg-gray-200 { background-color: rgb(51 65 85); }  /* slate-700 */
-  .dark .border-gray-100 { border-color: rgb(30 41 59); }    /* slate-800 */
-  .dark .border-gray-200 { border-color: rgb(51 65 85); }   /* slate-700 */
-  .dark .hover\:bg-gray-50:hover { background-color: rgb(30 41 59); }
-  .dark .hover\:bg-gray-100:hover { background-color: rgb(51 65 85); }
-  .dark .hover\:border-gray-200:hover { border-color: rgb(71 85 105); }
-  .dark .focus\:bg-gray-100:focus { background-color: rgb(51 65 85); }
+  .dark .text-gray-800 { color: rgb(241 245 249); }
+  .dark .text-gray-700 { color: rgb(226 232 240); }
+  .dark .text-gray-600 { color: rgb(203 213 225); }
+  .dark .text-gray-500 { color: rgb(148 163 184); }
+  .dark .text-gray-400 { color: rgb(148 163 184); }
+  .dark .text-gray-300 { color: rgb(203 213 225); }
+  /* Deep space card backgrounds */
+  .dark .bg-white    { background-color: rgba(10, 16, 38, 0.92); }
+  .dark .bg-gray-50  { background-color: rgba(7, 12, 28, 0.92); }
+  .dark .bg-gray-100 { background-color: rgba(16, 26, 58, 0.95); }
+  .dark .bg-gray-200 { background-color: rgba(24, 38, 80, 0.95); }
+  /* Neon-tinted borders */
+  .dark .border-gray-100 { border-color: rgba(249, 115, 22, 0.10); }
+  .dark .border-gray-200 { border-color: rgba(249, 115, 22, 0.15); }
+  .dark .hover\:bg-gray-50:hover  { background-color: rgba(20, 32, 68, 0.85); }
+  .dark .hover\:bg-gray-100:hover { background-color: rgba(28, 44, 90, 0.85); }
+  .dark .hover\:border-gray-200:hover { border-color: rgba(249, 115, 22, 0.25); }
+  .dark .focus\:bg-gray-100:focus { background-color: rgba(28, 44, 90, 0.85); }
 
   /* Dark mode overrides for light color backgrounds used in badges/status cards */
   .dark .bg-green-50  { background-color: rgb(20 83 45 / 0.2); }
@@ -59,13 +61,36 @@
   .dark .border-green-200   { border-color: rgb(20 83 45 / 0.4); }
   .dark .border-amber-200  { border-color: rgb(120 53 15 / 0.4); }
   .dark .border-red-200    { border-color: rgb(127 29 29 / 0.4); }
+
+  /* ── Deep-space overrides for Tailwind slate palette ── */
+  /* These remap slate-* classes used in page cards/panels/tables */
+  .dark .bg-slate-950  { background-color: rgba(2, 5, 18, 1); }
+  .dark .bg-slate-900  { background-color: rgba(8, 14, 36, 0.97); }
+  .dark .bg-slate-800  { background-color: rgba(14, 22, 52, 0.97); }
+  .dark .bg-slate-700  { background-color: rgba(22, 35, 74, 0.97); }
+
+  /* Neon-tinted slate borders */
+  .dark .border-slate-800 { border-color: rgba(249, 115, 22, 0.07); }
+  .dark .border-slate-700 { border-color: rgba(249, 115, 22, 0.13); }
+  .dark .border-slate-600 { border-color: rgba(249, 115, 22, 0.20); }
+
+  /* Hover states for slate elements */
+  .dark .hover\:bg-slate-800:hover { background-color: rgba(20, 32, 68, 0.85); }
+  .dark .hover\:bg-slate-700:hover { background-color: rgba(28, 44, 92, 0.85); }
+
+  /* Slate text tones */
+  .dark .text-slate-100 { color: rgb(241 245 249); }
+  .dark .text-slate-200 { color: rgb(226 232 240); }
+  .dark .text-slate-300 { color: rgb(203 213 225); }
+  .dark .text-slate-400 { color: rgb(148 163 184); }
+  .dark .text-slate-500 { color: rgb(100 116 139); }
 }
 
 /* Page transition animations */
 @keyframes page-enter {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.995);
+    transform: translateY(6px) scale(0.998);
   }
   to {
     opacity: 1;
@@ -74,7 +99,7 @@
 }
 
 .page-enter-animation {
-  animation: page-enter 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: page-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @keyframes sidebar-ping {
@@ -121,4 +146,193 @@
     transform: translateX(0);
     opacity: 1;
   }
+}
+
+/* ============================================================
+   FUTURISTIC / CYBERPUNK THEME
+   ============================================================ */
+
+/* Deep space base */
+.dark body {
+  background: #020817;
+}
+
+/* Animated grid + radial gradient background */
+.dark .futuristic-bg {
+  background-color: #020817;
+  background-image:
+    linear-gradient(rgba(249, 115, 22, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(249, 115, 22, 0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  position: relative;
+}
+
+.dark .futuristic-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 5% 5%,  rgba(249, 115, 22, 0.09) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 70% at 95% 95%, rgba(6, 182, 212, 0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 50% 0%,  rgba(249, 115, 22, 0.04) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Glassmorphism sidebar */
+.glass-sidebar {
+  background: rgba(4, 8, 22, 0.88) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-right: 1px solid rgba(249, 115, 22, 0.15) !important;
+  box-shadow: 4px 0 32px rgba(0, 0, 0, 0.5), inset -1px 0 0 rgba(249, 115, 22, 0.08);
+}
+
+/* Glassmorphism navbar */
+.glass-navbar {
+  background: rgba(4, 8, 22, 0.82) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Neon active sidebar item */
+.dark .sidebar-active-ping {
+  background: rgba(249, 115, 22, 0.12) !important;
+  border: 1px solid rgba(249, 115, 22, 0.30) !important;
+  box-shadow: 0 0 18px rgba(249, 115, 22, 0.20), inset 0 0 12px rgba(249, 115, 22, 0.06) !important;
+}
+
+/* Neon glow on active indicator dot */
+.dark .sidebar-active-ping .neon-dot {
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.8), 0 0 16px rgba(249, 115, 22, 0.4);
+}
+
+/* Neon orange glow */
+.neon-orange-glow {
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.5), 0 0 28px rgba(249, 115, 22, 0.2);
+}
+
+/* Neon cyan glow */
+.neon-cyan-glow {
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.5), 0 0 28px rgba(6, 182, 212, 0.2);
+}
+
+/* Gradient text */
+.neon-gradient-text {
+  background: linear-gradient(135deg, #f97316 0%, #fb923c 50%, #fdba74 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Scanline flicker animation for PRO badge */
+@keyframes neon-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(249,115,22,0.6); }
+  50%       { opacity: 0.85; box-shadow: 0 0 12px rgba(249,115,22,0.9); }
+}
+.dark .neon-pro-badge {
+  animation: neon-pulse 2.5s ease-in-out infinite;
+}
+
+/* Futuristic scrollbar */
+.dark ::-webkit-scrollbar        { width: 4px; height: 4px; }
+.dark ::-webkit-scrollbar-track  { background: rgba(2, 8, 23, 0.6); }
+.dark ::-webkit-scrollbar-thumb  { background: rgba(249, 115, 22, 0.35); border-radius: 4px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: rgba(249, 115, 22, 0.6); }
+
+/* Neon focus ring */
+.dark input:focus, .dark textarea:focus, .dark select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.35), 0 0 12px rgba(249, 115, 22, 0.15);
+}
+
+/* Glowing card on hover */
+.dark .hover\:shadow-neon:hover {
+  box-shadow: 0 0 0 1px rgba(249,115,22,0.2), 0 8px 32px rgba(249,115,22,0.1);
+}
+
+/* Neon separator line */
+.dark .neon-separator {
+  background: linear-gradient(90deg, transparent, rgba(249,115,22,0.3), transparent);
+  height: 1px;
+  border: none;
+}
+
+/* ── Futuristic table styles ── */
+/* Table header rows get a subtle deep-space gradient */
+.dark table thead tr {
+  background: linear-gradient(90deg, rgba(8,14,36,1) 0%, rgba(12,20,50,1) 100%);
+}
+.dark table thead th {
+  color: rgba(249, 115, 22, 0.65) !important;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(249, 115, 22, 0.12) !important;
+}
+/* Table body row hover — neon orange micro-glow */
+.dark table tbody tr {
+  border-bottom-color: rgba(249, 115, 22, 0.06) !important;
+  transition: background 0.15s;
+}
+.dark table tbody tr:hover {
+  background: rgba(249, 115, 22, 0.04) !important;
+  box-shadow: inset 3px 0 0 rgba(249, 115, 22, 0.35);
+}
+
+/* ── Futuristic inputs & selects ── */
+.dark input[type="text"],
+.dark input[type="search"],
+.dark input[type="email"],
+.dark input[type="number"],
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="password"],
+.dark textarea,
+.dark select {
+  background-color: rgba(8, 14, 36, 0.92) !important;
+  border-color: rgba(249, 115, 22, 0.18) !important;
+  color: rgb(226 232 240) !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgba(148, 163, 184, 0.45) !important;
+}
+.dark select option {
+  background-color: rgba(8, 14, 36, 1);
+  color: rgb(226 232 240);
+}
+
+/* ── Card glass effect for page panels ── */
+/* Any rounded-xl with border in dark mode gets subtle neon border */
+.dark .rounded-xl.border,
+.dark .rounded-2xl.border {
+  box-shadow: 0 1px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(249,115,22,0.06) inset;
+}
+/* Hover elevation for cards */
+.dark .rounded-xl.border:hover,
+.dark .rounded-2xl.border:hover {
+  box-shadow: 0 4px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(249,115,22,0.12) inset;
+  transition: box-shadow 0.2s;
+}
+
+/* ── Page section titles ── */
+.dark h1 { color: rgb(241 245 249); }
+.dark h2 { color: rgb(226 232 240); }
+.dark h3 { color: rgb(203 213 225); }
+
+/* ── Badge/tag pill neon overrides ── */
+.dark .rounded-full.bg-orange-500 { box-shadow: 0 0 8px rgba(249,115,22,0.6); }
+.dark .rounded-full.bg-green-500  { box-shadow: 0 0 8px rgba(34,197,94,0.5); }
+
+/* ── Orange primary button neon glow ── */
+.dark .bg-orange-500 {
+  box-shadow: 0 0 12px rgba(249,115,22,0.3);
+}
+.dark .bg-orange-500:hover,
+.dark .hover\:bg-orange-600:hover {
+  box-shadow: 0 0 20px rgba(249,115,22,0.5);
 }

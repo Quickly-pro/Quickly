@@ -29,7 +29,7 @@ const ROLE_CONFIG: Record<RoleOption, { label: string; icon: string; desc: strin
 };
 
 export default function Registro() {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [role, setRole] = useState<RoleOption | null>(null);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -37,6 +37,7 @@ export default function Registro() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [registeredEmail, setRegisteredEmail] = useState('');
   const navigate = useNavigate();
 
   const handleSelectRole = (r: RoleOption) => {
@@ -48,6 +49,7 @@ export default function Registro() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!role) return;
+
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
       return;
@@ -69,12 +71,23 @@ export default function Registro() {
           full_name: fullName.trim(),
           role: role,
         },
+        // Redirigir siempre a la URL real de la app (no localhost)
+        emailRedirectTo: `${window.location.origin}/`,
       },
     });
 
     if (authError) {
       setLoading(false);
-      setError(authError.message);
+      // Mensajes de error en español
+      if (authError.message.includes('already registered') || authError.message.includes('User already registered')) {
+        setError('Este correo ya está registrado. Inicia sesión o usa otro correo.');
+      } else if (authError.message.includes('invalid email')) {
+        setError('El correo electrónico no es válido.');
+      } else if (authError.message.includes('Password should be')) {
+        setError('La contraseña debe tener al menos 6 caracteres.');
+      } else {
+        setError(authError.message);
+      }
       return;
     }
 
@@ -111,8 +124,55 @@ export default function Registro() {
     }
 
     setLoading(false);
-    navigate('/', { replace: true });
+
+    // Si hay sesión activa → entrar directamente
+    if (authData.session) {
+      navigate('/', { replace: true });
+    } else {
+      // Supabase requiere confirmación de email → mostrar aviso
+      setRegisteredEmail(email.trim());
+      setStep(3);
+    }
   };
+
+  // ── Paso 3: Confirmar email ──────────────────────────────────────────────
+  if (step === 3) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 px-4">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 p-8 shadow-sm text-center">
+          <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <i className="ri-mail-check-line text-3xl text-orange-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-2">¡Cuenta creada!</h2>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
+            Hemos enviado un correo de confirmación a:
+          </p>
+          <p className="font-semibold text-orange-600 dark:text-orange-400 mb-6 break-all">{registeredEmail}</p>
+          <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800/30 rounded-xl p-4 text-left mb-6">
+            <p className="text-sm text-gray-700 dark:text-slate-300 font-medium mb-2">
+              <i className="ri-information-line mr-1 text-orange-500" />
+              Pasos para entrar:
+            </p>
+            <ol className="text-sm text-gray-600 dark:text-slate-400 space-y-1 ml-4 list-decimal">
+              <li>Abre tu bandeja de entrada de <strong>{registeredEmail}</strong></li>
+              <li>Busca el correo de confirmación de Quickly</li>
+              <li>Haz clic en el enlace de confirmación</li>
+              <li>Vuelve aquí e inicia sesión</li>
+            </ol>
+          </div>
+          <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">
+            ¿No encuentras el correo? Revisa la carpeta de spam.
+          </p>
+          <button
+            onClick={() => navigate('/login')}
+            className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium text-sm transition-all"
+          >
+            Ir a iniciar sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 px-4">
@@ -234,7 +294,8 @@ export default function Registro() {
             </div>
 
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm flex items-start gap-2">
+                <i className="ri-error-warning-line flex-shrink-0 mt-0.5" />
                 {error}
               </div>
             )}
@@ -242,8 +303,9 @@ export default function Registro() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
+              {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               {loading ? 'Creando cuenta...' : 'Crear cuenta'}
             </button>
 

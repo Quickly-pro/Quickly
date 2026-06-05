@@ -12,10 +12,10 @@ const COLORS = ['#f97316', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#f59e0b'
 
 export default function EmpresaDashboard() {
   const { isDark } = useTheme();
-  const gridStroke = isDark ? '#334155' : '#e5e7eb';
-  const tickFill = isDark ? '#94a3b8' : '#9ca3af';
-  const tooltipBg = isDark ? '#1e293b' : '#ffffff';
-  const tooltipBorder = isDark ? '#334155' : '#f3f4f6';
+  const gridStroke = isDark ? 'rgba(255,255,255,0.05)' : '#e5e7eb';
+  const tickFill = isDark ? '#374151' : '#9ca3af';
+  const tooltipBg = isDark ? 'rgba(4,8,22,0.97)' : '#ffffff';
+  const tooltipBorder = isDark ? 'rgba(249,115,22,0.25)' : '#f3f4f6';
   const tooltipText = isDark ? '#e2e8f0' : '#1f2937';
 
   const [stats, setStats] = useState<any>(null);
@@ -157,125 +157,134 @@ export default function EmpresaDashboard() {
   };
 
   const statCards = useMemo(() => stats ? [
-    { label: 'Clientes', value: stats.totalClients, icon: 'ri-user-3-line', color: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' },
-    { label: 'Rutas Activas', value: stats.activeRoutes, icon: 'ri-route-line', color: 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' },
-    { label: 'Pedidos Activos', value: stats.activeOrders, icon: 'ri-shopping-cart-2-line', color: 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400' },
-    { label: 'Stock Bajo', value: stats.lowStock, icon: 'ri-alert-line', color: 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' },
-    { label: 'Facturas Pend.', value: stats.pendingInvoices, icon: 'ri-file-list-3-line', color: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' },
-    { label: 'Empleados', value: stats.totalEmployees, icon: 'ri-user-settings-line', color: 'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400' },
+    { label: 'Clientes', value: stats.totalClients, icon: 'ri-user-3-line', gradient: 'from-blue-500 to-cyan-500', iconBg: 'bg-blue-500/10', iconColor: 'text-blue-400' },
+    { label: 'Rutas Activas', value: stats.activeRoutes, icon: 'ri-route-line', gradient: 'from-green-500 to-emerald-500', iconBg: 'bg-green-500/10', iconColor: 'text-green-400' },
+    { label: 'Pedidos Activos', value: stats.activeOrders, icon: 'ri-shopping-cart-2-line', gradient: 'from-orange-500 to-amber-400', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-400' },
+    { label: 'Stock Bajo', value: stats.lowStock, icon: 'ri-alert-line', gradient: 'from-red-500 to-rose-500', iconBg: 'bg-red-500/10', iconColor: 'text-red-400' },
+    { label: 'Facturas Pend.', value: stats.pendingInvoices, icon: 'ri-file-list-3-line', gradient: 'from-amber-500 to-yellow-400', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
+    { label: 'Empleados', value: stats.totalEmployees, icon: 'ri-user-settings-line', gradient: 'from-purple-500 to-violet-500', iconBg: 'bg-purple-500/10', iconColor: 'text-purple-400' },
   ] : [], [stats]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Dashboard Empresarial</h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Resumen completo de tu operación</p>
+          <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">
+            Dashboard <span className="dark:neon-gradient-text">Empresarial</span>
+          </h1>
+          <p className="text-sm text-gray-400 dark:text-slate-500 mt-1">Resumen en tiempo real de tu operación</p>
         </div>
-        <span className="text-sm text-gray-400 dark:text-slate-500">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+        <span className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-100 dark:bg-white/5 dark:border dark:border-white/8 text-gray-500 dark:text-slate-400 rounded-full capitalize">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </span>
       </div>
 
       <SubscriptionBanner />
-
       <DashboardStats stats={stats} />
 
+      {/* ── Mini stat cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700 animate-pulse">
-              <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-slate-700 mb-2" />
-              <div className="h-6 w-12 bg-gray-200 dark:bg-slate-700 rounded" />
-              <div className="h-3 w-20 bg-gray-200 dark:bg-slate-700 rounded mt-2" />
+        {loading ? Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="bg-white dark:bg-[#080e24] rounded-2xl p-4 border border-gray-100 dark:border-white/5 animate-pulse">
+            <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/5 mb-3" />
+            <div className="h-7 w-10 bg-gray-100 dark:bg-white/5 rounded-lg" />
+            <div className="h-2.5 w-16 bg-gray-100 dark:bg-white/5 rounded mt-2" />
+          </div>
+        )) : statCards.map((s, i) => (
+          <div key={i} className="relative overflow-hidden bg-white dark:bg-[#080e24] rounded-2xl p-4 border border-gray-100 dark:border-white/5 hover:border-gray-200 dark:hover:border-orange-500/20 transition-all group cursor-default">
+            <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${s.gradient}`} />
+            <div className={`w-10 h-10 flex items-center justify-center rounded-xl mb-3 ${s.iconBg} group-hover:scale-110 transition-transform duration-200`}>
+              <i className={`${s.icon} text-lg ${s.iconColor}`} />
             </div>
-          ))
-        ) : (
-          statCards.map((s, i) => (
-            <div key={i} className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700">
-              <div className={`w-8 h-8 flex items-center justify-center rounded-lg mb-2 ${s.color}`}>
-                <i className={s.icon} />
-              </div>
-              <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{s.value}</p>
-              <p className="text-xs text-gray-500 dark:text-slate-400">{s.label}</p>
-            </div>
-          ))
-        )}
+            <p className="text-2xl font-black text-gray-900 dark:text-white">{s.value}</p>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{s.label}</p>
+          </div>
+        ))}
       </div>
 
+      {/* ── Financial cards ── */}
       {!loading && stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700">
-            <p className="text-xs text-gray-500 dark:text-slate-400">Pendiente Cobro</p>
-            <p className="text-xl font-bold text-orange-600">€{stats.pendingTotal.toLocaleString()}</p>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">{stats.pendingInvoices} facturas</p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700">
-            <p className="text-xs text-gray-500 dark:text-slate-400">Total Cobrado</p>
-            <p className="text-xl font-bold text-green-600">€{stats.cobradasTotal.toLocaleString()}</p>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">{stats.cobradas} facturas</p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700">
-            <p className="text-xs text-gray-500 dark:text-slate-400">Valor Inventario</p>
-            <p className="text-xl font-bold text-blue-600">€{Math.round(stats.totalInventory).toLocaleString()}</p>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Productos en stock</p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700">
-            <p className="text-xs text-gray-500 dark:text-slate-400">Gasto Combustible</p>
-            <p className="text-xl font-bold text-red-600">€{stats.fuelCost.toLocaleString()}</p>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Este mes</p>
-          </div>
+          {[
+            { label: 'Pendiente Cobro', value: `€${stats.pendingTotal.toLocaleString()}`, sub: `${stats.pendingInvoices} facturas`, valueColor: 'text-orange-500 dark:text-orange-400', bar: 'bg-orange-500', icon: 'ri-time-line', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-400' },
+            { label: 'Total Cobrado',   value: `€${stats.cobradasTotal.toLocaleString()}`, sub: `${stats.cobradas} facturas`,        valueColor: 'text-green-600 dark:text-green-400',  bar: 'bg-green-500',  icon: 'ri-check-double-line', iconBg: 'bg-green-500/10',  iconColor: 'text-green-400' },
+            { label: 'Valor Inventario',value: `€${Math.round(stats.totalInventory).toLocaleString()}`, sub: 'En stock',          valueColor: 'text-blue-600 dark:text-blue-400',    bar: 'bg-blue-500',   icon: 'ri-archive-line',     iconBg: 'bg-blue-500/10',   iconColor: 'text-blue-400' },
+            { label: 'Gasto Combustible',value:`€${stats.fuelCost.toLocaleString()}`,      sub: 'Este mes',                        valueColor: 'text-red-600 dark:text-red-400',      bar: 'bg-red-500',    icon: 'ri-gas-station-line', iconBg: 'bg-red-500/10',    iconColor: 'text-red-400' },
+          ].map((card, i) => (
+            <div key={i} className="relative overflow-hidden bg-white dark:bg-[#080e24] rounded-2xl p-4 border border-gray-100 dark:border-white/5">
+              <div className={`absolute left-0 top-4 bottom-4 w-1 ${card.bar} rounded-r-full`} />
+              <div className="pl-4 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-600">{card.label}</p>
+                  <p className={`text-xl font-black mt-1 ${card.valueColor}`}>{card.value}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-600 mt-0.5">{card.sub}</p>
+                </div>
+                <div className={`w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl ${card.iconBg}`}>
+                  <i className={`${card.icon} ${card.iconColor}`} />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
+      {/* ── Charts row 1 ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-800 dark:text-slate-100">Ingresos Mensuales (€)</h3>
-            <span className="text-xs text-gray-400 dark:text-slate-500">Desde facturas reales</span>
+        <div className="lg:col-span-2 bg-white dark:bg-[#080e24] rounded-2xl border border-gray-100 dark:border-white/5 p-5">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-5 bg-gradient-to-b from-orange-500 to-amber-400 rounded-full" />
+              <div>
+                <h3 className="font-bold text-gray-800 dark:text-white text-sm">Ingresos Mensuales</h3>
+                <p className="text-xs text-gray-400 dark:text-slate-500">Desde facturas reales</p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 text-xs font-bold bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-lg">€ EUR</span>
           </div>
-          <div className="h-56">
-            {loading ? (
-              <div className="h-full flex items-center justify-center text-gray-400 dark:text-slate-500 text-sm">Cargando gráfico...</div>
-            ) : (
+          <div className="h-52">
+            {loading ? <div className="h-full flex items-center justify-center text-gray-300 dark:text-slate-700 text-sm">Cargando...</div> : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyRevenue}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-                  <XAxis dataKey="name" tick={{ fill: tickFill, fontSize: 12 }} axisLine={false} />
-                  <YAxis tick={{ fill: tickFill, fontSize: 12 }} axisLine={false} tickFormatter={v => `€${v}`} />
-                  <Tooltip formatter={(value: any) => [`€${value}`, 'Importe']} contentStyle={{ borderRadius: 12, border: `1px solid ${tooltipBorder}`, backgroundColor: tooltipBg }} itemStyle={{ color: tooltipText }} labelStyle={{ color: tooltipText }} />
-                  <Bar dataKey="importe" fill="#f97316" radius={[4, 4, 0, 0]} />
+                <BarChart data={monthlyRevenue} barSize={18}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: tickFill, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: tickFill, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `€${v}`} />
+                  <Tooltip formatter={(value: any) => [`€${value}`, 'Importe']} contentStyle={{ borderRadius: 12, border: `1px solid ${tooltipBorder}`, backgroundColor: tooltipBg, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} itemStyle={{ color: tooltipText }} labelStyle={{ color: tooltipText, fontWeight: 700 }} />
+                  <Bar dataKey="importe" fill="#f97316" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-5">
+        <div className="bg-white dark:bg-[#080e24] rounded-2xl border border-gray-100 dark:border-white/5 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-800 dark:text-slate-100">Pedidos por Estado</h3>
-            <span className="text-xs text-gray-400 dark:text-slate-500">Total: {stats?.totalOrders || 0}</span>
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-5 bg-gradient-to-b from-purple-500 to-pink-500 rounded-full" />
+              <h3 className="font-bold text-gray-800 dark:text-white text-sm">Pedidos por Estado</h3>
+            </div>
+            <span className="text-xs font-medium text-gray-400 dark:text-slate-600">Total: {stats?.totalOrders || 0}</span>
           </div>
-          <div className="h-48">
-            {loading ? (
-              <div className="h-full flex items-center justify-center text-gray-400 dark:text-slate-500 text-sm">Cargando...</div>
-            ) : ordersByStatus.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-gray-400 dark:text-slate-500 text-sm">Sin datos</div>
-            ) : (
+          <div className="h-44">
+            {loading ? <div className="h-full flex items-center justify-center text-gray-300 dark:text-slate-700 text-sm">Cargando...</div>
+            : ordersByStatus.length === 0 ? <div className="h-full flex items-center justify-center text-gray-300 dark:text-slate-700 text-sm">Sin datos</div>
+            : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={ordersByStatus} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" nameKey="name" paddingAngle={3}>
-                    {ordersByStatus.map((_, i) => (
-                      <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />
-                    ))}
+                  <Pie data={ordersByStatus} cx="50%" cy="50%" innerRadius={44} outerRadius={66} dataKey="value" nameKey="name" paddingAngle={4} strokeWidth={0}>
+                    {ordersByStatus.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip formatter={(value: any, name: any) => [value, name]} />
+                  <Tooltip formatter={(v: any, n: any) => [v, n]} contentStyle={{ borderRadius: 12, border: `1px solid ${tooltipBorder}`, backgroundColor: tooltipBg }} itemStyle={{ color: tooltipText }} />
                 </PieChart>
               </ResponsiveContainer>
             )}
           </div>
-          <div className="flex flex-wrap gap-2 mt-2">
+          <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-2">
             {ordersByStatus.map((entry, i) => (
-              <span key={i} className="flex items-center gap-1 text-xs text-gray-600 dark:text-slate-400">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+              <span key={i} className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-500">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                 {entry.name} ({entry.value})
               </span>
             ))}
@@ -283,129 +292,124 @@ export default function EmpresaDashboard() {
         </div>
       </div>
 
+      {/* ── Charts row 2 ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-5">
-          <h3 className="font-semibold text-gray-800 dark:text-slate-100 mb-4">Rutas por Día (últimos 7 días)</h3>
-          <div className="h-48">
-            {loading ? (
-              <div className="h-full flex items-center justify-center text-gray-400 dark:text-slate-500 text-sm">Cargando...</div>
-            ) : (
+        <div className="lg:col-span-2 bg-white dark:bg-[#080e24] rounded-2xl border border-gray-100 dark:border-white/5 p-5">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-1 h-5 bg-gradient-to-b from-green-500 to-emerald-400 rounded-full" />
+            <div>
+              <h3 className="font-bold text-gray-800 dark:text-white text-sm">Rutas por Día</h3>
+              <p className="text-xs text-gray-400 dark:text-slate-500">Últimos 7 días</p>
+            </div>
+          </div>
+          <div className="h-44">
+            {loading ? <div className="h-full flex items-center justify-center text-gray-300 dark:text-slate-700 text-sm">Cargando...</div> : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={dailyRoutes}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-                  <XAxis dataKey="name" tick={{ fill: tickFill, fontSize: 12 }} axisLine={false} />
-                  <YAxis tick={{ fill: tickFill, fontSize: 12 }} axisLine={false} allowDecimals={false} />
-                  <Tooltip contentStyle={{ borderRadius: 12, border: `1px solid ${tooltipBorder}`, backgroundColor: tooltipBg }} itemStyle={{ color: tooltipText }} labelStyle={{ color: tooltipText }} />
-                  <Line type="monotone" dataKey="rutas" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: tickFill, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: tickFill, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: `1px solid ${tooltipBorder}`, backgroundColor: tooltipBg, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} itemStyle={{ color: tooltipText }} labelStyle={{ color: tooltipText, fontWeight: 700 }} />
+                  <Line type="monotone" dataKey="rutas" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 5 }} />
                 </LineChart>
               </ResponsiveContainer>
             )}
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-5">
-          <h3 className="font-semibold text-gray-800 dark:text-slate-100 mb-4">Actividad Reciente</h3>
+        <div className="bg-white dark:bg-[#080e24] rounded-2xl border border-gray-100 dark:border-white/5 p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-1 h-5 bg-gradient-to-b from-cyan-500 to-blue-500 rounded-full" />
+            <h3 className="font-bold text-gray-800 dark:text-white text-sm">Actividad Reciente</h3>
+          </div>
           <div className="space-y-3">
-            {loading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex items-start gap-3 animate-pulse">
-                  <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-slate-700 flex-shrink-0" />
-                  <div className="flex-1 space-y-1">
-                    <div className="h-3 w-32 bg-gray-200 dark:bg-slate-700 rounded" />
-                    <div className="h-3 w-20 bg-gray-200 dark:bg-slate-700 rounded" />
-                  </div>
+            {loading ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-start gap-3 animate-pulse">
+                <div className="w-8 h-8 rounded-xl bg-gray-100 dark:bg-white/5 flex-shrink-0" />
+                <div className="flex-1 pt-1 space-y-1.5">
+                  <div className="h-2.5 w-3/4 bg-gray-100 dark:bg-white/5 rounded" />
+                  <div className="h-2 w-1/2 bg-gray-100 dark:bg-white/5 rounded" />
                 </div>
-              ))
-            ) : (
-              recentActivity.map((act) => (
-                <div key={act.id} className="flex items-start gap-3">
-                  <div className={`w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 ${act.color}`}>
-                    <i className={act.icon} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-700 dark:text-slate-300">{act.text}</p>
-                    <p className="text-xs text-gray-400 dark:text-slate-500">{act.time}</p>
-                  </div>
+              </div>
+            )) : recentActivity.map((act) => (
+              <div key={act.id} className="flex items-start gap-3 group">
+                <div className={`w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 ${act.color} group-hover:scale-110 transition-transform`}>
+                  <i className={`${act.icon} text-xs`} />
                 </div>
-              ))
-            )}
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <p className="text-sm text-gray-700 dark:text-slate-300 truncate">{act.text}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-600 mt-0.5">{act.time}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 dark:text-slate-100">Pedidos Recientes</h3>
-          <span className="text-xs text-gray-400 dark:text-slate-500">5 más recientes</span>
+      {/* ── Recent orders table ── */}
+      <div className="bg-white dark:bg-[#080e24] rounded-2xl border border-gray-100 dark:border-white/5 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-5 bg-gradient-to-b from-orange-500 to-amber-400 rounded-full" />
+            <h3 className="font-bold text-gray-800 dark:text-white">Pedidos Recientes</h3>
+          </div>
+          <span className="px-2.5 py-1 text-xs bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-slate-500 rounded-lg font-medium">5 más recientes</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 dark:border-slate-800">
-                <th className="text-left px-4 py-3 text-gray-500 dark:text-slate-400 font-medium">ID</th>
-                <th className="text-left px-4 py-3 text-gray-500 dark:text-slate-400 font-medium">Fecha</th>
-                <th className="text-left px-4 py-3 text-gray-500 dark:text-slate-400 font-medium">Estado</th>
-                <th className="text-left px-4 py-3 text-gray-500 dark:text-slate-400 font-medium">Pago</th>
-                <th className="text-right px-4 py-3 text-gray-500 dark:text-slate-400 font-medium">Total</th>
+              <tr className="border-b border-gray-100 dark:border-white/5">
+                {['ID', 'Fecha', 'Estado', 'Pago', 'Total'].map((h, i) => (
+                  <th key={h} className={`px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-gray-400 dark:text-slate-600 ${i === 4 ? 'text-right' : 'text-left'}`}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-slate-500">Cargando...</td></tr>
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-300 dark:text-slate-700">Cargando...</td></tr>
               ) : recentOrders.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-slate-500">Sin pedidos aún</td></tr>
-              ) : (
-                recentOrders.map(order => (
-                  <tr key={order.id} className="border-b border-gray-50 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/50">
-                    <td className="px-4 py-3 font-medium text-gray-800 dark:text-slate-200">PED-{String(order.id).padStart(6, '0')}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-slate-400">{formatDate(order.created_at)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(order.status)}`}>
-                        {statusLabel(order.status)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-slate-400 capitalize">{order.payment_provider || 'manual'}</td>
-                    <td className="px-4 py-3 text-right font-medium text-gray-800 dark:text-slate-200">€{orderTotal(order).toFixed(2)}</td>
-                  </tr>
-                ))
-              )}
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-gray-300 dark:text-slate-700">Sin pedidos aún</td></tr>
+              ) : recentOrders.map(order => (
+                <tr key={order.id} className="border-b border-gray-50 dark:border-white/5 hover:bg-gray-50/80 dark:hover:bg-orange-500/5 transition-colors">
+                  <td className="px-5 py-3.5 font-mono font-bold text-xs text-gray-600 dark:text-orange-400/70">PED-{String(order.id).padStart(6, '0')}</td>
+                  <td className="px-5 py-3.5 text-gray-500 dark:text-slate-500 text-xs">{formatDate(order.created_at)}</td>
+                  <td className="px-5 py-3.5">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusBadge(order.status)}`}>{statusLabel(order.status)}</span>
+                  </td>
+                  <td className="px-5 py-3.5 text-gray-500 dark:text-slate-500 text-xs capitalize">{order.payment_provider || 'manual'}</td>
+                  <td className="px-5 py-3.5 text-right font-bold text-gray-800 dark:text-white">€{orderTotal(order).toFixed(2)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-5">
-        <h3 className="font-semibold text-gray-800 dark:text-slate-100 mb-4">Estado de Facturas</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-100 dark:border-amber-800/30">
-            <div className="w-10 h-10 flex items-center justify-center bg-amber-100 dark:bg-amber-800/40 rounded-full">
-              <i className="ri-time-line text-amber-600 dark:text-amber-400" />
+      {/* ── Invoice status ── */}
+      <div className="bg-white dark:bg-[#080e24] rounded-2xl border border-gray-100 dark:border-white/5 p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-1 h-5 bg-gradient-to-b from-amber-500 to-yellow-400 rounded-full" />
+          <h3 className="font-bold text-gray-800 dark:text-white">Estado de Facturas</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {[
+            { label: 'Pendientes', value: stats?.pendingInvoices || 0, icon: 'ri-time-line',         bg: 'bg-amber-50 dark:bg-amber-500/8',   border: 'border-amber-100 dark:border-amber-500/15', iconBg: 'bg-amber-100 dark:bg-amber-500/20', iconColor: 'text-amber-600 dark:text-amber-400', textColor: 'text-amber-700 dark:text-amber-400', numColor: 'text-amber-800 dark:text-amber-300' },
+            { label: 'Cobradas',   value: stats?.cobradas        || 0, icon: 'ri-check-double-line', bg: 'bg-green-50 dark:bg-green-500/8',    border: 'border-green-100 dark:border-green-500/15',  iconBg: 'bg-green-100 dark:bg-green-500/20',  iconColor: 'text-green-600 dark:text-green-400',  textColor: 'text-green-700 dark:text-green-400',  numColor: 'text-green-800 dark:text-green-300' },
+            { label: 'Vencidas',   value: stats?.vencidas        || 0, icon: 'ri-alert-line',        bg: 'bg-red-50 dark:bg-red-500/8',        border: 'border-red-100 dark:border-red-500/15',      iconBg: 'bg-red-100 dark:bg-red-500/20',      iconColor: 'text-red-600 dark:text-red-400',      textColor: 'text-red-700 dark:text-red-400',      numColor: 'text-red-800 dark:text-red-300' },
+          ].map((item, i) => (
+            <div key={i} className={`flex items-center gap-4 p-4 ${item.bg} rounded-xl border ${item.border}`}>
+              <div className={`w-11 h-11 flex items-center justify-center ${item.iconBg} rounded-xl flex-shrink-0`}>
+                <i className={`${item.icon} text-lg ${item.iconColor}`} />
+              </div>
+              <div>
+                <p className={`text-sm font-semibold ${item.textColor}`}>{item.label}</p>
+                <p className={`text-3xl font-black ${item.numColor}`}>{item.value}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Pendientes</p>
-              <p className="text-lg font-bold text-amber-800 dark:text-amber-300">{stats?.pendingInvoices || 0}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800/30">
-            <div className="w-10 h-10 flex items-center justify-center bg-green-100 dark:bg-green-800/40 rounded-full">
-              <i className="ri-check-double-line text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-green-700 dark:text-green-400">Cobradas</p>
-              <p className="text-lg font-bold text-green-800 dark:text-green-300">{stats?.cobradas || 0}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800/30">
-            <div className="w-10 h-10 flex items-center justify-center bg-red-100 dark:bg-red-800/40 rounded-full">
-              <i className="ri-alert-line text-red-600 dark:text-red-400" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-red-700 dark:text-red-400">Vencidas</p>
-              <p className="text-lg font-bold text-red-800 dark:text-red-300">{stats?.vencidas || 0}</p>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
+
     </div>
   );
 }

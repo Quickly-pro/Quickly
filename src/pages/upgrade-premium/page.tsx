@@ -127,7 +127,7 @@ export default function UpgradePremium() {
           Desbloquea todo el potencial
         </h1>
         <p className="text-sm text-gray-500 dark:text-slate-400 max-w-md mx-auto">
-          El plan gratuito cubre lo básico. Premium te da las herramientas que necesitas para escalar tu negocio de reparto.
+          El plan gratuito cubre lo básico. Premium te da las herramientas que necesitas para escalar tu empresa de transporte y logística.
         </p>
 
         {/* Toggle mensual / anual */}

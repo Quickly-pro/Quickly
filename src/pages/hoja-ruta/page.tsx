@@ -12,20 +12,78 @@ interface RouteRow {
   iva: string;
 }
 
-const sampleData: RouteRow[] = [
-  { id: 1, client: 'Restaurante La Luna', product: 'Leche entera 1L', quantity: 20, price: 0.95, total: 19.00, status: 'Pagado', date: '5/4', iva: '21%' },
-  { id: 2, client: 'Restaurante La Luna', product: 'Pan de molde', quantity: 10, price: 1.20, total: 12.00, status: 'Pagado', date: '5/4', iva: '21%' },
-  { id: 3, client: 'Hotel Mar Azul', product: 'Detergente 3L', quantity: 5, price: 5.99, total: 29.95, status: 'Pagado', date: '5/4', iva: '21%' },
-  { id: 4, client: 'Cafetería Central', product: 'Zumo de naranja 1L', quantity: 15, price: 1.50, total: 22.50, status: 'Pagado', date: '5/4', iva: '21%' },
-  { id: 5, client: 'Bar El Sol', product: 'Agua mineral 1.5L', quantity: 50, price: 0.45, total: 22.50, status: 'Pagado', date: '5/4', iva: '21%' },
-  { id: 6, client: 'Bar El Sol', product: 'Coca-Cola 33cl', quantity: 30, price: 0.85, total: 25.50, status: 'Pagado', date: '5/4', iva: '21%' },
-];
+const PEDIDOS_KEY = 'hoja-pedidos-rows';
+const RUTA_KEY = 'hoja-ruta-rows';
 
 const ROWS_INITIAL = 15;
 const ROWS_ADD = 20;
 
+// Convierte filas de Hoja de Pedidos → filas de Hoja de Ruta (expande productos)
+function pedidosToRuta(pedidos: any[]): RouteRow[] {
+  const result: RouteRow[] = [];
+  let id = 1;
+  for (const row of pedidos) {
+    if (!row.employee) continue;
+    const products: [string, string][] = [
+      [row.product1, row.cant1],
+      [row.product2, row.cant2],
+      [row.product3, row.cant3],
+      [row.product4, row.cant4],
+    ].filter(([p]) => !!p) as [string, string][];
+    for (const [product, cant] of products) {
+      result.push({
+        id: id++,
+        client: row.employee,
+        product,
+        quantity: parseInt(cant) || 0,
+        price: 0,
+        total: 0,
+        status: '',
+        date: row.date || '',
+        iva: '',
+      });
+    }
+  }
+  return result;
+}
+
+function loadRutaRows(): RouteRow[] {
+  try {
+    const pedidosRaw = localStorage.getItem(PEDIDOS_KEY);
+    if (pedidosRaw) {
+      const pedidos = JSON.parse(pedidosRaw);
+      const derived = pedidosToRuta(pedidos);
+      if (derived.length > 0) {
+        // Merge con extras guardados (precio, total, estado, IVA)
+        const rutaRaw = localStorage.getItem(RUTA_KEY);
+        if (rutaRaw) {
+          const saved: RouteRow[] = JSON.parse(rutaRaw);
+          return derived.map(row => {
+            const match = saved.find(s =>
+              s.client === row.client &&
+              s.product === row.product &&
+              s.date === row.date
+            );
+            return match
+              ? { ...row, price: match.price, total: match.total, status: match.status, iva: match.iva }
+              : row;
+          });
+        }
+        return derived;
+      }
+    }
+  } catch { /* ignore */ }
+  // Fallback: datos guardados anteriores
+  try {
+    const rutaRaw = localStorage.getItem(RUTA_KEY);
+    if (rutaRaw) return JSON.parse(rutaRaw) as RouteRow[];
+  } catch { /* ignore */ }
+  return [];
+}
+
 export default function HojaRuta() {
-  const [rows, setRows] = useState<RouteRow[]>(sampleData);
+  const [rows, setRows] = useState<RouteRow[]>(loadRutaRows);
+  const [syncMsg, setSyncMsg] = useState('');
   const [visibleCount, setVisibleCount] = useState(ROWS_INITIAL);
   const [editingCell, setEditingCell] = useState<{ rowId: number; field: keyof RouteRow } | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -37,14 +95,36 @@ export default function HojaRuta() {
 
   const handleCellSave = () => {
     if (!editingCell) return;
-    setRows(prev => prev.map(r => {
+    const newRows = rows.map(r => {
       if (r.id !== editingCell.rowId) return r;
       const newValue = editingCell.field === 'quantity' || editingCell.field === 'price' || editingCell.field === 'total'
         ? parseFloat(editValue) || 0
         : editValue;
       return { ...r, [editingCell.field]: newValue };
-    }));
+    });
+    setRows(newRows);
     setEditingCell(null);
+    try { localStorage.setItem(RUTA_KEY, JSON.stringify(newRows)); } catch { /* ignore */ }
+  };
+
+  const syncFromPedidos = () => {
+    try {
+      const pedidosRaw = localStorage.getItem(PEDIDOS_KEY);
+      if (!pedidosRaw) { setSyncMsg('No hay datos en Hoja de Pedidos'); setTimeout(() => setSyncMsg(''), 3000); return; }
+      const pedidos = JSON.parse(pedidosRaw);
+      const derived = pedidosToRuta(pedidos);
+      // Merge con extras actuales
+      const merged = derived.map(row => {
+        const match = rows.find(s =>
+          s.client === row.client && s.product === row.product && s.date === row.date
+        );
+        return match ? { ...row, price: match.price, total: match.total, status: match.status, iva: match.iva } : row;
+      });
+      setRows(merged);
+      try { localStorage.setItem(RUTA_KEY, JSON.stringify(merged)); } catch { /* ignore */ }
+      setSyncMsg(`Sincronizado: ${merged.length} filas`);
+      setTimeout(() => setSyncMsg(''), 3000);
+    } catch { setSyncMsg('Error al sincronizar'); setTimeout(() => setSyncMsg(''), 3000); }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -108,9 +188,25 @@ export default function HojaRuta() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500 dark:text-slate-400">Edita directamente las celdas</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <p className="text-sm text-gray-500 dark:text-slate-400">Sincronizada automáticamente con Hoja de Pedidos</p>
+          {syncMsg && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5 flex items-center gap-1">
+              <i className="ri-check-line" /> {syncMsg}
+            </p>
+          )}
+        </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={syncFromPedidos}
+            className="px-3 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-all flex items-center gap-2 whitespace-nowrap"
+          >
+            <div className="w-4 h-4 flex items-center justify-center">
+              <i className="ri-refresh-line" />
+            </div>
+            Sincronizar
+          </button>
           <button
             onClick={handlePrint}
             className="px-3 py-2 bg-gray-800 dark:bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700 dark:hover:bg-slate-700 transition-all flex items-center gap-2 whitespace-nowrap"
@@ -342,12 +438,11 @@ export default function HojaRuta() {
           onClick={addRows}
           className="px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-slate-700 transition-all flex items-center gap-2 whitespace-nowrap"
         >
-          <div className="w-4 h-4 flex items-center justify-center">
-            <i className="ri-add-line" />
-          </div>
+          <i className="ri-add-line" />
           + {ROWS_ADD} filas más
         </button>
       </div>
+
     </div>
   );
 }

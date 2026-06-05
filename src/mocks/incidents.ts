@@ -1,7 +1,7 @@
 export const vehicleIncidents = [
   {
     id: 1,
-    vehicle: 'Furgoneta F-01',
+    vehicle: 'Camión TIR-01',
     type: 'pinchazo',
     description: 'Pinchazo en rueda trasera izquierda durante la ruta Centro.',
     status: 'resuelta',
@@ -12,7 +12,7 @@ export const vehicleIncidents = [
   },
   {
     id: 2,
-    vehicle: 'Furgoneta F-02',
+    vehicle: 'Trailer TR-02',
     type: 'mecanica',
     description: 'Ruido extraño en el motor, posible problema de correa de distribución.',
     status: 'en_proceso',
@@ -23,7 +23,7 @@ export const vehicleIncidents = [
   },
   {
     id: 3,
-    vehicle: 'Furgoneta F-03',
+    vehicle: 'Furgoneta FUR-03',
     type: 'accidente',
     description: 'Pequeño roce lateral con un coche aparcado. Abolladura en la puerta delantera.',
     status: 'abierta',
@@ -37,7 +37,7 @@ export const vehicleIncidents = [
 export const fuelTickets = [
   {
     id: 1,
-    vehicle: 'Furgoneta F-01',
+    vehicle: 'Camión TIR-01',
     employee: 'Carlos Martínez',
     liters: 45.5,
     cost: 68.25,
@@ -48,7 +48,7 @@ export const fuelTickets = [
   },
   {
     id: 2,
-    vehicle: 'Furgoneta F-02',
+    vehicle: 'Trailer TR-02',
     employee: 'Ana López',
     liters: 38.2,
     cost: 57.30,
@@ -59,7 +59,7 @@ export const fuelTickets = [
   },
   {
     id: 3,
-    vehicle: 'Furgoneta F-03',
+    vehicle: 'Furgoneta FUR-03',
     employee: 'Miguel García',
     liters: 42.0,
     cost: 63.00,

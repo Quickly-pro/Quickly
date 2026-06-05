@@ -7,11 +7,28 @@ import Modal from '@/components/base/Modal';
 import { useRole } from '@/hooks/useRole';
 import { useProfile } from '@/hooks/useProfile';
 import ImageWithFallback from '@/components/base/ImageWithFallback';
+import ChatWidget from '@/components/feature/ChatWidget';
 
 const incidentTypes = [
-  { value: 'Pinchazo', label: 'Pinchazo' },
-  { value: 'Mecánica', label: 'Mecánica' },
-  { value: 'Accidente', label: 'Accidente' },
+  { value: 'Pinchazo',       label: '🔧 Pinchazo / Rueda' },
+  { value: 'Avería Motor',   label: '🔩 Avería de motor' },
+  { value: 'Frenos',         label: '⚠️ Problema de frenos' },
+  { value: 'Eléctrico',      label: '⚡ Fallo eléctrico' },
+  { value: 'Remolque',       label: '🚛 Problema con remolque' },
+  { value: 'Carga',          label: '📦 Incidencia en la carga' },
+  { value: 'Accidente',      label: '💥 Accidente de tráfico' },
+  { value: 'Documentación',  label: '📋 Documentación / ADR' },
+  { value: 'Combustible',    label: '⛽ Sin combustible' },
+  { value: 'Mecánica',       label: '🔨 Avería mecánica general' },
+  { value: 'Otro',           label: '❓ Otro' },
+];
+
+const productIncidentTypes = [
+  { value: 'Rotura', label: 'Rotura / Deterioro' },
+  { value: 'Caducidad', label: 'Caducidad vencida' },
+  { value: 'Dano_transporte', label: 'Daño en transporte' },
+  { value: 'Defecto_fabrica', label: 'Defecto de fábrica' },
+  { value: 'Faltante', label: 'Producto faltante' },
   { value: 'Otro', label: 'Otro' },
 ];
 
@@ -22,9 +39,9 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function Incidencias() {
-  const { isEmpresa } = useRole();
+  const { isEmpresa, isEmpleado, isCliente } = useRole();
   const { profile } = useProfile();
-  const [activeTab, setActiveTab] = useState<'vehicles' | 'fuel'>('vehicles');
+  const [activeTab, setActiveTab] = useState<'vehicles' | 'fuel' | 'products'>('vehicles');
   const [showNewIncident, setShowNewIncident] = useState(false);
   const [showNewFuel, setShowNewFuel] = useState(false);
   const [showIncidentDetail, setShowIncidentDetail] = useState(false);
@@ -55,6 +72,21 @@ export default function Incidencias() {
   const [newIncident, setNewIncident] = useState({ vehicle: '', type: 'Pinchazo', description: '', assigned_to: '' });
   const [newFuel, setNewFuel] = useState({ vehicle: '', employee: '', liters: '', cost: '', station: '' });
 
+  // ── Productos ──────────────────────────────────────────────────────────
+  const [productIncidents, setProductIncidents] = useState<any[]>([]);
+  const [showNewProduct, setShowNewProduct] = useState(false);
+  const [showProductDetail, setShowProductDetail] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [submittingProduct, setSubmittingProduct] = useState(false);
+  const [productError, setProductError] = useState('');
+  const [newProduct, setNewProduct] = useState({ product_name: '', type: 'Rotura', description: '' });
+  const [productPhoto, setProductPhoto] = useState<string | null>(null);
+  const [productPhotoName, setProductPhotoName] = useState('');
+  const [isDraggingProductPhoto, setIsDraggingProductPhoto] = useState(false);
+  const productPhotoInputRef = useRef<HTMLInputElement>(null);
+  const newProductRef = useRef<HTMLDivElement>(null);
+  const productDetailRef = useRef<HTMLDivElement>(null);
+
   const showSuccessToast = (msg: string) => {
     setSuccessToast(msg);
     playNotificationSound('success');
@@ -69,6 +101,11 @@ export default function Incidencias() {
   useClickOutside(incidentDetailRef, () => { setShowIncidentDetail(false); setSelectedIncident(null); }, showIncidentDetail);
   useClickOutside(fuelDetailRef, () => { setShowFuelDetail(false); setSelectedFuel(null); }, showFuelDetail);
   useClickOutside(newFuelRef, () => { setShowNewFuel(false); clearFuelPhoto(); }, showNewFuel);
+  useClickOutside(newProductRef, () => { setShowNewProduct(false); clearProductPhoto(); }, showNewProduct);
+  useClickOutside(productDetailRef, () => { setShowProductDetail(false); setSelectedProduct(null); }, showProductDetail);
+
+  // Para clientes: ir directamente al tab de productos
+  useEffect(() => { if (isCliente) setActiveTab('products'); }, [isCliente]);
 
   // Incident photo upload
   const [incidentPhoto, setIncidentPhoto] = useState<string | null>(null);
@@ -112,9 +149,10 @@ export default function Incidencias() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [{ data: incData }, { data: fuelData }] = await Promise.all([
+    const [{ data: incData }, { data: fuelData }, { data: prodData }] = await Promise.all([
       supabase.from('vehicle_incidents').select('*').order('id', { ascending: false }),
       supabase.from('fuel_tickets').select('*').order('id', { ascending: false }),
+      supabase.from('product_incidents').select('*').order('id', { ascending: false }),
     ]);
     if (incData) {
       setIncidents(incData);
@@ -142,6 +180,7 @@ export default function Incidencias() {
         return merged;
       });
     }
+    if (prodData) setProductIncidents(prodData);
     setLoading(false);
   }, []);
 
@@ -213,6 +252,48 @@ export default function Incidencias() {
   };
 
   const clearFuelPhoto = () => { setFuelPhoto(null); setFuelPhotoName(''); if (fuelPhotoInputRef.current) fuelPhotoInputRef.current.value = ''; };
+
+  const processProductPhoto = (file: File) => {
+    if (file.size > 5 * 1024 * 1024) { alert('La imagen no puede superar los 5MB'); return; }
+    setProductPhotoName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => setProductPhoto(ev.target?.result as string || null);
+    reader.readAsDataURL(file);
+  };
+  const clearProductPhoto = () => { setProductPhoto(null); setProductPhotoName(''); if (productPhotoInputRef.current) productPhotoInputRef.current.value = ''; };
+
+  const addProductIncident = async () => {
+    setProductError('');
+    if (!newProduct.product_name.trim()) { setProductError('El nombre del producto es obligatorio'); return; }
+    if (!newProduct.description.trim()) { setProductError('La descripción es obligatoria'); return; }
+    setSubmittingProduct(true);
+    const { error } = await supabase.from('product_incidents').insert([{
+      ...newProduct,
+      status: 'abierta',
+      date: new Date().toISOString().split('T')[0],
+      photo: productPhoto || null,
+      reported_by: profile.full_name || '',
+    }]);
+    setSubmittingProduct(false);
+    if (error) {
+      setProductError('Error al registrar: ' + error.message);
+    } else {
+      addNotification('Nueva incidencia de producto', `${newProduct.product_name} — ${newProduct.type}`, 'system');
+      showSuccessToast(`✅ Incidencia de "${newProduct.product_name}" registrada`);
+      setShowNewProduct(false);
+      setNewProduct({ product_name: '', type: 'Rotura', description: '' });
+      clearProductPhoto();
+      fetchData();
+    }
+  };
+
+  const updateProductStatus = async (id: number, newStatus: string) => {
+    const { error } = await supabase.from('product_incidents').update({ status: newStatus }).eq('id', id);
+    if (!error) {
+      setSelectedProduct((prev: any) => prev ? { ...prev, status: newStatus } : null);
+      fetchData();
+    }
+  };
 
   const addIncident = async () => {
     setIncidentError('');
@@ -382,22 +463,33 @@ export default function Incidencias() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Incidencias y Tickets</h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Gestión de incidencias de vehículos y repostajes</p>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Flota completa — furgonetas, camiones, trailers y vehículos industriales</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {!isCliente && (
+            <button
+              onClick={() => setActiveTab('vehicles')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5
+                ${activeTab === 'vehicles' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+            >
+              <i className="ri-truck-line" /> Vehículos
+            </button>
+          )}
+          {!isCliente && (
+            <button
+              onClick={() => setActiveTab('fuel')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5
+                ${activeTab === 'fuel' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+            >
+              <i className="ri-gas-station-line" /> Combustible
+            </button>
+          )}
           <button
-            onClick={() => setActiveTab('vehicles')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap
-              ${activeTab === 'vehicles' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+            onClick={() => setActiveTab('products')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5
+              ${activeTab === 'products' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
           >
-            Vehículos
-          </button>
-          <button
-            onClick={() => setActiveTab('fuel')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap
-              ${activeTab === 'fuel' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
-          >
-            Combustible
+            <i className="ri-box-3-line" /> Productos
           </button>
         </div>
       </div>
@@ -609,6 +701,81 @@ export default function Incidencias() {
         </>
       )}
 
+      {/* ── Tab: Productos ─────────────────────────────────────────────── */}
+      {activeTab === 'products' && (
+        <>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-gray-100 dark:border-slate-700">
+                <p className="text-xs text-gray-500 dark:text-slate-400">Abiertas</p>
+                <p className="text-xl font-bold text-red-600">{productIncidents.filter(p => p.status === 'abierta').length}</p>
+              </div>
+              <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-gray-100 dark:border-slate-700">
+                <p className="text-xs text-gray-500 dark:text-slate-400">En Proceso</p>
+                <p className="text-xl font-bold text-amber-600">{productIncidents.filter(p => p.status === 'en_proceso').length}</p>
+              </div>
+              <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-gray-100 dark:border-slate-700">
+                <p className="text-xs text-gray-500 dark:text-slate-400">Resueltas</p>
+                <p className="text-xl font-bold text-green-600">{productIncidents.filter(p => p.status === 'resuelta').length}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowNewProduct(true)}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-all flex items-center gap-2 whitespace-nowrap"
+            >
+              <i className="ri-add-line" /> Nueva Incidencia
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : productIncidents.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-12 text-center">
+              <div className="w-14 h-14 mx-auto bg-orange-50 dark:bg-orange-900/20 rounded-full flex items-center justify-center mb-3">
+                <i className="ri-box-3-line text-orange-400 text-2xl" />
+              </div>
+              <p className="text-gray-500 dark:text-slate-400 text-sm">No hay incidencias de producto registradas</p>
+              <p className="text-gray-400 dark:text-slate-500 text-xs mt-1">Haz clic en "Nueva Incidencia" para registrar una</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {productIncidents.map((prod) => (
+                <div key={prod.id} className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-5 hover:shadow-md transition-all">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center flex-shrink-0">
+                        <i className="ri-box-3-line text-orange-500 text-sm" />
+                      </div>
+                      <span className="font-semibold text-sm text-gray-800 dark:text-slate-100 truncate">{prod.product_name}</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ml-2 ${statusConfig[prod.status]?.color || 'bg-gray-50 text-gray-600'}`}>
+                      {statusConfig[prod.status]?.label || prod.status}
+                    </span>
+                  </div>
+                  <span className="inline-block px-2 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded text-xs mb-2">
+                    {productIncidentTypes.find(t => t.value === prod.type)?.label || prod.type}
+                  </span>
+                  <p className="text-sm text-gray-600 dark:text-slate-300 mb-3 line-clamp-2">{prod.description}</p>
+                  {prod.photo && (
+                    <button onClick={() => window.open(prod.photo, '_blank')} className="block w-full overflow-hidden rounded-lg border border-gray-100 dark:border-slate-700 hover:border-orange-300 transition-all mb-3">
+                      <img src={prod.photo} alt="Foto" className="w-full h-28 object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                    </button>
+                  )}
+                  <div className="flex items-center justify-between text-xs text-gray-400 dark:text-slate-500 mt-1 pt-3 border-t border-gray-50 dark:border-slate-800">
+                    <span>{prod.date}</span>
+                    <button onClick={() => { setSelectedProduct(prod); setShowProductDetail(true); }} className="text-orange-600 hover:underline">
+                      Ver detalle
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {/* New Incident Modal */}
       <Modal
         isOpen={showNewIncident}
@@ -619,7 +786,7 @@ export default function Incidencias() {
         <div className="space-y-4">
           <div>
             <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Vehículo</label>
-            <input type="text" placeholder="Ej: Furgoneta F-01" value={newIncident.vehicle} onChange={e => setNewIncident({...newIncident, vehicle: e.target.value})} className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none" />
+            <input type="text" placeholder="Ej: Camión TIR, Trailer, Furgoneta, Moto..." value={newIncident.vehicle} onChange={e => setNewIncident({...newIncident, vehicle: e.target.value})} className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none" />
           </div>
           <div>
             <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Tipo de incidencia</label>
@@ -859,7 +1026,7 @@ export default function Incidencias() {
           </div>
           <div>
             <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Estación de servicio</label>
-            <input type="text" placeholder="Nombre de la gasolinera..." value={newFuel.station} onChange={e => setNewFuel({...newFuel, station: e.target.value})} className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none" />
+            <input type="text" placeholder="Ej: BP, Repsol, Cepsa, depósito empresa..." value={newFuel.station} onChange={e => setNewFuel({...newFuel, station: e.target.value})} className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none" />
           </div>
           {/* Fuel Photo Upload */}
           <div>
@@ -910,6 +1077,144 @@ export default function Incidencias() {
           </div>
         </div>
       </Modal>
+      {/* ── Modal: Nueva incidencia de producto ──────────────────────────── */}
+      <Modal isOpen={showNewProduct} onClose={() => { setShowNewProduct(false); clearProductPhoto(); }} title="Nueva Incidencia de Producto" size="lg">
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Nombre del producto</label>
+            <input type="text" placeholder="Ej: Caja de tomates cherry" value={newProduct.product_name}
+              onChange={e => setNewProduct({ ...newProduct, product_name: e.target.value })}
+              className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none" />
+          </div>
+          <div>
+            <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Tipo de incidencia</label>
+            <select value={newProduct.type} onChange={e => setNewProduct({ ...newProduct, type: e.target.value })}
+              className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none">
+              {productIncidentTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Descripción</label>
+            <textarea value={newProduct.description} onChange={e => setNewProduct({ ...newProduct, description: e.target.value })}
+              className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none resize-none"
+              rows={3} placeholder="Describe el problema con el producto..." maxLength={500} />
+          </div>
+          <div>
+            <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Foto del producto</label>
+            {productPhoto ? (
+              <div className="relative rounded-xl overflow-hidden border border-gray-200 dark:border-slate-600">
+                <img src={productPhoto} alt="Preview" className="w-full h-32 object-cover" />
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <span className="px-2 py-1 bg-black/60 text-white rounded-md text-xs">{productPhotoName}</span>
+                  <button type="button" onClick={clearProductPhoto} className="w-7 h-7 flex items-center justify-center bg-black/60 text-white rounded-md hover:bg-black/80">
+                    <i className="ri-close-line text-sm" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => productPhotoInputRef.current?.click()}
+                onDrop={e => { e.preventDefault(); setIsDraggingProductPhoto(false); const f = e.dataTransfer.files?.[0]; if (f && f.type.startsWith('image/')) processProductPhoto(f); }}
+                onDragOver={e => { e.preventDefault(); setIsDraggingProductPhoto(true); }}
+                onDragLeave={e => { e.preventDefault(); setIsDraggingProductPhoto(false); }}
+                className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors
+                  ${isDraggingProductPhoto ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/10' : 'border-gray-200 dark:border-slate-600 hover:border-orange-300 dark:hover:border-orange-500'}`}
+              >
+                <i className="ri-camera-line text-gray-400 dark:text-slate-500 text-2xl mb-1 block" />
+                <p className="text-sm text-gray-500 dark:text-slate-400">Arrastra o haz clic para subir foto</p>
+                <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">JPG, PNG hasta 5MB</p>
+                <input ref={productPhotoInputRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) processProductPhoto(f); }} className="hidden" />
+              </div>
+            )}
+          </div>
+          {productError && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+              <i className="ri-error-warning-line flex-shrink-0" /> {productError}
+            </div>
+          )}
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-700">
+            <button onClick={() => { setShowNewProduct(false); setProductError(''); clearProductPhoto(); }}
+              className="px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 whitespace-nowrap">
+              Cancelar
+            </button>
+            <button onClick={addProductIncident} disabled={submittingProduct}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 flex items-center gap-2 whitespace-nowrap">
+              {submittingProduct
+                ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Registrando...</>
+                : <><i className="ri-check-line" /> Registrar</>}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Modal: Detalle de incidencia de producto ──────────────────────── */}
+      <Modal isOpen={showProductDetail && !!selectedProduct} onClose={() => { setShowProductDetail(false); setSelectedProduct(null); }} title="Detalle de Incidencia de Producto" size="lg">
+        {selectedProduct && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500 dark:text-slate-400">Producto</span>
+              <span className="font-semibold text-gray-800 dark:text-slate-100">{selectedProduct.product_name}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500 dark:text-slate-400">Tipo</span>
+              <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded text-xs">
+                {productIncidentTypes.find(t => t.value === selectedProduct.type)?.label || selectedProduct.type}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500 dark:text-slate-400">Estado</span>
+              {isEmpresa || isEmpleado ? (
+                <select value={selectedProduct.status} onChange={e => updateProductStatus(selectedProduct.id, e.target.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border outline-none cursor-pointer transition-all
+                    ${selectedProduct.status === 'abierta' ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800' : ''}
+                    ${selectedProduct.status === 'en_proceso' ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800' : ''}
+                    ${selectedProduct.status === 'resuelta' ? 'bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800' : ''}`}>
+                  <option value="abierta">Abierta</option>
+                  <option value="en_proceso">En Proceso</option>
+                  <option value="resuelta">Resuelta</option>
+                </select>
+              ) : (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig[selectedProduct.status]?.color || 'bg-gray-50 text-gray-600'}`}>
+                  {statusConfig[selectedProduct.status]?.label || selectedProduct.status}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500 dark:text-slate-400">Fecha</span>
+              <span className="text-sm text-gray-700 dark:text-slate-200">{selectedProduct.date}</span>
+            </div>
+            {selectedProduct.reported_by && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500 dark:text-slate-400">Reportado por</span>
+                <span className="text-sm text-gray-700 dark:text-slate-200">{selectedProduct.reported_by}</span>
+              </div>
+            )}
+            <div>
+              <span className="text-sm text-gray-500 dark:text-slate-400 block mb-1">Descripción</span>
+              <p className="text-sm text-gray-700 dark:text-slate-300 bg-gray-50 dark:bg-slate-800 rounded-lg p-3 border border-gray-100 dark:border-slate-700">{selectedProduct.description}</p>
+            </div>
+            {selectedProduct.photo && (
+              <div>
+                <span className="text-sm text-gray-500 dark:text-slate-400 block mb-2">Foto del producto</span>
+                <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-slate-600">
+                  <ImageWithFallback src={selectedProduct.photo} alt="Foto producto" className="w-full h-48 object-cover"
+                    fallbackText={selectedProduct.product_name?.charAt(0) || 'P'} fallbackSize="lg" />
+                </div>
+                <button onClick={() => window.open(selectedProduct.photo, '_blank')} className="mt-2 text-xs text-orange-600 hover:underline flex items-center gap-1.5">
+                  <i className="ri-external-link-line" /> Abrir en nueva pestaña
+                </button>
+              </div>
+            )}
+            <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-slate-700">
+              <button onClick={() => { setShowProductDetail(false); setSelectedProduct(null); }}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 whitespace-nowrap">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+      <ChatWidget sharedChannel="incidencias" />
     </div>
   );
 }

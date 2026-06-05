@@ -10,12 +10,12 @@ export const dashboardStats = {
 };
 
 export const recentActivities = [
-  { id: 1, type: 'invoice', description: 'Factura #F-2026-0042 generada - Cliente: Restaurante El Pino', time: 'Hace 5 min', icon: 'ri-bill-line' },
+  { id: 1, type: 'invoice', description: 'Factura #F-2026-0042 generada - Cliente: Distribuciones García', time: 'Hace 5 min', icon: 'ri-bill-line' },
   { id: 2, type: 'delivery', description: 'Entrega completada - Ruta 3, Parada 7', time: 'Hace 12 min', icon: 'ri-truck-line' },
-  { id: 3, type: 'stock', description: 'Alerta stock bajo - Producto: Aceite Oliva 5L', time: 'Hace 25 min', icon: 'ri-alert-line' },
-  { id: 4, type: 'fuel', description: 'Repostaje registrado - Furgoneta F-03, 45L', time: 'Hace 42 min', icon: 'ri-gas-station-line' },
-  { id: 5, type: 'client', description: 'Nuevo cliente registrado - Bar La Plaza', time: 'Hace 1 hora', icon: 'ri-user-add-line' },
-  { id: 6, type: 'incident', description: 'Incidencia resuelta - Furgoneta F-01, pinchazo', time: 'Hace 2 horas', icon: 'ri-check-double-line' },
+  { id: 3, type: 'stock', description: 'Alerta stock bajo - Producto: Palet estándar 120x80', time: 'Hace 25 min', icon: 'ri-alert-line' },
+  { id: 4, type: 'fuel', description: 'Repostaje registrado - Camión TIR-03, 180L', time: 'Hace 42 min', icon: 'ri-gas-station-line' },
+  { id: 5, type: 'client', description: 'Nuevo cliente registrado - Logística Norte S.L.', time: 'Hace 1 hora', icon: 'ri-user-add-line' },
+  { id: 6, type: 'incident', description: 'Incidencia resuelta - Trailer TR-01, pinchazo', time: 'Hace 2 horas', icon: 'ri-check-double-line' },
 ];
 
 export const monthlyRevenue = [

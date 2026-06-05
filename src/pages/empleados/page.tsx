@@ -106,6 +106,14 @@ export default function Empleados() {
     fetchData();
   }, [fetchData]);
 
+  const [confirmDeleteEmpId, setConfirmDeleteEmpId] = useState<number | null>(null);
+
+  const deleteEmployee = async (id: number) => {
+    await supabase.from('employees').delete().eq('id', id);
+    setConfirmDeleteEmpId(null);
+    fetchData();
+  };
+
   const addEmployee = async () => {
     if (!newEmployee.name) return;
     const { error } = await supabase.from('employees').insert([{
@@ -404,15 +412,24 @@ export default function Empleados() {
                 <div><p className="text-gray-400 dark:text-slate-500">Horas mes</p><p className="font-medium text-gray-700 dark:text-slate-300">{emp.hours_this_month ?? 0}h</p></div>
                 <div><p className="text-gray-400 dark:text-slate-500">Rutas</p><p className="font-medium text-gray-700 dark:text-slate-300">{emp.routes_completed ?? 0}</p></div>
               </div>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex gap-2" onClick={e => e.stopPropagation()}>
                 <button onClick={(e) => { e.stopPropagation(); setShowVideoFor(emp.name); }} className="flex-1 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center gap-1.5">
-                  <div className="w-3 h-3 flex items-center justify-center"><i className="ri-video-line" /></div>
-                  Video
+                  <i className="ri-video-line text-xs" /> Video
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); setShowChatFor(emp.name); }} className="flex-1 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 flex items-center justify-center gap-1.5">
-                  <div className="w-3 h-3 flex items-center justify-center"><i className="ri-chat-1-line" /></div>
-                  Chat
+                  <i className="ri-chat-1-line text-xs" /> Chat
                 </button>
+                {confirmDeleteEmpId === emp.id ? (
+                  <div className="flex items-center gap-1 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg px-2">
+                    <span className="text-[10px] text-red-600 dark:text-red-400 font-medium whitespace-nowrap">¿Eliminar?</span>
+                    <button onClick={() => deleteEmployee(emp.id)} className="text-[10px] text-white bg-red-500 hover:bg-red-600 rounded px-1.5 py-0.5 font-medium">Sí</button>
+                    <button onClick={() => setConfirmDeleteEmpId(null)} className="text-[10px] text-gray-600 dark:text-slate-400 px-1">No</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setConfirmDeleteEmpId(emp.id)} className="w-8 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-400 dark:text-red-400 rounded-lg text-xs font-medium hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center flex-shrink-0" title="Eliminar empleado">
+                    <i className="ri-delete-bin-line text-xs" />
+                  </button>
+                )}
               </div>
             </div>
           ))}

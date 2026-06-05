@@ -1,256 +1,229 @@
-import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
-
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "facturas@tenden-c.com";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     const { invoice, items, toEmail, companyName, paymentInfo } = await req.json();
 
-    if (!invoice || !toEmail) {
-      return new Response(JSON.stringify({ error: "Faltan datos requeridos" }), {
-        status: 400, headers: { "Content-Type": "application/json", ...corsHeaders },
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'onboarding@resend.dev';
+
+    if (!RESEND_API_KEY) {
+      return new Response(JSON.stringify({ error: 'RESEND_API_KEY no configurado' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const statusLabel: Record<string, string> = {
-      pendiente: "Pendiente de pago",
-      cobrado: "Pagado",
-      vencida: "Vencida",
-    };
-
-    const statusColor: Record<string, string> = {
-      pendiente: "#f59e0b",
-      cobrado: "#10b981",
-      vencida: "#ef4444",
-    };
+    const fmt = (n: number) =>
+      new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
 
     const itemsRows = (items || []).map((item: any) => `
-      <tr style="border-bottom: 1px solid #f1f5f9;">
-        <td style="padding: 10px 12px; font-size: 14px; color: #334155;">${item.product || item.description || "Producto"}</td>
-        <td style="padding: 10px 12px; font-size: 14px; color: #64748b; text-align: center;">${item.qty}</td>
-        <td style="padding: 10px 12px; font-size: 14px; color: #64748b; text-align: right;">€${Number(item.price || 0).toFixed(2)}</td>
-        <td style="padding: 10px 12px; font-size: 14px; font-weight: 600; color: #0f172a; text-align: right;">€${Number(item.total || (item.qty * (item.price || 0))).toFixed(2)}</td>
-      </tr>
-    `).join("");
+      <tr>
+        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;color:#374151;font-size:14px;">${item.description || item.name || 'Producto'}</td>
+        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;color:#374151;font-size:14px;text-align:center;">${item.quantity || 1}</td>
+        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;color:#374151;font-size:14px;text-align:right;">${fmt(item.unit_price || item.price || 0)}</td>
+        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;color:#374151;font-size:14px;text-align:right;font-weight:600;">${fmt((item.quantity || 1) * (item.unit_price || item.price || 0))}</td>
+      </tr>`).join('');
 
-    const company = companyName || "Quickly";
-    const statusText = statusLabel[invoice.status] || invoice.status;
-    const statusBadgeColor = statusColor[invoice.status] || "#64748b";
-    const totalAmount = Number(invoice.amount || 0).toFixed(2);
+    // Build payment buttons
+    const paymentButtonsArr: string[] = [];
+    if (paymentInfo?.bizum) {
+      paymentButtonsArr.push(`<td style="padding-right:8px;padding-bottom:8px;">
+        <table cellpadding="0" cellspacing="0"><tr><td style="background:#1e3a5f;border-radius:10px;padding:12px 20px;">
+          <a href="tel:${paymentInfo.bizum}" style="color:#fff;text-decoration:none;font-size:13px;font-weight:700;white-space:nowrap;">📱 Bizum ${paymentInfo.bizum}</a>
+        </td></tr></table></td>`);
+    }
+    if (paymentInfo?.paypal) {
+      const paypalHref = String(paymentInfo.paypal).startsWith('http') ? paymentInfo.paypal : `https://paypal.me/${paymentInfo.paypal}`;
+      paymentButtonsArr.push(`<td style="padding-right:8px;padding-bottom:8px;">
+        <table cellpadding="0" cellspacing="0"><tr><td style="background:#003087;border-radius:10px;padding:12px 20px;">
+          <a href="${paypalHref}" style="color:#fff;text-decoration:none;font-size:13px;font-weight:700;white-space:nowrap;"><span style="color:#009cde;">Pay</span><span style="color:#fff;">Pal</span></a>
+        </td></tr></table></td>`);
+    }
+    if (paymentInfo?.stripe) {
+      paymentButtonsArr.push(`<td style="padding-bottom:8px;">
+        <table cellpadding="0" cellspacing="0"><tr><td style="background:#f97316;border-radius:10px;padding:12px 20px;">
+          <a href="${paymentInfo.stripe}" style="color:#fff;text-decoration:none;font-size:13px;font-weight:700;white-space:nowrap;">Pagar con tarjeta →</a>
+        </td></tr></table></td>`);
+    }
+    const paymentButtons = paymentButtonsArr.join('');
+    const ibanBlock = paymentInfo?.iban ? `
+      <div style="margin-top:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;">
+        <span style="color:#6b7280;font-size:12px;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;">Transferencia bancaria · IBAN:</span>
+        <div style="color:#111827;font-size:14px;font-weight:700;margin-top:4px;font-family:monospace;">${paymentInfo.iban}</div>
+      </div>` : '';
 
-    // ── Sección de métodos de pago ──
-    const pi = paymentInfo || {};
-    const hasPayment = pi.bizum || pi.iban || pi.paypal || pi.stripe;
-    const paymentSection = hasPayment ? `
-    <div style="margin-bottom:28px;padding:24px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;">
-      <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#0f172a;">💳 Opciones de pago</p>
-      <p style="margin:0 0 16px;font-size:13px;color:#64748b;">Importe: <strong>€${totalAmount}</strong> · Elige cómo pagar:</p>
-      <table cellpadding="0" cellspacing="0">
-        <tr>
-          ${pi.bizum ? `<td style="padding-right:10px;padding-bottom:10px;">
-            <a href="https://bizum.es" style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;background:#0049e0;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">
-              📱 Bizum &nbsp;<strong>${pi.bizum}</strong>
-            </a>
-          </td>` : ''}
-          ${pi.paypal ? `<td style="padding-right:10px;padding-bottom:10px;">
-            <a href="${pi.paypal.startsWith('http') ? pi.paypal : 'https://' + pi.paypal}" style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;background:#003087;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">
-              🅿️ PayPal
-            </a>
-          </td>` : ''}
-          ${pi.stripe ? `<td style="padding-right:10px;padding-bottom:10px;">
-            <a href="${pi.stripe}" style="display:inline-flex;align-items:center;gap:6px;padding:12px 20px;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:700;">
-              💳 Pagar con tarjeta →
-            </a>
-          </td>` : ''}
-        </tr>
-      </table>
-      ${pi.iban ? `<div style="margin-top:12px;padding:12px;background:#fff;border-radius:8px;border:1px solid #e2e8f0;">
-        <p style="margin:0;font-size:12px;color:#64748b;">🏦 Transferencia bancaria</p>
-        <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#0f172a;font-family:monospace;">${pi.iban}</p>
-      </div>` : ''}
-    </div>` : '';
+    const subtotal = invoice.subtotal ?? invoice.total ?? 0;
+    const tax = invoice.tax ?? 0;
+    const total = invoice.total ?? subtotal;
+
+    const invoiceDate = invoice.date
+      ? new Date(invoice.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
+      : new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
+    const dueDate = invoice.due_date
+      ? new Date(invoice.due_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
+      : '';
+
+    const statusColors: Record<string, string> = { paid: '#10b981', pending: '#f59e0b', overdue: '#ef4444' };
+    const statusLabels: Record<string, string> = { paid: 'Pagada', pending: 'Pendiente', overdue: 'Vencida' };
+    const statusColor = statusColors[invoice.status] || '#f59e0b';
+    const statusLabel = statusLabels[invoice.status] || 'Pendiente';
 
     const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Factura ${invoice.invoice_number}</title>
 </head>
-<body style="margin:0; padding:0; background-color:#f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%;">
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
-          <!-- Header -->
+  <!-- Header marca -->
+  <tr><td style="background:#fff;border-radius:16px 16px 0 0;padding:24px 40px;border-bottom:3px solid #f97316;">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td>
+        <div style="color:#f97316;font-size:22px;font-weight:800;">${companyName || 'Empresa'}</div>
+        <div style="color:#9ca3af;font-size:12px;margin-top:2px;">Factura electrónica</div>
+      </td>
+      <td align="right">
+        <span style="background:#fff7ed;color:#f97316;font-size:13px;font-weight:700;padding:6px 16px;border-radius:20px;border:1.5px solid #fed7aa;">${invoice.invoice_number}</span>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Saludo -->
+  <tr><td style="background:#fff;padding:28px 40px 12px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
+    <div style="color:#111827;font-size:20px;font-weight:700;">Hola, ${invoice.client || 'Cliente'} 👋</div>
+    <p style="color:#6b7280;font-size:14px;margin:8px 0 0;line-height:1.6;">Te enviamos el resumen de tu factura. Puedes revisar los detalles a continuación.</p>
+  </td></tr>
+
+  <!-- Fechas -->
+  <tr><td style="background:#fff;padding:16px 40px 20px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td width="48%" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px;">
+        <div style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">FECHA EMISIÓN</div>
+        <div style="color:#111827;font-size:15px;font-weight:700;">${invoiceDate}</div>
+      </td>
+      <td width="4%"></td>
+      <td width="48%" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px;">
+        <div style="color:#9ca3af;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">VENCIMIENTO</div>
+        <div style="color:#111827;font-size:15px;font-weight:700;">${dueDate || invoiceDate}</div>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Tabla de items -->
+  <tr><td style="background:#fff;padding:0 40px 20px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+      <thead><tr style="background:#f9fafb;">
+        <th style="padding:11px 16px;text-align:left;color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e5e7eb;">Concepto</th>
+        <th style="padding:11px 16px;text-align:center;color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e5e7eb;">Cant.</th>
+        <th style="padding:11px 16px;text-align:right;color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e5e7eb;">Precio</th>
+        <th style="padding:11px 16px;text-align:right;color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e5e7eb;">Total</th>
+      </tr></thead>
+      <tbody>
+        ${itemsRows || '<tr><td colspan="4" style="padding:16px;text-align:center;color:#9ca3af;font-size:13px;">Sin líneas de detalle</td></tr>'}
+      </tbody>
+    </table>
+  </td></tr>
+
+  <!-- Totales + estado -->
+  <tr><td style="background:#fff;padding:0 40px 24px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td width="50%" style="vertical-align:bottom;">
+        <span style="background:${statusColor}20;color:${statusColor};font-size:12px;font-weight:700;padding:7px 18px;border-radius:20px;border:1.5px solid ${statusColor}50;">${statusLabel}</span>
+      </td>
+      <td width="50%">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          ${tax > 0 ? `
           <tr>
-            <td style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 16px 16px 0 0; padding: 32px 40px;">
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td>
-                    <p style="margin:0; font-size:24px; font-weight:800; color:#ffffff; letter-spacing:-0.5px;">${company}</p>
-                    <p style="margin:4px 0 0; font-size:14px; color:rgba(255,255,255,0.85);">Factura electrónica</p>
-                  </td>
-                  <td align="right">
-                    <span style="background:rgba(255,255,255,0.2); color:#ffffff; padding: 6px 14px; border-radius:20px; font-size:13px; font-weight:600;">${invoice.invoice_number || "FAC-000"}</span>
-                  </td>
-                </tr>
-              </table>
+            <td style="padding:4px 0;color:#6b7280;font-size:13px;">Subtotal:</td>
+            <td style="padding:4px 0;color:#374151;font-size:13px;text-align:right;">${fmt(subtotal)}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;color:#6b7280;font-size:13px;">IVA (${invoice.tax_rate ?? 21}%):</td>
+            <td style="padding:4px 0;color:#374151;font-size:13px;text-align:right;">${fmt(tax)}</td>
+          </tr>` : ''}
+          <tr>
+            <td style="padding:10px 0 0;border-top:2px solid #e5e7eb;">
+              <span style="color:#111827;font-size:16px;font-weight:800;">TOTAL</span>
+            </td>
+            <td style="padding:10px 0 0;border-top:2px solid #e5e7eb;text-align:right;">
+              <span style="color:#f97316;font-size:22px;font-weight:800;">${fmt(total)}</span>
             </td>
           </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="background:#ffffff; padding: 36px 40px;">
-
-              <!-- Greeting -->
-              <p style="margin:0 0 8px; font-size:18px; font-weight:700; color:#0f172a;">Hola, ${invoice.client} 👋</p>
-              <p style="margin:0 0 28px; font-size:15px; color:#64748b; line-height:1.6;">
-                Te enviamos el resumen de tu factura. Puedes revisar los detalles a continuación.
-              </p>
-
-              <!-- Invoice info cards -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
-                <tr>
-                  <td width="48%" style="background:#f8fafc; border-radius:12px; padding:16px 20px; border:1px solid #e2e8f0;">
-                    <p style="margin:0 0 4px; font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">Fecha emisión</p>
-                    <p style="margin:0; font-size:15px; font-weight:600; color:#0f172a;">${invoice.date || "-"}</p>
-                  </td>
-                  <td width="4%"></td>
-                  <td width="48%" style="background:#f8fafc; border-radius:12px; padding:16px 20px; border:1px solid #e2e8f0;">
-                    <p style="margin:0 0 4px; font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">Vencimiento</p>
-                    <p style="margin:0; font-size:15px; font-weight:600; color:#0f172a;">${invoice.due_date || "-"}</p>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Items table -->
-              ${itemsRows ? `
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px; border: 1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
-                <thead>
-                  <tr style="background:#f8fafc;">
-                    <th style="padding: 10px 12px; font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; text-align:left; letter-spacing:0.5px;">Concepto</th>
-                    <th style="padding: 10px 12px; font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; text-align:center; letter-spacing:0.5px;">Cant.</th>
-                    <th style="padding: 10px 12px; font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; text-align:right; letter-spacing:0.5px;">Precio</th>
-                    <th style="padding: 10px 12px; font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; text-align:right; letter-spacing:0.5px;">Total</th>
-                  </tr>
-                </thead>
-                <tbody>${itemsRows}</tbody>
-              </table>
-              ` : ""}
-
-              <!-- Total -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
-                <tr>
-                  <td align="right">
-                    <table cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td style="padding: 6px 12px; font-size:14px; color:#64748b;">Subtotal</td>
-                        <td style="padding: 6px 12px; font-size:14px; color:#0f172a; font-weight:600; min-width:80px; text-align:right;">€${Number(invoice.subtotal || invoice.amount || 0).toFixed(2)}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 6px 12px; font-size:14px; color:#64748b;">IVA</td>
-                        <td style="padding: 6px 12px; font-size:14px; color:#0f172a; font-weight:600; text-align:right;">€${Number(invoice.tax || 0).toFixed(2)}</td>
-                      </tr>
-                      <tr style="border-top: 2px solid #e2e8f0;">
-                        <td style="padding: 10px 12px; font-size:17px; font-weight:800; color:#0f172a;">TOTAL</td>
-                        <td style="padding: 10px 12px; font-size:20px; font-weight:800; color:#f97316; text-align:right;">€${Number(invoice.amount || 0).toFixed(2)}</td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Status badge -->
-              <div style="text-align:center; margin-bottom:28px;">
-                <span style="background:${statusBadgeColor}20; color:${statusBadgeColor}; padding: 8px 20px; border-radius:20px; font-size:13px; font-weight:700; border: 1px solid ${statusBadgeColor}40;">
-                  ${statusText}
-                </span>
-              </div>
-
-              <!-- Payment method -->
-              ${invoice.payment_method ? `
-              <div style="background:#f8fafc; border-radius:12px; padding:16px 20px; margin-bottom:28px; border:1px solid #e2e8f0;">
-                <p style="margin:0 0 4px; font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">Método de pago</p>
-                <p style="margin:0; font-size:15px; font-weight:600; color:#0f172a;">${invoice.payment_method}</p>
-              </div>
-              ` : ""}
-
-              <!-- Notes -->
-              ${invoice.notes ? `
-              <div style="background:#fffbeb; border-radius:12px; padding:16px 20px; margin-bottom:28px; border:1px solid #fde68a;">
-                <p style="margin:0 0 4px; font-size:11px; font-weight:600; color:#92400e; text-transform:uppercase; letter-spacing:0.5px;">Notas</p>
-                <p style="margin:0; font-size:14px; color:#78350f; line-height:1.6;">${invoice.notes}</p>
-              </div>
-              ` : ""}
-
-              <!-- Payment options -->
-              ${paymentSection}
-
-              <p style="margin:0; font-size:14px; color:#94a3b8; line-height:1.6;">
-                Si tienes alguna pregunta sobre esta factura, responde a este email o contacta con nosotros.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background:#f1f5f9; border-radius: 0 0 16px 16px; padding: 24px 40px; text-align:center;">
-              <p style="margin:0; font-size:13px; color:#94a3b8;">
-                Este email fue enviado automáticamente por <strong style="color:#f97316;">${company}</strong>
-              </p>
-              <p style="margin:6px 0 0; font-size:12px; color:#cbd5e1;">© ${new Date().getFullYear()} ${company} · Todos los derechos reservados</p>
-            </td>
-          </tr>
-
         </table>
       </td>
-    </tr>
-  </table>
+    </tr></table>
+  </td></tr>
+
+  <!-- Botones de pago -->
+  ${paymentButtons || ibanBlock ? `
+  <tr><td style="background:#f9fafb;padding:20px 40px 24px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;border-top:1px solid #e5e7eb;">
+    <div style="color:#111827;font-size:14px;font-weight:700;margin-bottom:4px;">Opciones de pago</div>
+    <div style="color:#9ca3af;font-size:12px;margin-bottom:16px;">Importe: ${fmt(total)} · Elige cómo pagar:</div>
+    ${paymentButtons ? `<table cellpadding="0" cellspacing="0"><tr>${paymentButtons}</tr></table>` : ''}
+    ${ibanBlock}
+  </td></tr>` : ''}
+
+  <!-- Notas -->
+  ${invoice.notes ? `
+  <tr><td style="background:#fff;padding:16px 40px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
+    <div style="color:#6b7280;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">NOTAS</div>
+    <p style="color:#374151;font-size:13px;line-height:1.6;margin:0;">${invoice.notes}</p>
+  </td></tr>` : ''}
+
+  <!-- Footer -->
+  <tr><td style="background:#f3f4f6;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 16px 16px;padding:20px 40px;text-align:center;">
+    <p style="color:#9ca3af;font-size:12px;margin:0;">Email enviado automáticamente por <strong style="color:#f97316;">${companyName}</strong></p>
+    <p style="color:#d1d5db;font-size:11px;margin:6px 0 0;">Para consultas, contacta directamente con la empresa.</p>
+  </td></tr>
+
+</table>
+</td></tr></table>
 </body>
 </html>`;
 
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
+    const emailRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
       headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `${company} Facturación <${FROM_EMAIL}>`,
+        from: FROM_EMAIL,
         to: [toEmail],
-        subject: `Factura ${invoice.invoice_number} — €${Number(invoice.amount || 0).toFixed(2)}`,
+        subject: `Factura ${invoice.invoice_number} - ${companyName}`,
         html,
       }),
     });
 
-    const data = await res.json();
+    const result = await emailRes.json();
 
-    if (!res.ok) {
-      return new Response(JSON.stringify({ error: data.message || "Error al enviar el email" }), {
-        status: 500, headers: { "Content-Type": "application/json", ...corsHeaders },
+    if (!emailRes.ok) {
+      return new Response(JSON.stringify({ error: result?.message || 'Error Resend' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({ success: true, id: data.id }), {
-      status: 200, headers: { "Content-Type": "application/json", ...corsHeaders },
+    return new Response(JSON.stringify({ success: true, id: result.id }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500, headers: { "Content-Type": "application/json", ...corsHeaders },
+    return new Response(JSON.stringify({ error: err.message || 'Error inesperado' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });

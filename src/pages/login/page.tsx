@@ -25,7 +25,15 @@ export default function Login() {
     setLoading(false);
 
     if (err) {
-      setError(err.message);
+      if (err.message.includes('Invalid login credentials') || err.message.includes('invalid_credentials')) {
+        setError('Correo o contraseña incorrectos. Verifica tus datos e inténtalo de nuevo.');
+      } else if (err.message.includes('Email not confirmed')) {
+        setError('Debes confirmar tu correo electrónico antes de entrar. Revisa tu bandeja de entrada.');
+      } else if (err.message.includes('Too many requests')) {
+        setError('Demasiados intentos. Espera unos minutos e inténtalo de nuevo.');
+      } else {
+        setError(err.message);
+      }
       return;
     }
 

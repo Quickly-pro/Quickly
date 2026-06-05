@@ -41,18 +41,18 @@ interface ChartDef {
 }
 
 const DEFAULT_PALETTES: Palette[] = [
-  { name: 'Cl\u00e1sico', colors: ['#ffffff', '#ffebee', '#e8f5e9', '#e3f2fd', '#fff3e0', '#f3e5f5', '#e0f7fa', '#fce4ec', '#f1f8e9', '#ede7f6'] },
+  { name: 'Clásico', colors: ['#ffffff', '#ffebee', '#e8f5e9', '#e3f2fd', '#fff3e0', '#f3e5f5', '#e0f7fa', '#fce4ec', '#f1f8e9', '#ede7f6'] },
   { name: 'Pastel', colors: ['#ffffff', '#ffe0b2', '#c8e6c9', '#bbdefb', '#ffccbc', '#e1bee7', '#b2dfdb', '#f8bbd0', '#dcedc8', '#d1c4e9'] },
   { name: 'Vivo', colors: ['#ffffff', '#ff5722', '#4caf50', '#2196f3', '#ff9800', '#9c27b0', '#00bcd4', '#e91e63', '#8bc34a', '#673ab7'] },
 ];
 
 const SAMPLE_DATA: Record<string, string> = {
-  '0-0': 'Env\u00edo', '0-1': 'Cliente', '0-2': 'Tipo', '0-3': 'Peso (kg)', '0-4': 'Precio (\u20ac)', '0-5': 'Fecha',
-  '1-0': 'EXP-10234', '1-1': 'Ferreter\u00eda El Martillo', '1-2': 'Paquete 5kg', '1-3': '4.2', '1-4': '4.50', '1-5': '04/05/26',
-  '2-0': 'EXP-10235', '2-1': 'Muebles Casa Nova', '2-2': 'Sof\u00e1 3 plazas', '2-3': '85.0', '2-4': '85.00', '2-5': '04/05/26',
+  '0-0': 'Envío', '0-1': 'Cliente', '0-2': 'Tipo', '0-3': 'Peso (kg)', '0-4': 'Precio (€)', '0-5': 'Fecha',
+  '1-0': 'EXP-10234', '1-1': 'Ferretería El Martillo', '1-2': 'Paquete 5kg', '1-3': '4.2', '1-4': '4.50', '1-5': '04/05/26',
+  '2-0': 'EXP-10235', '2-1': 'Muebles Casa Nova', '2-2': 'Sofá 3 plazas', '2-3': '85.0', '2-4': '85.00', '2-5': '04/05/26',
   '3-0': 'EXP-10236', '3-1': 'ElectroMart S.A.', '3-2': 'Nevera americana', '3-3': '120.0', '3-4': '120.00', '3-5': '03/05/26',
   '4-0': 'EXP-10237', '4-1': 'AutoTaller Ruiz', '4-2': 'Transporte coche', '4-3': '1,200', '4-4': '350.00', '4-5': '03/05/26',
-  '5-0': 'EXP-10238', '5-1': 'Construcciones L\u00f3pez', '5-2': 'Palets cemento', '5-3': '1,000', '5-4': '180.00', '5-5': '02/05/26',
+  '5-0': 'EXP-10238', '5-1': 'Construcciones López', '5-2': 'Palets cemento', '5-3': '1,000', '5-4': '180.00', '5-5': '02/05/26',
 };
 
 function getCellKey(row: number, col: number) {
@@ -79,7 +79,7 @@ export default function HojaCalculo() {
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
   const [rangeEnd, setRangeEnd] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<string | null>(null);
-  const [showPanel, setShowPanel] = useState(true);
+  const [showPanel, setShowPanel] = useState(false);
   const [showImporter, setShowImporter] = useState(false);
   const [showChartConfig, setShowChartConfig] = useState(false);
   const [charts, setCharts] = useState<ChartDef[]>([]);
@@ -677,14 +677,14 @@ export default function HojaCalculo() {
     <PremiumGate>
       <div className="flex flex-col h-[calc(100vh-64px)]">
         {/* Top bar with formula bar */}
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-100 bg-white">
+        <div className="flex items-center gap-2 px-3 sm:px-4 py-2 border-b border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900">
           {/* Name box */}
-          <div className="flex-shrink-0 w-20 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-xs font-medium text-gray-600 text-center">
-            {selectedCell ? `${colLabels[parseInt(selectedCell.split('-')[1])]}${parseInt(selectedCell.split('-')[0]) + 1}` : '\u2014'}
+          <div className="flex-shrink-0 w-14 sm:w-20 px-1.5 sm:px-2 py-1.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded text-xs font-medium text-gray-600 dark:text-slate-300 text-center">
+            {selectedCell ? `${colLabels[parseInt(selectedCell.split('-')[1])]}${parseInt(selectedCell.split('-')[0]) + 1}` : '—'}
           </div>
           {/* Formula bar */}
-          <div className="flex-1 flex items-center gap-2">
-            <div className="w-6 h-6 flex items-center justify-center text-gray-400 flex-shrink-0">
+          <div className="flex-1 flex items-center gap-1.5 sm:gap-2">
+            <div className="hidden sm:flex w-6 h-6 items-center justify-center text-gray-400 dark:text-slate-500 flex-shrink-0">
               <i className="ri-function-line" />
             </div>
             <input
@@ -699,8 +699,8 @@ export default function HojaCalculo() {
               onBlur={() => {
                 if (selectedCell) handleFormulaBarChange(formulaBar);
               }}
-              placeholder="=SUM(A1:A5) o escribe un valor..."
-              className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 outline-none focus:border-orange-400"
+              placeholder="=SUM(A1:A5) o valor..."
+              className="flex-1 px-2 sm:px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-400 dark:placeholder:text-slate-500"
             />
           </div>
           {/* Quick actions */}
@@ -717,15 +717,17 @@ export default function HojaCalculo() {
           </div>
         </div>
 
-        {/* Toolbar */}
-        <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-gray-100 bg-white">
-          <div>
-            <h1 className="text-lg font-bold text-gray-800">Hoja de C\u00e1lculo</h1>
-            <p className="text-xs text-gray-500">
-              {filledCells} celdas \u00b7 {coloredCells} coloreadas \u00b7 {formulaCells} f\u00f3rmulas
+        {/* Toolbar — single scrollable row on mobile, title on desktop */}
+        <div className="flex items-center border-b border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900">
+          {/* Desktop title */}
+          <div className="hidden lg:flex flex-col justify-center px-4 py-2 flex-shrink-0 border-r border-gray-100 dark:border-slate-700 min-w-[180px]">
+            <h1 className="text-sm font-bold text-gray-800 dark:text-slate-100 whitespace-nowrap">Hoja de Cálculo</h1>
+            <p className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">
+              {filledCells} celdas · {coloredCells} col. · {formulaCells} fórmulas
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Scrollable buttons */}
+          <div className="flex items-center gap-1.5 px-3 py-2 overflow-x-auto flex-1 scrollbar-hide">
             {/* Create chart */}
             <button
               onClick={() => {
@@ -733,40 +735,33 @@ export default function HojaCalculo() {
                   setShowChartConfig(true);
                 }
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+              className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
                 selectedRange && selectedRange.endRow > selectedRange.startRow
-                  ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+                  : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-600 cursor-not-allowed'
               }`}
-              title="Selecciona un rango (Shift+click) para crear gr\u00e1fico"
+              title="Selecciona un rango para crear gráfico"
             >
-              <div className="w-4 h-4 flex items-center justify-center">
-                <i className="ri-bar-chart-grouped-line" />
-              </div>
-              Crear gr\u00e1fico
+              <i className="ri-bar-chart-grouped-line" />
+              <span className="hidden sm:inline">Gráfico</span>
             </button>
 
             {/* Import CSV */}
             <button
               onClick={() => setShowImporter(true)}
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200 transition-all flex items-center gap-2 whitespace-nowrap"
-              title="Importar CSV"
+              className="flex-shrink-0 px-2.5 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-gray-200 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 whitespace-nowrap"
             >
-              <div className="w-4 h-4 flex items-center justify-center">
-                <i className="ri-file-upload-line" />
-              </div>
-              Importar CSV
+              <i className="ri-file-upload-line" />
+              <span className="hidden sm:inline">Importar</span>
             </button>
 
             {/* Export CSV */}
             <button
               onClick={exportCSV}
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200 transition-all flex items-center gap-2 whitespace-nowrap"
+              className="flex-shrink-0 px-2.5 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-gray-200 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 whitespace-nowrap"
             >
-              <div className="w-4 h-4 flex items-center justify-center">
-                <i className="ri-file-download-line" />
-              </div>
-              Exportar CSV
+              <i className="ri-file-download-line" />
+              <span>Exportar</span>
             </button>
 
             {/* Save all */}
@@ -774,39 +769,32 @@ export default function HojaCalculo() {
               <button
                 onClick={saveAllToSupabase}
                 disabled={saving}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap
-                  ${isDirty ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap
+                  ${isDirty ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'}`}
               >
                 {saving ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    Guardando...
-                  </>
+                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <>
-                    <div className="w-4 h-4 flex items-center justify-center">
-                      <i className="ri-save-line" />
-                    </div>
-                    Guardar todo
-                  </>
+                  <i className="ri-save-line" />
                 )}
+                <span>{saving ? 'Guardando...' : 'Guardar'}</span>
               </button>
             )}
 
+            {/* Separator */}
+            <div className="flex-shrink-0 w-px h-5 bg-gray-200 dark:bg-slate-700 mx-1" />
+
             {/* Palettes */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500">Paleta:</span>
-              {palettes.map((p, idx) => (
-                <button
-                  key={p.name + idx}
-                  onClick={() => handleChangePalette(idx)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap
-                    ${activePaletteIndex === idx ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
-                >
-                  {p.name}
-                </button>
-              ))}
-            </div>
+            {palettes.map((p, idx) => (
+              <button
+                key={p.name + idx}
+                onClick={() => handleChangePalette(idx)}
+                className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap
+                  ${activePaletteIndex === idx ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+              >
+                {p.name}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -818,7 +806,7 @@ export default function HojaCalculo() {
                 <div className="w-4 h-4 flex items-center justify-center text-orange-500">
                   <i className="ri-bar-chart-box-line" />
                 </div>
-                Gr\u00e1ficos ({charts.length})
+                Gráficos ({charts.length})
               </h2>
               <button
                 onClick={() => setCharts([])}
@@ -854,13 +842,13 @@ export default function HojaCalculo() {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 overflow-auto bg-white">
+              <div className="flex-1 overflow-auto bg-white dark:bg-slate-950">
                 <div className="inline-block min-w-full">
                   {/* Header row */}
-                  <div className="flex border-b border-gray-200 sticky top-0 z-10">
-                    <div className="w-10 h-8 bg-gray-50 border-r border-gray-200 flex-shrink-0 sticky left-0 z-20" />
+                  <div className="flex border-b border-gray-200 dark:border-slate-700 sticky top-0 z-10">
+                    <div className="w-10 h-8 bg-gray-50 dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 flex-shrink-0 sticky left-0 z-20" />
                     {colLabels.map((label) => (
-                      <div key={label} className="w-32 h-8 bg-gray-50 border-r border-gray-200 flex items-center justify-center text-xs font-medium text-gray-500 flex-shrink-0">
+                      <div key={label} className="w-20 sm:w-32 h-8 bg-gray-50 dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 flex items-center justify-center text-xs font-medium text-gray-500 dark:text-slate-400 flex-shrink-0">
                         {label}
                       </div>
                     ))}
@@ -868,8 +856,8 @@ export default function HojaCalculo() {
 
                   {/* Data rows */}
                   {Array.from({ length: ROWS }).map((_, rowIdx) => (
-                    <div key={rowIdx} className="flex border-b border-gray-100">
-                      <div className="w-10 h-8 bg-gray-50 border-r border-gray-200 flex items-center justify-center text-xs text-gray-400 flex-shrink-0 sticky left-0">
+                    <div key={rowIdx} className="flex border-b border-gray-100 dark:border-slate-800">
+                      <div className="w-10 h-8 bg-gray-50 dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 flex items-center justify-center text-xs text-gray-400 dark:text-slate-500 flex-shrink-0 sticky left-0">
                         {rowIdx + 1}
                       </div>
                       {Array.from({ length: COLS }).map((_, colIdx) => {
@@ -904,36 +892,49 @@ export default function HojaCalculo() {
             )}
 
             {/* Info bar */}
-            <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-2 text-xs text-gray-500 bg-white border-t border-gray-100">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between flex-wrap gap-2 px-3 sm:px-4 py-2 text-xs text-gray-500 dark:text-slate-400 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-700">
+              <div className="hidden sm:flex items-center gap-2">
                 <div className="w-4 h-4 flex items-center justify-center">
                   <i className="ri-information-line" />
                 </div>
-                <span>Doble clic para editar \u00b7 Clic para seleccionar \u00b7 Shift+clic para rango \u00b7 Ctrl+B negrita \u00b7 Flechas para navegar \u00b7 Enter para editar \u00b7 Espacio para color</span>
+                <span>Doble clic para editar · Clic para seleccionar · Shift+clic para rango · Ctrl+B negrita · Flechas para navegar · Enter para editar · Espacio para color</span>
+              </div>
+              <div className="flex sm:hidden items-center gap-1.5 text-gray-400 dark:text-slate-500">
+                <i className="ri-information-line" />
+                <span>Toca para seleccionar · Doble toque para editar</span>
               </div>
               {!user?.id && (
-                <span className="text-orange-600 font-medium">Datos guardados localmente. Inicia sesi\u00f3n para persistirlos.</span>
+                <span className="text-orange-600 font-medium">Datos guardados localmente. Inicia sesión para persistirlos.</span>
               )}
             </div>
           </div>
 
-          {/* Properties panel */}
+          {/* Properties panel — overlay on mobile, sidebar on desktop */}
           {showPanel && (
-            <CellPropertiesPanel
-              selectedCell={selectedCell}
-              cellMeta={selectedMeta}
-              onBoldChange={handleBoldChange}
-              onAlignChange={handleAlignChange}
-              onFormatChange={handleFormatChange}
-              onColorToggle={() => {
-                if (!selectedCell) return;
-                const [r, c] = selectedCell.split('-').map(Number);
-                handleToggleColor(r, c);
-              }}
-              activePaletteColors={activePalette.colors}
-              cellColor={selectedColor}
-              onClose={() => setShowPanel(false)}
-            />
+            <>
+              {/* Mobile backdrop */}
+              <div
+                className="fixed inset-0 bg-black/30 z-40 sm:hidden"
+                onClick={() => setShowPanel(false)}
+              />
+              <div className="fixed bottom-0 left-0 right-0 z-50 sm:static sm:z-auto">
+                <CellPropertiesPanel
+                  selectedCell={selectedCell}
+                  cellMeta={selectedMeta}
+                  onBoldChange={handleBoldChange}
+                  onAlignChange={handleAlignChange}
+                  onFormatChange={handleFormatChange}
+                  onColorToggle={() => {
+                    if (!selectedCell) return;
+                    const [r, c] = selectedCell.split('-').map(Number);
+                    handleToggleColor(r, c);
+                  }}
+                  activePaletteColors={activePalette.colors}
+                  cellColor={selectedColor}
+                  onClose={() => setShowPanel(false)}
+                />
+              </div>
+            </>
           )}
         </div>
 

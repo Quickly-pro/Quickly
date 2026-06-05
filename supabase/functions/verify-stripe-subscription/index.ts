@@ -9,16 +9,21 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
+};
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
-      },
-    });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
@@ -26,10 +31,7 @@ serve(async (req) => {
     const { sessionId } = body;
 
     if (!sessionId) {
-      return new Response(JSON.stringify({ error: "Missing sessionId" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ error: "Missing sessionId" }, 400);
     }
 
     // Retrieve checkout session from Stripe with subscription expanded
@@ -38,40 +40,28 @@ serve(async (req) => {
     });
 
     if (session.payment_status !== "paid") {
-      return new Response(JSON.stringify({ error: "Payment not completed" }), {
-        status: 402,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ error: "Payment not completed" }, 402);
     }
 
     const subscription = session.subscription as Stripe.Subscription;
     if (!subscription) {
-      return new Response(JSON.stringify({ error: "No subscription found" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ error: "No subscription found" }, 400);
     }
 
     const userId = session.metadata?.supabase_user_id;
     const plan = session.metadata?.plan || "premium";
 
     if (!userId) {
-      return new Response(JSON.stringify({ error: "Missing user metadata" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ error: "Missing user metadata" }, 400);
     }
 
+    // Only include columns that exist in the subscriptions table schema
     const payload = {
       user_id: userId,
       status: "active",
       plan,
-      stripe_customer_id: typeof session.customer === "string" ? session.customer : session.customer?.id || null,
+      stripe_customer_id: typeof session.customer === "string" ? session.customer : (session.customer as any)?.id || null,
       stripe_subscription_id: subscription.id,
-      stripe_checkout_session_id: session.id,
-      current_period_start: subscription.current_period_start
-        ? new Date(subscription.current_period_start * 1000).toISOString()
-        : null,
       current_period_end: subscription.current_period_end
         ? new Date(subscription.current_period_end * 1000).toISOString()
         : null,
@@ -90,44 +80,19 @@ serve(async (req) => {
         .update({ ...payload, updated_at: new Date().toISOString() })
         .eq("id", existing.id);
 
-      if (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
+      if (error) return json({ error: error.message }, 500);
     } else {
       const { error } = await supabaseAdmin.from("subscriptions").insert(payload);
-      if (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
+      if (error) return json({ error: error.message }, 500);
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        plan,
-        status: "active",
-        current_period_end: payload.current_period_end,
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
-      }
-    );
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+    return json({
+      success: true,
+      plan,
+      status: "active",
+      current_period_end: payload.current_period_end,
     });
+  } catch (err: any) {
+    return json({ error: err.message || "Internal server error" }, 500);
   }
 });

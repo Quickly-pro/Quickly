@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useRole } from '@/hooks/useRole';
+import ChatWidget from '@/components/feature/ChatWidget';
 import { useNotificationsContext } from '@/context/NotificationsContext';
 import Modal from '@/components/base/Modal';
 import ImageWithFallback from '@/components/base/ImageWithFallback';
@@ -1402,6 +1403,7 @@ export default function Productos() {
           </div>
         </Modal>
       )}
+      <ChatWidget />
     </div>
   );
 }

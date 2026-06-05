@@ -5,6 +5,7 @@ import { useNotificationsContext } from '@/context/NotificationsContext';
 import { useAuth } from '@/context/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import Modal from '@/components/base/Modal';
+import SignaturePad from '@/components/base/SignaturePad';
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pendiente: { label: 'Pendiente', color: 'bg-amber-50 text-amber-600' },
@@ -65,6 +66,13 @@ export default function Facturacion() {
   const [cobroInvoiceId, setCobroInvoiceId] = useState<number | null>(null);
   const [cobroMethod, setCobroMethod] = useState('Efectivo');
   const [sentReminders, setSentReminders] = useState<Set<number>>(new Set());
+
+  // Firmas de facturas (almacenadas en local, indexadas por invoice id)
+  const [invoiceSignatures, setInvoiceSignatures] = useState<Record<number, { name: string; data?: string }>>({});
+  const [showSignInvoice, setShowSignInvoice] = useState(false);
+  const [signInvoiceName, setSignInvoiceName] = useState('');
+  const [signInvoiceData, setSignInvoiceData] = useState('');
+  const [showSignPad, setShowSignPad] = useState(false);
 
   const invoiceDetailRef = useRef<HTMLDivElement>(null);
   const pdfModalRef = useRef<HTMLDivElement>(null);
@@ -220,13 +228,15 @@ export default function Facturacion() {
       if (sendEmail) {
         const clientEmail = clients.find(c => c.name === invoiceClient)?.email;
         if (clientEmail) {
-          await supabase.functions.invoke('send-invoice-email', {
-            body: {
+          await fetch('https://irbilfifptefmpudwxee.supabase.co/functions/v1/send-invoice-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
               invoice: { ...invoicePayload, id: invoiceId },
               items: itemsPayload,
               toEmail: clientEmail,
               companyName: 'Quickly',
-            },
+            }),
           });
           addNotification('Factura enviada por email', `Factura ${invNum} enviada a ${clientEmail}`, 'invoice');
         } else {
@@ -346,7 +356,7 @@ export default function Facturacion() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Facturacion y Cobros</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Facturas</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{isCliente ? 'Consulta y descarga tus facturas' : 'Gestiona facturas, cobros y deudas'}</p>
         </div>
         <div className="flex gap-2">
@@ -398,9 +408,14 @@ export default function Facturacion() {
               </select>
             )}
             <div className="flex items-center gap-2">
-              <input type="date" value={filterDateFrom} onChange={e => { setFilterDateFrom(e.target.value); setCurrentPage(1); }} className="px-2 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300" />
-              <span className="text-xs text-gray-400">a</span>
-              <input type="date" value={filterDateTo} onChange={e => { setFilterDateTo(e.target.value); setCurrentPage(1); }} className="px-2 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300" />
+              <label className="flex flex-col gap-0.5">
+                <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1"><i className="ri-calendar-line" /> Desde</span>
+                <input type="date" value={filterDateFrom} onChange={e => { setFilterDateFrom(e.target.value); setCurrentPage(1); }} className="px-2 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300" />
+              </label>
+              <label className="flex flex-col gap-0.5">
+                <span className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1"><i className="ri-calendar-line" /> Hasta</span>
+                <input type="date" value={filterDateTo} onChange={e => { setFilterDateTo(e.target.value); setCurrentPage(1); }} className="px-2 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300" />
+              </label>
             </div>
             <div className="flex items-center gap-2">
               <input type="number" placeholder="€ min" value={filterMinAmount} onChange={e => { setFilterMinAmount(e.target.value); setCurrentPage(1); }} className="w-[80px] px-2 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300" />
@@ -612,7 +627,24 @@ export default function Facturacion() {
               <div className="flex justify-between text-lg font-bold"><span className="text-gray-800 dark:text-slate-100">TOTAL</span><span className="text-orange-600">€{Number(selectedInvoice.amount).toFixed(2)}</span></div>
             </div>
 
-            <div className="flex gap-2">
+            {/* Firma */}
+            {invoiceSignatures[selectedInvoice.id] && (
+              <div className="p-3 bg-green-50/60 dark:bg-green-900/10 border border-green-200 dark:border-green-800/30 rounded-lg text-sm text-green-800 dark:text-green-200">
+                <span className="font-medium">✍️ Firmada</span>
+                {invoiceSignatures[selectedInvoice.id].data ? (
+                  <div className="mt-2">
+                    <img src={invoiceSignatures[selectedInvoice.id].data} alt="Firma" className="h-16 object-contain bg-white rounded border border-green-200 dark:border-green-800/30 p-1" />
+                    {invoiceSignatures[selectedInvoice.id].name && (
+                      <p className="text-xs mt-1 text-green-700 dark:text-green-400">{invoiceSignatures[selectedInvoice.id].name}</p>
+                    )}
+                  </div>
+                ) : (
+                  <span> por: {invoiceSignatures[selectedInvoice.id].name}</span>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2 flex-wrap">
               <button onClick={() => generateInvoicePDF(selectedInvoice, getItemsForInvoice(selectedInvoice.id))} className="flex-1 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 flex items-center justify-center gap-2">
                 <div className="w-4 h-4 flex items-center justify-center"><i className="ri-file-pdf-line" /></div>
                 Descargar PDF
@@ -623,7 +655,98 @@ export default function Facturacion() {
                   Enviar por Email
                 </button>
               )}
+              <button
+                onClick={() => { setSignInvoiceName(''); setSignInvoiceData(''); setShowSignPad(false); setShowSignInvoice(true); }}
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center gap-2"
+              >
+                <div className="w-4 h-4 flex items-center justify-center"><i className="ri-pen-nib-line" /></div>
+                Firmar
+              </button>
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* SIGN INVOICE MODAL */}
+      <Modal
+        isOpen={showSignInvoice && !!selectedInvoice}
+        onClose={() => { setShowSignInvoice(false); setShowSignPad(false); }}
+        title="Firmar factura"
+        size="md"
+      >
+        {selectedInvoice && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500 dark:text-slate-400">
+              Firma digital para la factura <span className="font-mono font-bold">{selectedInvoice.invoice_number}</span>.
+            </p>
+
+            <div>
+              <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Nombre del firmante</label>
+              <input
+                type="text"
+                value={signInvoiceName}
+                onChange={e => setSignInvoiceName(e.target.value)}
+                placeholder="Nombre y apellidos"
+                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm outline-none focus:border-orange-300 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Firma digital</label>
+              {showSignPad ? (
+                <SignaturePad
+                  label="Dibuja tu firma:"
+                  onSave={(data) => { setSignInvoiceData(data); setShowSignPad(false); }}
+                  onCancel={() => setShowSignPad(false)}
+                />
+              ) : signInvoiceData ? (
+                <div className="border border-orange-200 dark:border-orange-800/40 rounded-xl overflow-hidden bg-white dark:bg-slate-800 p-2">
+                  <img src={signInvoiceData} alt="Firma" className="h-20 object-contain mx-auto" />
+                  <div className="flex justify-center mt-2">
+                    <button type="button" onClick={() => { setSignInvoiceData(''); setShowSignPad(true); }}
+                      className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1">
+                      <i className="ri-delete-bin-line" /> Repetir firma
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowSignPad(true)}
+                  className="w-full px-3 py-2.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800/30 rounded-lg text-sm font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 flex items-center justify-center gap-2"
+                >
+                  <i className="ri-pen-nib-line" />
+                  Dibujar firma digital
+                </button>
+              )}
+            </div>
+
+            {!showSignPad && (
+              <div className="flex gap-3 pt-2 border-t border-gray-100 dark:border-slate-700">
+                <button
+                  onClick={() => { setShowSignInvoice(false); setShowSignPad(false); }}
+                  className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    if (!signInvoiceName.trim() && !signInvoiceData) return;
+                    setInvoiceSignatures(prev => ({
+                      ...prev,
+                      [selectedInvoice.id]: { name: signInvoiceName.trim(), data: signInvoiceData || undefined },
+                    }));
+                    addNotification('Factura firmada', `${selectedInvoice.invoice_number} firmada por ${signInvoiceName || 'firmante'}`, 'invoice');
+                    setShowSignInvoice(false);
+                    setShowSignPad(false);
+                  }}
+                  disabled={!signInvoiceName.trim() && !signInvoiceData}
+                  className="flex-1 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <i className="ri-pen-nib-line" /> Confirmar firma
+                </button>
+              </div>
+            )}
           </div>
         )}
       </Modal>

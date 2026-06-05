@@ -98,11 +98,11 @@ export default function SpreadsheetCell({
     <div
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
-      className={`w-32 h-8 border-r border-gray-100 flex items-center px-1.5 text-xs flex-shrink-0 cursor-pointer select-none truncate
-        ${isHeader ? 'font-semibold text-gray-700' : meta.is_bold ? 'font-bold text-gray-800' : 'text-gray-600'}
+      className={`w-20 sm:w-32 h-8 border-r border-gray-100 dark:border-slate-700 flex items-center px-1.5 text-xs flex-shrink-0 cursor-pointer select-none truncate
+        ${isHeader ? 'font-semibold text-gray-700 dark:text-slate-200' : meta.is_bold ? 'font-bold text-gray-800 dark:text-slate-100' : 'text-gray-600 dark:text-slate-300'}
         ${isSelected ? 'ring-2 ring-orange-400 ring-inset z-10' : ''}
-        ${isInRange ? 'bg-orange-50/50' : ''}
-        ${isFormulaCell && !isHeader ? 'text-emerald-700' : ''}`}
+        ${isInRange ? 'bg-orange-50/50 dark:bg-orange-900/20' : ''}
+        ${isFormulaCell && !isHeader ? 'text-emerald-700 dark:text-emerald-400' : ''}`}
       style={{ backgroundColor: isInRange ? undefined : color }}
     >
       {isEditing ? (
@@ -113,7 +113,7 @@ export default function SpreadsheetCell({
           onChange={e => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          className="w-full h-full bg-transparent outline-none text-xs text-gray-700"
+          className="w-full h-full bg-transparent outline-none text-xs text-gray-700 dark:text-slate-200"
           onClick={e => e.stopPropagation()}
         />
       ) : (

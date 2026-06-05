@@ -1,30 +1,30 @@
-const CACHE_NAME = 'quickly-v1';
-const ASSETS_TO_CACHE = ['/'];
+// Service Worker minimalista — solo para soporte offline básico
+// Los assets JS/CSS NO se cachean aquí (Vercel CDN los gestiona)
+// Esto evita que versiones antiguas se sirvan tras un deploy
 
-self.addEventListener('install', (event) => {
+const CACHE_NAME = 'quickly-shell-v1';
+
+self.addEventListener('install', () => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
-  );
 });
 
 self.addEventListener('activate', (event) => {
+  // Eliminar TODAS las cachés antiguas
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+    caches.keys()
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
+// Estrategia: siempre red primero, sin cachear nada
+// Así cada deploy se ve inmediatamente sin necesidad de limpiar caché
 self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        if (response.status === 200 && event.request.method === 'GET' && event.request.url.startsWith(self.location.origin)) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => cached);
-    })
-  );
+  // Solo interceptar navegaciones (no assets JS/CSS)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => fetch('/'))
+    );
+  }
+  // Todo lo demás (JS, CSS, imágenes) va directo a la red sin pasar por SW
 });

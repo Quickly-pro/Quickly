@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
+    setLoading(true); // siempre bloquear antes de verificar para que RoleGuard no redirija
     try {
       const { data: { session } } = await supabase.auth.getSession();
 
@@ -48,11 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .eq('email', session.user.email)
             .maybeSingle();
 
+          // Si el email coincide con un cliente registrado → rol cliente
+          // Si no, es un usuario autenticado de la plataforma → rol empresa por defecto
           setUser({
             id: session.user.id,
             email: session.user.email || '',
             full_name: client?.name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Usuario',
-            role: 'cliente',
+            role: client ? 'cliente' : 'empresa',
             avatar_url: null,
           });
         } else {

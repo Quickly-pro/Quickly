@@ -6,21 +6,27 @@ import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useClickOutside } from '@/hooks/useClickOutside';
+import { useLanguage, LANGUAGES } from '@/context/LanguageContext';
 
 export default function Navbar() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
+
   const { isDark, toggle } = useTheme();
   const { notifications, unreadCount, markAllRead, markRead } = useNotificationsContext();
   const { data: company } = useCompany();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { lang, setLang, currentLang, t } = useLanguage();
 
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(notifRef, () => setNotificationsOpen(false), notificationsOpen);
   useClickOutside(profileRef, () => setProfileOpen(false), profileOpen);
+  useClickOutside(langRef, () => setLangOpen(false), langOpen);
 
   const getIconForType = (type: string) => {
     switch (type) {
@@ -45,65 +51,107 @@ export default function Navbar() {
   const displayName = user?.full_name || 'Invitado';
   const avatarUrl = user?.avatar_url;
   const hasAvatar = !!avatarUrl;
-  const isOnline = true; // simplificado
+  const isOnline = true;
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
-    window.location.reload();
   };
 
+  // Idiomas divididos en dos columnas para el dropdown
+  const LANG_COLS = [LANGUAGES.slice(0, 9), LANGUAGES.slice(9)];
+
   return (
-    <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between px-3 sm:px-4 md:px-6 sticky top-0 z-30">
-      {/* Breadcrumb / Title with company logo */}
+    <header className="h-16 bg-white dark:glass-navbar border-b border-gray-100 flex items-center justify-between px-3 sm:px-4 md:px-6 sticky top-0 z-30">
+
+      {/* Izquierda: logo + nombre empresa */}
       <div className="ml-10 md:ml-0 flex items-center gap-2 md:gap-2.5 min-w-0">
         <img
-          src={company.logo}
+          src={company.logo || '/logo.png'}
           alt={company.name}
           className="w-7 h-7 md:w-8 md:h-8 object-contain rounded flex-shrink-0"
+          onError={(e) => { (e.target as HTMLImageElement).src = '/logo.png'; }}
         />
         <div className="min-w-0">
           <h2 className="text-sm md:text-base font-semibold text-gray-800 dark:text-slate-100 truncate">{company.name.split(' ')[0]}</h2>
-          <p className="text-[10px] md:text-xs text-gray-400 dark:text-slate-500 hidden sm:block">Panel de Gestión</p>
+          <p className="text-[10px] md:text-xs text-gray-400 dark:text-slate-500 hidden sm:block">{t('managementPanel')}</p>
         </div>
       </div>
 
-      {/* Right actions */}
-      <div className="flex items-center gap-1.5 md:gap-4 flex-shrink-0">
-        {/* Search */}
-        <div className="hidden md:flex items-center bg-gray-50 dark:bg-slate-800 rounded-lg px-3 py-1.5">
-          <div className="w-4 h-4 flex items-center justify-center mr-2">
-            <i className="ri-search-line text-gray-400 dark:text-slate-400 text-sm" />
-          </div>
+      {/* Derecha: acciones */}
+      <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+
+        {/* Search — desktop */}
+        <div className="hidden md:flex items-center bg-gray-50 dark:bg-white/5 dark:border dark:border-orange-500/10 rounded-xl px-3 py-1.5 mr-1 transition-all dark:focus-within:border-orange-500/30 dark:focus-within:shadow-[0_0_12px_rgba(249,115,22,0.1)]">
+          <i className="ri-search-line text-gray-400 dark:text-orange-400/60 text-sm mr-2" />
           <input
             type="text"
-            placeholder="Buscar..."
-            className="bg-transparent text-sm text-gray-700 dark:text-slate-200 outline-none w-48"
+            placeholder={t('search')}
+            className="bg-transparent text-sm text-gray-700 dark:text-slate-200 outline-none w-40"
           />
         </div>
 
-        {/* Theme Toggle */}
-        <button
-          onClick={toggle}
-          className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition-all"
-          title={isDark ? 'Modo claro' : 'Modo oscuro'}
-        >
-          {isDark ? (
-            <div className="w-5 h-5 flex items-center justify-center">
-              <i className="ri-sun-line text-lg text-amber-500" />
-            </div>
-          ) : (
-            <div className="w-5 h-5 flex items-center justify-center">
-              <i className="ri-moon-line text-lg text-slate-600" />
+        {/* 🌐 Selector de idioma — SIEMPRE VISIBLE */}
+        <div className="relative" ref={langRef}>
+          <button
+            onClick={() => setLangOpen(!langOpen)}
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition-all border border-gray-100 dark:border-slate-700 group"
+            title="Cambiar idioma / Change language"
+          >
+            <i className="ri-earth-line text-lg text-orange-500 group-hover:text-orange-600" />
+            <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-slate-200">{currentLang.flag}</span>
+            <span className="hidden md:block text-xs text-gray-500 dark:text-slate-400">{currentLang.code.toUpperCase()}</span>
+            <i className="ri-arrow-down-s-line text-xs text-gray-400 hidden sm:block" />
+          </button>
+
+          {langOpen && (
+            <div className="fixed inset-x-2 top-16 sm:absolute sm:right-0 sm:top-12 sm:inset-x-auto sm:w-[420px] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 z-50 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center gap-2">
+                <i className="ri-earth-line text-orange-500" />
+                <span className="font-semibold text-sm text-gray-800 dark:text-slate-100">Selecciona tu idioma</span>
+                <span className="text-xs text-gray-400 dark:text-slate-500 ml-auto">/ Select your language</span>
+              </div>
+              <div className="p-3 grid grid-cols-2 gap-1 max-h-80 overflow-y-auto">
+                {LANGUAGES.map((l) => (
+                  <button
+                    key={l.code}
+                    onClick={() => { setLang(l.code); setLangOpen(false); }}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all ${
+                      lang === l.code
+                        ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 font-medium'
+                        : 'hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200'
+                    }`}
+                  >
+                    <span className="text-xl leading-none">{l.flag}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium leading-tight">{l.nativeName}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-slate-500">{l.label}</p>
+                    </div>
+                    {lang === l.code && <i className="ri-check-line text-orange-500 ml-auto flex-shrink-0" />}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
+        </div>
+
+        {/* Theme toggle */}
+        <button
+          onClick={toggle}
+          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
+          title={isDark ? 'Modo claro' : 'Modo oscuro'}
+        >
+          {isDark
+            ? <i className="ri-sun-line text-lg text-amber-500" />
+            : <i className="ri-moon-line text-lg text-slate-600" />
+          }
         </button>
 
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setNotificationsOpen(!notificationsOpen)}
-            className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800"
+            className="relative w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
           >
             <i className="ri-notification-3-line text-lg text-gray-600 dark:text-slate-300" />
             {unreadCount > 0 && (
@@ -116,7 +164,7 @@ export default function Navbar() {
           {notificationsOpen && (
             <div className="fixed inset-x-2 top-16 sm:absolute sm:right-0 sm:top-12 sm:inset-x-auto sm:w-80 md:w-96 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 z-50 overflow-hidden max-h-[80vh] sm:max-h-[480px] flex flex-col">
               <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between flex-shrink-0">
-                <span className="font-semibold text-sm text-gray-800 dark:text-slate-100">Notificaciones</span>
+                <span className="font-semibold text-sm text-gray-800 dark:text-slate-100">{t('notifications')}</span>
                 {unreadCount > 0 && (
                   <button onClick={markAllRead} className="text-xs text-orange-600 hover:underline">Marcar todas leídas</button>
                 )}
@@ -134,13 +182,10 @@ export default function Navbar() {
                     <div
                       key={n.id}
                       onClick={() => markRead(n.id)}
-                      className={`px-4 py-3 border-b border-gray-50 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer flex items-start gap-3 transition-colors
-                        ${n.read ? '' : 'bg-orange-50/20 dark:bg-orange-900/10'}`}
+                      className={`px-4 py-3 border-b border-gray-50 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer flex items-start gap-3 transition-colors ${n.read ? '' : 'bg-orange-50/20 dark:bg-orange-900/10'}`}
                     >
                       <div className={`w-9 h-9 rounded-lg ${getBgForType(n.type)} flex items-center justify-center flex-shrink-0`}>
-                        <div className="w-4 h-4 flex items-center justify-center">
-                          <i className={getIconForType(n.type)} />
-                        </div>
+                        <i className={`${getIconForType(n.type)} text-sm`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{n.title}</p>
@@ -153,7 +198,9 @@ export default function Navbar() {
                 )}
               </div>
               <div className="px-4 py-2 border-t border-gray-100 dark:border-slate-700 text-center flex-shrink-0">
-                <Link to="/notificaciones" onClick={() => setNotificationsOpen(false)} className="text-sm text-orange-600 hover:underline">Ver todas las notificaciones</Link>
+                <Link to="/notificaciones" onClick={() => setNotificationsOpen(false)} className="text-sm text-orange-600 hover:underline">
+                  Ver todas las notificaciones
+                </Link>
               </div>
             </div>
           )}
@@ -172,43 +219,25 @@ export default function Navbar() {
             className="flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg px-2 py-1"
           >
             <div className="relative w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center overflow-hidden">
-              {hasAvatar ? (
-                <img
-                  src={avatarUrl}
-                  alt="Avatar"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <i className="ri-user-line text-orange-600" />
-              )}
-              {/* Online / Offline dot */}
-              <span
-                className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${
-                  isOnline ? 'bg-green-500' : 'bg-gray-400'
-                }`}
-                title={isOnline ? 'En línea' : 'Sin conexión'}
-              />
+              {hasAvatar
+                ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                : <i className="ri-user-line text-orange-600" />
+              }
+              <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
             </div>
             <span className="hidden md:block text-sm text-gray-700 dark:text-slate-200 font-medium">{displayName}</span>
-            <div className="hidden md:flex w-4 h-4 items-center justify-center">
-              <i className="ri-arrow-down-s-line text-gray-400 text-xs" />
-            </div>
+            <i className="hidden md:block ri-arrow-down-s-line text-gray-400 text-xs" />
           </button>
 
           {profileOpen && (
             <div className="fixed inset-x-2 top-16 sm:absolute sm:right-0 sm:top-12 sm:inset-x-auto sm:w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 z-50 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center gap-3">
                 <div className="relative w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {hasAvatar ? (
-                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <i className="ri-user-line text-orange-600 text-sm" />
-                  )}
-                  <span
-                    className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-white dark:border-slate-900 ${
-                      isOnline ? 'bg-green-500' : 'bg-gray-400'
-                    }`}
-                  />
+                  {hasAvatar
+                    ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    : <i className="ri-user-line text-orange-600 text-sm" />
+                  }
+                  <span className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-white dark:border-slate-900 ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">{displayName}</p>
@@ -217,36 +246,21 @@ export default function Navbar() {
               </div>
               <div className="py-1">
                 <Link to="/perfil" onClick={() => setProfileOpen(false)} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2">
-                  <div className="w-4 h-4 flex items-center justify-center">
-                    <i className="ri-user-line text-gray-400 dark:text-slate-400" />
-                  </div>
-                  Perfil
+                  <i className="ri-user-line text-gray-400 dark:text-slate-400 text-sm" />
+                  {t('profile')}
                 </Link>
                 <Link to="/configuracion" onClick={() => setProfileOpen(false)} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-2">
-                  <div className="w-4 h-4 flex items-center justify-center">
-                    <i className="ri-settings-3-line text-gray-400 dark:text-slate-400" />
-                  </div>
-                  Configuración
+                  <i className="ri-settings-3-line text-gray-400 dark:text-slate-400 text-sm" />
+                  {t('settings')}
                 </Link>
                 {user ? (
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                  >
-                    <div className="w-4 h-4 flex items-center justify-center">
-                      <i className="ri-logout-box-r-line" />
-                    </div>
-                    Cerrar sesión
+                  <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-2">
+                    <i className="ri-logout-box-r-line text-sm" />
+                    {t('logout')}
                   </button>
                 ) : (
-                  <Link
-                    to="/login"
-                    onClick={() => setProfileOpen(false)}
-                    className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 flex items-center gap-2"
-                  >
-                    <div className="w-4 h-4 flex items-center justify-center">
-                      <i className="ri-login-box-line" />
-                    </div>
+                  <Link to="/login" onClick={() => setProfileOpen(false)} className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 flex items-center gap-2">
+                    <i className="ri-login-box-line text-sm" />
                     Iniciar sesión
                   </Link>
                 )}
