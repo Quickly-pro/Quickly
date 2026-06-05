@@ -42,28 +42,51 @@ export default function ChatModal({ employeeName, onClose }: Props) {
             <p className="text-xs text-green-500">En línea</p>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto space-y-3 mb-3">
+        <div className="flex-1 overflow-y-auto space-y-2 mb-3">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-slate-500">
               <i className="ri-chat-1-line text-3xl mb-2" />
               <p className="text-sm">Sin mensajes. ¡Empieza la conversación!</p>
             </div>
           )}
-          {messages.map((m) => (
-            <div key={m.id} className={`flex ${m.sender_name === (user?.full_name || 'Tú') ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm ${
-                m.sender_name === (user?.full_name || 'Tú')
-                  ? 'bg-orange-500 text-white rounded-br-none'
-                  : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-bl-none'
-              }`}>
-                <p className="text-[10px] opacity-80 mb-0.5">{m.sender_name}</p>
-                <p>{m.text}</p>
-                <p className={`text-[10px] mt-1 ${m.sender_name === (user?.full_name || 'Tú') ? 'text-orange-100' : 'text-gray-400 dark:text-slate-500'}`}>
-                  {formatTime(m.created_at)}
-                </p>
+          {messages.map((m) => {
+            const mine = m.sender_name === (user?.full_name || 'Tú');
+            return (
+              <div key={m.id} className={`flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+
+                {/* Avatar del empleado en mensajes recibidos */}
+                {!mine && (
+                  <div className="w-7 h-7 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 self-end">
+                    <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
+                      {employeeName.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+
+                {/* Burbuja */}
+                <div className={`max-w-[72%] rounded-2xl px-3 py-2 text-sm
+                  ${mine
+                    ? 'bg-orange-500 text-white rounded-br-sm'
+                    : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-bl-sm'
+                  }`}>
+                  {!mine && <p className="text-[10px] font-semibold opacity-70 mb-0.5">{m.sender_name}</p>}
+                  <p>{m.text}</p>
+                  <p className={`text-[10px] mt-1 text-right ${mine ? 'text-orange-100' : 'text-gray-400 dark:text-slate-500'}`}>
+                    {formatTime(m.created_at)}
+                  </p>
+                </div>
+
+                {/* Avatar propio en mensajes enviados */}
+                {mine && (
+                  <div className="w-7 h-7 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 self-end">
+                    <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
+                      {(user?.full_name || 'T').charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={bottomRef} />
         </div>
         <div className="border-t border-gray-100 dark:border-slate-700 pt-3 flex items-center gap-2 flex-shrink-0">

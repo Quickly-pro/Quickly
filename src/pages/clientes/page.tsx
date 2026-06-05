@@ -39,6 +39,15 @@ export default function Clientes() {
   const [saveClientError, setSaveClientError] = useState<string | null>(null);
   const [savingClient, setSavingClient] = useState(false);
 
+  // Edit client state
+  const [showEditClient, setShowEditClient] = useState(false);
+  const [editingClient, setEditingClient] = useState<any | null>(null);
+  const [editClientError, setEditClientError] = useState<string | null>(null);
+  const [savingEditClient, setSavingEditClient] = useState(false);
+
+  // Delete confirmation state
+  const [confirmDeleteClientId, setConfirmDeleteClientId] = useState<number | null>(null);
+
   // Photo upload state for new client
   const [clientPhoto, setClientPhoto] = useState<string | null>(null);
   const [clientPhotoName, setClientPhotoName] = useState('');
@@ -121,6 +130,37 @@ export default function Clientes() {
     await supabase.from('clients').delete().eq('id', id);
     fetchClients();
     setShowClientDetail(false);
+  };
+
+  const openEditClient = (client: any, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setEditingClient({ ...client });
+    setEditClientError(null);
+    setShowEditClient(true);
+  };
+
+  const updateClient = async () => {
+    if (!editingClient) return;
+    if (!editingClient.name?.trim()) { setEditClientError('El nombre es obligatorio'); return; }
+    setSavingEditClient(true);
+    setEditClientError(null);
+    const { error } = await supabase.from('clients').update({
+      name: editingClient.name.trim(),
+      contact: editingClient.contact || null,
+      phone: editingClient.phone || null,
+      email: editingClient.email || null,
+      address: editingClient.address || null,
+      status: editingClient.status || 'activo',
+      notes: editingClient.notes || null,
+    }).eq('id', editingClient.id);
+    setSavingEditClient(false);
+    if (!error) {
+      setShowEditClient(false);
+      setEditingClient(null);
+      fetchClients();
+    } else {
+      setEditClientError(error.message || 'Error al guardar los cambios');
+    }
   };
 
   const handleExportPDF = () => {
@@ -211,6 +251,11 @@ export default function Clientes() {
   const chatTargetId = selectedClient ? `client_${selectedClient.id}` : null;
   const { messages: chatMessages, sendMessage: sendClientMessage } = useChatMessages('client', chatTargetId);
   const [chatInput, setChatInput] = useState('');
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   const sendClientChat = () => {
     if (!chatInput.trim() || !chatTargetId) return;
@@ -433,6 +478,32 @@ export default function Clientes() {
                   <h3 className="font-semibold text-sm text-gray-800 dark:text-slate-100 truncate">{client.name}</h3>
                   <p className="text-xs text-gray-400 dark:text-slate-500">{client.contact}</p>
                 </div>
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={(e) => openEditClient(client, e)}
+                    title="Editar cliente"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-orange-500 dark:hover:text-orange-400 transition-all"
+                  >
+                    <i className="ri-pencil-line text-sm" />
+                  </button>
+                  {confirmDeleteClientId === client.id ? (
+                    <div className="flex items-center gap-1 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg px-2 py-1">
+                      <span className="text-[10px] text-red-600 dark:text-red-400 font-medium whitespace-nowrap">¿Eliminar?</span>
+                      <button onClick={() => { deleteClient(client.id); setConfirmDeleteClientId(null); }}
+                        className="text-[10px] text-white bg-red-500 hover:bg-red-600 rounded px-1.5 py-0.5 font-medium">Sí</button>
+                      <button onClick={() => setConfirmDeleteClientId(null)}
+                        className="text-[10px] text-gray-600 dark:text-slate-400 hover:text-gray-800 px-1">No</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDeleteClientId(client.id)}
+                      title="Eliminar cliente"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 dark:hover:text-red-400 transition-all"
+                    >
+                      <i className="ri-delete-bin-line text-sm" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="mt-3 flex items-center gap-2">
@@ -608,28 +679,63 @@ export default function Clientes() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-3 mb-3">
+            <div className="flex-1 overflow-y-auto space-y-2 mb-3">
               {chatMessages.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-slate-500">
                   <i className="ri-chat-1-line text-3xl mb-2" />
                   <p className="text-sm">Sin mensajes. ¡Empieza la conversación!</p>
                 </div>
               )}
-              {chatMessages.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.sender_name === (user?.full_name || 'Tú') ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm
-                    ${msg.sender_name === (user?.full_name || 'Tú')
-                      ? 'bg-orange-500 text-white rounded-br-md'
-                      : 'bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 rounded-bl-md'
-                    }`}>
-                    <p className="text-[10px] opacity-80 mb-0.5">{msg.sender_name}</p>
-                    <p>{msg.text}</p>
-                    <p className={`text-xs mt-1 ${msg.sender_name === (user?.full_name || 'Tú') ? 'text-orange-100' : 'text-gray-400 dark:text-slate-500'}`}>
-                      {formatTime(msg.created_at)}
-                    </p>
+              {chatMessages.map((msg) => {
+                const mine = msg.sender_name === (user?.full_name || 'Tú');
+                return (
+                  <div key={msg.id} className={`flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+
+                    {/* Avatar del cliente en mensajes recibidos */}
+                    {!mine && (
+                      <div className="w-7 h-7 rounded-full flex-shrink-0 self-end overflow-hidden">
+                        {selectedClient?.avatar ? (
+                          <img
+                            src={selectedClient.avatar}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                            <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
+                              {selectedClient?.name?.charAt(0).toUpperCase() || '?'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Burbuja */}
+                    <div className={`max-w-[72%] rounded-2xl px-4 py-2.5 text-sm
+                      ${mine
+                        ? 'bg-orange-500 text-white rounded-br-sm'
+                        : 'bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 rounded-bl-sm'
+                      }`}>
+                      {!mine && <p className="text-[10px] font-semibold opacity-70 mb-0.5">{msg.sender_name}</p>}
+                      <p>{msg.text}</p>
+                      <p className={`text-[10px] mt-1 text-right ${mine ? 'text-orange-100' : 'text-gray-400 dark:text-slate-500'}`}>
+                        {formatTime(msg.created_at)}
+                      </p>
+                    </div>
+
+                    {/* Avatar propio en mensajes enviados */}
+                    {mine && (
+                      <div className="w-7 h-7 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 self-end">
+                        <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
+                          {(user?.full_name || 'T').charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
+              <div ref={chatBottomRef} />
             </div>
 
             <div className="border-t border-gray-100 dark:border-slate-700 pt-3">
@@ -646,6 +752,67 @@ export default function Clientes() {
                   <i className="ri-send-plane-fill" />
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Client Modal */}
+      <Modal
+        isOpen={showEditClient && !!editingClient}
+        onClose={() => { setShowEditClient(false); setEditingClient(null); setEditClientError(null); }}
+        title="Editar Cliente"
+        size="lg"
+      >
+        {editingClient && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Nombre del negocio</label>
+              <input type="text" placeholder="Ej: Restaurante..." value={editingClient.name || ''} onChange={e => setEditingClient({...editingClient, name: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-300" />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Contacto</label>
+              <input type="text" placeholder="Nombre del contacto..." value={editingClient.contact || ''} onChange={e => setEditingClient({...editingClient, contact: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-300" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Teléfono</label>
+                <input type="tel" placeholder="+34..." value={editingClient.phone || ''} onChange={e => setEditingClient({...editingClient, phone: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-300" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Email</label>
+                <input type="email" placeholder="email@..." value={editingClient.email || ''} onChange={e => setEditingClient({...editingClient, email: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-300" />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Dirección</label>
+              <input type="text" placeholder="Calle, número, ciudad..." value={editingClient.address || ''} onChange={e => setEditingClient({...editingClient, address: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-300" />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Estado</label>
+              <select value={editingClient.status || 'activo'} onChange={e => setEditingClient({...editingClient, status: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-300">
+                {clientStatuses.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Notas</label>
+              <textarea placeholder="Notas adicionales..." value={editingClient.notes || ''} onChange={e => setEditingClient({...editingClient, notes: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-300 resize-none" rows={2} maxLength={500} />
+            </div>
+            {editClientError && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg">
+                <i className="ri-error-warning-line text-red-500 text-sm flex-shrink-0" />
+                <p className="text-xs text-red-600 dark:text-red-400">{editClientError}</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-700">
+              <button onClick={() => { setShowEditClient(false); setEditingClient(null); setEditClientError(null); }} className="px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">
+                Cancelar
+              </button>
+              <button onClick={updateClient} disabled={savingEditClient} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">
+                {savingEditClient ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</> : <><i className="ri-save-line" />Guardar Cambios</>}
+              </button>
             </div>
           </div>
         )}
