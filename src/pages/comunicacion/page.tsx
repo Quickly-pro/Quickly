@@ -36,6 +36,29 @@ export default function Comunicacion() {
   const [inputMessage, setInputMessage] = useState('');
   const { messages, sendMessage, sendError: channelSendError } = useChatMessages(activeChannel);
 
+  // ── Feed agregado para empresa en General (todos los mensajes de todos los canales) ──
+  const [allMessages, setAllMessages] = useState<any[]>([]);
+  const fetchAllMessages = useCallback(async () => {
+    if (!isEmpresa) return;
+    const { data } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(500);
+    if (data) setAllMessages(data);
+  }, [isEmpresa]);
+
+  useEffect(() => {
+    if (!isEmpresa) return;
+    fetchAllMessages();
+    const interval = setInterval(fetchAllMessages, 4000);
+    const sub = supabase
+      .channel('all_msgs_empresa_' + Math.random())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, fetchAllMessages)
+      .subscribe();
+    return () => { clearInterval(interval); sub.unsubscribe(); };
+  }, [isEmpresa, fetchAllMessages]);
+
   // ── Mensajes directos ──────────────────────────────────────────────────
   // Para empresa: empieza en modo canal; para empleado/cliente: empieza en modo DM
   const [dmMode, setDmMode] = useState(!isEmpresa);
@@ -171,7 +194,7 @@ export default function Comunicacion() {
   }, [dmMessages, dmTargetId, user]);
 
   // Auto-scroll al final de mensajes
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, allMessages]);
   useEffect(() => { dmEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [dmMessages]);
 
   const filteredContacts = useMemo(() => {
@@ -452,31 +475,42 @@ export default function Comunicacion() {
                 <i className="ri-chat-1-line text-orange-500 text-sm" />
                 <div>
                   <p className="font-medium text-gray-800 dark:text-slate-200 text-sm">{currentChannel.name}</p>
-                  <p className="text-xs text-gray-400 dark:text-slate-500">{currentChannel.description}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500">
+                    {isEmpresa ? 'Todas las conversaciones' : currentChannel.description}
+                  </p>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.length === 0 ? (
+                {(isEmpresa ? allMessages : messages).length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-slate-500">
                     <i className="ri-chat-off-line text-3xl mb-2" />
                     <p className="text-sm">Sin mensajes aún. ¡Sé el primero!</p>
                   </div>
-                ) : messages.map(msg => (
-                  <div key={msg.id} className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 text-orange-600 dark:text-orange-400 font-bold text-sm">
-                      {msg.sender_name?.charAt(0)?.toUpperCase() || '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-sm font-medium text-gray-800 dark:text-slate-200">{msg.sender_name}</span>
-                        <span className="text-xs text-gray-400 dark:text-slate-500">{formatTime(msg.created_at)}</span>
+                ) : (isEmpresa ? allMessages : messages).map(msg => {
+                  const channelBadge =
+                    msg.channel === 'client' ? { label: 'CLI', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' } :
+                    msg.channel === 'employee' ? { label: 'EMP', color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' } :
+                    null;
+                  return (
+                    <div key={msg.id} className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 text-orange-600 dark:text-orange-400 font-bold text-sm">
+                        {msg.sender_name?.charAt(0)?.toUpperCase() || '?'}
                       </div>
-                      <div className="text-sm text-gray-700 dark:text-slate-300 mt-0.5">
-                        <MessageContent text={msg.text} mine={false} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-800 dark:text-slate-200">{msg.sender_name}</span>
+                          {channelBadge && (
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${channelBadge.color}`}>{channelBadge.label}</span>
+                          )}
+                          <span className="text-xs text-gray-400 dark:text-slate-500">{formatTime(msg.created_at)}</span>
+                        </div>
+                        <div className="text-sm text-gray-700 dark:text-slate-300 mt-0.5">
+                          <MessageContent text={msg.text} mine={false} />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div ref={messagesEndRef} />
               </div>
               <div className="p-3 border-t border-gray-100 dark:border-orange-500/10 flex-shrink-0 space-y-2">
