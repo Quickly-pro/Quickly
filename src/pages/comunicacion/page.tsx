@@ -9,11 +9,7 @@ import ChatInputAddons from '@/components/base/ChatInputAddons';
 import MessageContent from '@/components/base/MessageContent';
 
 const ALL_CHANNELS = [
-  { id: 'general',      name: 'General',      description: 'Canal general',       icon: 'ri-chat-1-line',        badge: 0, clienteVisible: true },
-  { id: 'comerciales',  name: 'Comerciales',  description: 'Ventas y comerciales', icon: 'ri-store-2-line',       badge: 0, clienteVisible: true },
-  { id: 'conductores',  name: 'Conductores',  description: 'Rutas y repartos',     icon: 'ri-truck-line',         badge: 0, clienteVisible: true },
-  { id: 'almacen',      name: 'Almacén',      description: 'Gestión de stock',     icon: 'ri-box-3-line',         badge: 0, clienteVisible: false },
-  { id: 'incidencias',  name: 'Incidencias',  description: 'Problemas y reportes', icon: 'ri-error-warning-line', badge: 1, clienteVisible: true },
+  { id: 'general', name: 'General', description: 'Canal general', icon: 'ri-chat-1-line', badge: 0, clienteVisible: true },
 ];
 
 interface DirectContact {
