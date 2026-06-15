@@ -304,17 +304,19 @@ export default function Comunicacion() {
       </div>
 
       {/* Top action cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
-            <i className="ri-chat-smile-2-line text-blue-600 text-xl" />
+      <div className={`grid grid-cols-1 gap-3 ${isEmpresa ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
+        {!isEmpresa && (
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
+              <i className="ri-chat-smile-2-line text-blue-600 text-xl" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-gray-800 dark:text-slate-200 text-sm">Chat interno</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400">Activo ahora</p>
+            </div>
+            <span className="px-2.5 py-1 bg-blue-500 text-white rounded-full text-xs font-medium">Online</span>
           </div>
-          <div className="flex-1">
-            <p className="font-medium text-gray-800 dark:text-slate-200 text-sm">Chat interno</p>
-            <p className="text-xs text-gray-500 dark:text-slate-400">Activo ahora</p>
-          </div>
-          <span className="px-2.5 py-1 bg-blue-500 text-white rounded-full text-xs font-medium">Online</span>
-        </div>
+        )}
         <button
           onClick={() => { setShowCallModal(true); setCallNumber(''); }}
           className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-4 flex items-center gap-3 text-left hover:border-green-300 dark:hover:border-green-500 transition-all"
@@ -342,8 +344,8 @@ export default function Comunicacion() {
         </button>
       </div>
 
-      {/* ── Chat layout ─────────────────────────────────────────────────── */}
-      <div className="flex gap-3 min-h-0" style={{ height: 'calc(100vh - 280px)' }}>
+      {/* ── Chat layout (solo empleados y clientes) ─────────────────────── */}
+      {!isEmpresa && <div className="flex gap-3 min-h-0" style={{ height: 'calc(100vh - 280px)' }}>
 
         {/* Sidebar */}
         <div className="w-full md:w-64 flex-shrink-0 bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 flex flex-col overflow-hidden">
@@ -700,7 +702,7 @@ export default function Comunicacion() {
             </>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ── Modales ──────────────────────────────────────────────────────── */}
       <Modal isOpen={showCallModal} onClose={() => setShowCallModal(false)} title="Realizar Llamada" size="sm">
