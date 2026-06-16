@@ -344,8 +344,8 @@ export default function Comunicacion() {
         </button>
       </div>
 
-      {/* ── Chat layout (solo empleados y clientes) ─────────────────────── */}
-      {!isEmpresa && <div className="flex gap-3 min-h-0" style={{ height: 'calc(100vh - 280px)' }}>
+      {/* ── Chat layout ─────────────────────────────────────────────────── */}
+      <div className="flex gap-3 min-h-0" style={{ height: 'calc(100vh - 280px)' }}>
 
         {/* Sidebar */}
         <div className="w-full md:w-64 flex-shrink-0 bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 flex flex-col overflow-hidden">
@@ -702,7 +702,7 @@ export default function Comunicacion() {
             </>
           )}
         </div>
-      </div>}
+      </div>
 
       {/* ── Modales ──────────────────────────────────────────────────────── */}
       <Modal isOpen={showCallModal} onClose={() => setShowCallModal(false)} title="Realizar Llamada" size="sm">
