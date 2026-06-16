@@ -345,169 +345,229 @@ export default function Comunicacion() {
       </div>
 
       {/* ── Chat layout ─────────────────────────────────────────────────── */}
-      <div className="flex gap-3 min-h-0" style={{ height: 'calc(100vh - 280px)' }}>
+      <div className="flex min-h-0 rounded-2xl border border-gray-100 dark:border-slate-700/60 overflow-hidden shadow-sm" style={{ height: 'calc(100vh - 280px)' }}>
 
-        {/* Sidebar */}
-        <div className="w-full md:w-64 flex-shrink-0 bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 flex flex-col overflow-hidden">
+        {/* ── Sidebar ── */}
+        <div className="w-[260px] flex-shrink-0 border-r border-gray-100 dark:border-slate-700/60 flex flex-col bg-white dark:bg-slate-900">
 
-          {/* ── Mensajes Directos (sección principal) ── */}
-          <div className="px-3 pt-3 pb-1 flex items-center justify-between border-b border-gray-100 dark:border-orange-500/10 flex-shrink-0">
-            <p className="text-[10px] font-bold text-gray-400 dark:text-orange-500/60 uppercase tracking-widest">Conversaciones</p>
-            {isEmpresa && <span className="text-[10px] text-gray-400 dark:text-slate-500">{directContacts.length} contactos</span>}
+          {/* Sidebar header */}
+          <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-slate-700/40 flex-shrink-0">
+            <h2 className="font-bold text-gray-900 dark:text-slate-100 text-base mb-3">Mensajes</h2>
+            {isEmpresa && (
+              <div className="relative">
+                <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 text-sm pointer-events-none" />
+                <input
+                  placeholder="Buscar contacto..."
+                  value={dmSearch}
+                  onChange={e => setDmSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 bg-gray-50 dark:bg-slate-800 rounded-xl text-sm outline-none text-gray-700 dark:text-slate-300 placeholder-gray-400 dark:placeholder-slate-600"
+                />
+              </div>
+            )}
           </div>
 
-          {/* Para empleado/cliente: entrada única a la empresa — SIEMPRE ACTIVA */}
-          {(isEmpleado || isCliente) && (
-            <button
-              onClick={() => setDmMode(true)}
-              className={`mx-2 mt-2 flex items-center gap-3 px-3 py-3 rounded-xl text-sm transition-all w-[calc(100%-16px)] text-left
-                ${dmMode
-                  ? 'bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700/30'
-                  : 'hover:bg-gray-50 dark:hover:bg-slate-800 border border-transparent'}`}
-            >
-              <div className="w-9 h-9 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
-                <i className="ri-building-line text-orange-500 text-base" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm font-semibold truncate ${dmMode ? 'text-orange-700 dark:text-orange-400' : 'text-gray-800 dark:text-slate-200'}`}>Empresa</p>
-                {myDirectId
-                  ? <p className="text-xs text-gray-400 dark:text-slate-500 truncate">
-                      {lastMessages[myDirectId]
-                        ? (lastMessages[myDirectId].mine ? 'Tú: ' : '') + lastMessages[myDirectId].text
-                        : 'Escribe tu primer mensaje...'}
-                    </p>
-                  : <p className="text-xs text-orange-400 animate-pulse">Conectando...</p>
-                }
-              </div>
-              {myDirectId && lastMessages[myDirectId] && (
-                <span className="text-[10px] text-gray-400 dark:text-slate-500 flex-shrink-0">{lastMessages[myDirectId].time}</span>
-              )}
-              <span className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0" />
-            </button>
-          )}
-
-          {/* Para empresa: lista de todos los contactos con preview */}
+          {/* Para empresa: botón General + lista de contactos */}
           {isEmpresa && (
-            <div className="flex-1 overflow-y-auto py-1 px-2 space-y-0.5">
-              {directContacts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 px-3 text-center">
-                  <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center mb-2">
-                    <i className="ri-user-add-line text-gray-400 text-lg" />
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-slate-400 font-medium mb-1">Sin conversaciones</p>
-                  <p className="text-[11px] text-gray-400 dark:text-slate-500 leading-relaxed">
-                    Añade clientes y empleados. Ellos deben registrarse en la app para poder chatear.
-                  </p>
+            <>
+              <button
+                onClick={() => { setDmMode(false); setSelectedDM(null); setActiveChannel('general'); setConfirmDeleteChat(false); }}
+                className={`flex items-center gap-3 w-full px-4 py-3 transition-all border-l-[3px] flex-shrink-0
+                  ${!dmMode
+                    ? 'bg-orange-50 dark:bg-orange-900/10 border-l-orange-500'
+                    : 'border-l-transparent hover:bg-gray-50 dark:hover:bg-slate-800/50'}`}
+              >
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all
+                  ${!dmMode
+                    ? 'bg-orange-500 shadow-md shadow-orange-200 dark:shadow-orange-900/40'
+                    : 'bg-orange-100 dark:bg-orange-900/20'}`}>
+                  <i className={`ri-global-line text-base ${!dmMode ? 'text-white' : 'text-orange-500'}`} />
                 </div>
-              ) : (
-                directContacts.map(contact => {
-                  const lastMsg = lastMessages[contact.id];
-                  const isActive = dmMode && selectedDM?.id === contact.id;
-                  return (
-                    <button
-                      key={contact.id}
-                      onClick={() => { setSelectedDM(contact); setDmMode(true); setActiveChannel('general'); setConfirmDeleteChat(false); }}
-                      className={`flex items-center gap-3 px-2 py-2.5 rounded-xl text-sm transition-all w-full text-left
-                        ${isActive
-                          ? 'bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700/30'
-                          : 'hover:bg-gray-50 dark:hover:bg-slate-800 border border-transparent'}`}
-                    >
-                      {/* Avatar */}
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold
-                        ${contact.type === 'client'
-                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                          : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'}`}>
-                        {contact.name.charAt(0).toUpperCase()}
-                      </div>
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <p className={`text-xs font-semibold truncate ${isActive ? 'text-orange-700 dark:text-orange-400' : 'text-gray-800 dark:text-slate-200'}`}>
-                            {contact.name}
-                          </p>
-                          <span className={`flex-shrink-0 text-[9px] px-1 py-0.5 rounded font-medium
-                            ${contact.type === 'client' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500' : 'bg-green-50 dark:bg-green-900/20 text-green-500'}`}>
-                            {contact.type === 'client' ? 'CLI' : 'EMP'}
-                          </span>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className={`text-sm font-semibold ${!dmMode ? 'text-orange-700 dark:text-orange-400' : 'text-gray-800 dark:text-slate-200'}`}>
+                    General
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 truncate">Todas las conversaciones</p>
+                </div>
+                {allMessages.length > 0 && (
+                  <span className="text-[10px] text-gray-400 dark:text-slate-500 flex-shrink-0">{allMessages.length}</span>
+                )}
+              </button>
+
+              <div className="mx-4 border-t border-gray-100 dark:border-slate-700/40 flex-shrink-0" />
+
+              {/* Lista de contactos */}
+              <div className="flex-1 overflow-y-auto">
+                {filteredContacts.length === 0 && directContacts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-slate-800 flex items-center justify-center mb-3">
+                      <i className="ri-user-add-line text-gray-300 dark:text-slate-600 text-xl" />
+                    </div>
+                    <p className="text-sm text-gray-400 dark:text-slate-500 font-medium">Sin contactos aún</p>
+                    <p className="text-xs text-gray-300 dark:text-slate-600 mt-1 leading-relaxed">Los clientes y empleados registrados aparecerán aquí</p>
+                  </div>
+                ) : filteredContacts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                    <i className="ri-search-line text-2xl text-gray-300 dark:text-slate-600 mb-2" />
+                    <p className="text-xs text-gray-400 dark:text-slate-500">Sin resultados</p>
+                  </div>
+                ) : (
+                  filteredContacts.map(contact => {
+                    const lastMsg = lastMessages[contact.id];
+                    const isActive = dmMode && selectedDM?.id === contact.id;
+                    return (
+                      <button
+                        key={contact.id}
+                        onClick={() => { setSelectedDM(contact); setDmMode(true); setActiveChannel('general'); setConfirmDeleteChat(false); }}
+                        className={`flex items-center gap-3 w-full px-4 py-3 transition-all border-l-[3px]
+                          ${isActive
+                            ? 'bg-orange-50 dark:bg-orange-900/10 border-l-orange-500'
+                            : 'border-l-transparent hover:bg-gray-50 dark:hover:bg-slate-800/50'}`}
+                      >
+                        <div className="relative flex-shrink-0">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm
+                            ${contact.type === 'client'
+                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                              : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'}`}>
+                            {contact.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-gray-200 dark:bg-slate-600 rounded-full border-2 border-white dark:border-slate-900" />
                         </div>
-                        <p className="text-[11px] text-gray-400 dark:text-slate-500 truncate">
-                          {lastMsg ? (lastMsg.mine ? 'Tú: ' : '') + lastMsg.text : contact.email || 'Sin mensajes aún'}
-                        </p>
-                      </div>
-                      {/* Hora */}
-                      {lastMsg && <span className="text-[10px] text-gray-400 dark:text-slate-500 flex-shrink-0">{lastMsg.time}</span>}
-                    </button>
-                  );
-                })
-              )}
-            </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className={`text-sm font-semibold truncate ${isActive ? 'text-orange-700 dark:text-orange-400' : 'text-gray-800 dark:text-slate-200'}`}>
+                              {contact.name}
+                            </span>
+                            {lastMsg && (
+                              <span className="text-[10px] text-gray-400 dark:text-slate-500 flex-shrink-0 whitespace-nowrap">{lastMsg.time}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold flex-shrink-0
+                              ${contact.type === 'client'
+                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400'
+                                : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 dark:text-emerald-400'}`}>
+                              {contact.type === 'client' ? 'CLI' : 'EMP'}
+                            </span>
+                            <p className="text-xs text-gray-400 dark:text-slate-500 truncate">
+                              {lastMsg
+                                ? (lastMsg.mine ? 'Tú: ' : '') + lastMsg.text
+                                : contact.email || 'Sin mensajes aún'}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </>
           )}
 
-          {/* ── Canales (sección secundaria) ── */}
-          <div className="border-t border-gray-100 dark:border-orange-500/10 flex-shrink-0">
-            <p className="text-[10px] font-bold text-gray-400 dark:text-orange-500/50 uppercase tracking-widest px-3 pt-2 pb-1">Canales</p>
-            <div className="flex md:flex-col gap-1 overflow-x-auto md:overflow-x-hidden px-2 pb-2">
-              {channels.map(ch => (
-                <button
-                  key={ch.id}
-                  onClick={() => { setActiveChannel(ch.id); setDmMode(false); setSelectedDM(null); }}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all flex-shrink-0 w-full text-left
-                    ${!dmMode && activeChannel === ch.id
-                      ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 font-medium'
-                      : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800'}`}
-                >
-                  <i className={`${ch.icon} text-xs`} />
-                  <span className="flex-1 whitespace-nowrap">{ch.name}</span>
-                  {ch.badge > 0 && (
-                    <span className="w-3.5 h-3.5 flex items-center justify-center bg-red-500 text-white rounded-full text-[8px] font-bold">{ch.badge}</span>
-                  )}
-                </button>
-              ))}
+          {/* Para empleado/cliente: entrada única a la empresa */}
+          {(isEmpleado || isCliente) && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <button
+                onClick={() => setDmMode(true)}
+                className={`flex items-center gap-3 w-full px-4 py-3 border-l-[3px] transition-all flex-shrink-0
+                  ${dmMode
+                    ? 'bg-orange-50 dark:bg-orange-900/10 border-l-orange-500'
+                    : 'border-l-transparent hover:bg-gray-50 dark:hover:bg-slate-800/50'}`}
+              >
+                <div className="relative flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                    <i className="ri-building-line text-orange-500 text-base" />
+                  </div>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white dark:border-slate-900" />
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className={`text-sm font-semibold truncate ${dmMode ? 'text-orange-700 dark:text-orange-400' : 'text-gray-800 dark:text-slate-200'}`}>Empresa</p>
+                  {myDirectId
+                    ? <p className="text-xs text-gray-400 dark:text-slate-500 truncate">
+                        {lastMessages[myDirectId]
+                          ? (lastMessages[myDirectId].mine ? 'Tú: ' : '') + lastMessages[myDirectId].text
+                          : 'Escribe tu primer mensaje...'}
+                      </p>
+                    : <p className="text-xs text-orange-400 animate-pulse">Conectando...</p>
+                  }
+                </div>
+                {myDirectId && lastMessages[myDirectId] && (
+                  <span className="text-[10px] text-gray-400 dark:text-slate-500 flex-shrink-0">{lastMessages[myDirectId].time}</span>
+                )}
+              </button>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Área de chat */}
-        <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 flex flex-col overflow-hidden min-w-0">
+        {/* ── Área de chat ── */}
+        <div className="flex-1 flex flex-col bg-gray-50 dark:bg-slate-950 min-w-0">
 
           {/* ── Vista: Canal general ── */}
           {!dmMode && (
             <>
-              <div className="px-4 py-3 border-b border-gray-100 dark:border-orange-500/10 flex items-center gap-2 flex-shrink-0">
-                <i className="ri-chat-1-line text-orange-500 text-sm" />
+              <div className="px-5 py-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-700/50 flex items-center gap-3 flex-shrink-0">
+                <div className="w-10 h-10 rounded-2xl bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center flex-shrink-0">
+                  <i className="ri-global-line text-orange-500 text-lg" />
+                </div>
                 <div>
-                  <p className="font-medium text-gray-800 dark:text-slate-200 text-sm">{currentChannel.name}</p>
+                  <p className="font-semibold text-gray-900 dark:text-slate-100">General</p>
                   <p className="text-xs text-gray-400 dark:text-slate-500">
-                    {isEmpresa ? 'Todas las conversaciones' : currentChannel.description}
+                    {isEmpresa
+                      ? `${allMessages.length} mensaje${allMessages.length !== 1 ? 's' : ''} · clientes y empleados`
+                      : currentChannel.description}
                   </p>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
                 {(isEmpresa ? allMessages : messages).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-slate-500">
-                    <i className="ri-chat-off-line text-3xl mb-2" />
-                    <p className="text-sm">Sin mensajes aún. ¡Sé el primero!</p>
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center mb-3">
+                      <i className="ri-chat-smile-3-line text-3xl text-orange-200 dark:text-orange-500/30" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Sin mensajes aún</p>
+                    <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+                      {isEmpresa ? 'Los mensajes de clientes y empleados aparecerán aquí' : '¡Sé el primero en escribir!'}
+                    </p>
                   </div>
-                ) : (isEmpresa ? allMessages : messages).map(msg => {
+                ) : (isEmpresa ? allMessages : messages).map((msg, idx) => {
                   const channelBadge =
-                    msg.channel === 'client' ? { label: 'CLI', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' } :
-                    msg.channel === 'employee' ? { label: 'EMP', color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' } :
-                    null;
+                    msg.channel === 'client'
+                      ? { label: 'Cliente', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' }
+                      : msg.channel === 'employee'
+                        ? { label: 'Empleado', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' }
+                        : null;
+                  const prevMsg = (isEmpresa ? allMessages : messages)[idx - 1];
+                  const showDate = !prevMsg || formatDate(prevMsg.created_at) !== formatDate(msg.created_at);
+                  const avatarColor =
+                    msg.channel === 'client' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
+                    msg.channel === 'employee' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
+                    'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400';
                   return (
-                    <div key={msg.id} className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 text-orange-600 dark:text-orange-400 font-bold text-sm">
-                        {msg.sender_name?.charAt(0)?.toUpperCase() || '?'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-gray-800 dark:text-slate-200">{msg.sender_name}</span>
-                          {channelBadge && (
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${channelBadge.color}`}>{channelBadge.label}</span>
-                          )}
-                          <span className="text-xs text-gray-400 dark:text-slate-500">{formatTime(msg.created_at)}</span>
+                    <div key={msg.id}>
+                      {showDate && (
+                        <div className="flex items-center gap-3 my-3">
+                          <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700/40" />
+                          <span className="text-[11px] text-gray-400 dark:text-slate-500 px-2">{formatDate(msg.created_at)}</span>
+                          <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700/40" />
                         </div>
-                        <div className="text-sm text-gray-700 dark:text-slate-300 mt-0.5">
-                          <MessageContent text={msg.text} mine={false} />
+                      )}
+                      <div className="flex gap-3 items-start">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${avatarColor}`}>
+                          {msg.sender_name?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                            <span className="text-sm font-semibold text-gray-800 dark:text-slate-200">{msg.sender_name}</span>
+                            {channelBadge && (
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${channelBadge.color}`}>
+                                {channelBadge.label}
+                              </span>
+                            )}
+                            <span className="text-[11px] text-gray-400 dark:text-slate-500">{formatTime(msg.created_at)}</span>
+                          </div>
+                          <div className="bg-white dark:bg-slate-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 shadow-sm inline-block max-w-[80%]">
+                            <MessageContent text={msg.text} mine={false} />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -515,14 +575,15 @@ export default function Comunicacion() {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <div className="p-3 border-t border-gray-100 dark:border-orange-500/10 flex-shrink-0 space-y-2">
+
+              <div className="px-4 py-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-700/50 flex-shrink-0 space-y-2">
                 {channelSendError && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl">
                     <i className="ri-error-warning-line text-red-500 flex-shrink-0 text-sm" />
                     <p className="text-xs text-red-600 dark:text-red-400 flex-1">{channelSendError}</p>
                   </div>
                 )}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2 bg-gray-100 dark:bg-slate-800 rounded-2xl px-3 py-1">
                   <EmojiPicker onSelect={emoji => setInputMessage(prev => prev + emoji)} direction="up" />
                   <ChatInputAddons onSendAttachment={att => sendMessage(att, user?.full_name || 'Tú', user?.avatar_url || undefined)} />
                   <input
@@ -530,11 +591,14 @@ export default function Comunicacion() {
                     value={inputMessage}
                     onChange={e => setInputMessage(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && sendChannel()}
-                    placeholder={`Escribe en ${currentChannel.name}...`}
-                    className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-slate-800 rounded-lg text-sm outline-none text-gray-800 dark:text-slate-200"
+                    placeholder="Escribe en General..."
+                    className="flex-1 bg-transparent py-2.5 text-sm outline-none text-gray-800 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-600"
                   />
-                  <button onClick={sendChannel} className="w-10 h-10 flex items-center justify-center bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex-shrink-0">
-                    <i className="ri-send-plane-fill" />
+                  <button
+                    onClick={sendChannel}
+                    className="w-9 h-9 flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 flex-shrink-0 transition-all shadow-sm shadow-orange-200 dark:shadow-orange-900/30"
+                  >
+                    <i className="ri-send-plane-fill text-sm" />
                   </button>
                 </div>
               </div>
@@ -545,57 +609,61 @@ export default function Comunicacion() {
           {dmMode && (
             <>
               {/* Header DM */}
-              <div className="px-4 py-3 border-b border-gray-100 dark:border-orange-500/10 flex items-center gap-3 flex-shrink-0">
-                {isEmpresa && (
+              <div className="px-5 py-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-700/50 flex items-center gap-3 flex-shrink-0">
+                {isEmpresa && selectedDM && (
                   <>
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0
-                      ${selectedDM?.type === 'client' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'}`}>
-                      {selectedDM ? selectedDM.name.charAt(0).toUpperCase() : '?'}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0
+                      ${selectedDM.type === 'client'
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                        : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'}`}>
+                      {selectedDM.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-800 dark:text-slate-200 text-sm truncate">{selectedDM?.name || 'Selecciona un contacto'}</p>
-                      <p className="text-xs text-gray-400 dark:text-slate-500">
-                        {selectedDM?.type === 'client' ? 'Cliente' : selectedDM?.type === 'employee' ? 'Empleado' : ''}
-                        {selectedDM?.email && ` · ${selectedDM.email}`}
-                      </p>
+                      <p className="font-semibold text-gray-900 dark:text-slate-100 truncate">{selectedDM.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full" />
+                        <span className="text-xs text-gray-400 dark:text-slate-500">
+                          {selectedDM.type === 'client' ? 'Cliente' : 'Empleado'}
+                          {selectedDM.email && ` · ${selectedDM.email}`}
+                        </span>
+                      </div>
                     </div>
                   </>
                 )}
                 {(isEmpleado || isCliente) && (
                   <>
-                    <div className="w-9 h-9 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
-                      <i className="ri-building-line text-orange-500" />
+                    <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
+                      <i className="ri-building-line text-orange-500 text-base" />
                     </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-800 dark:text-slate-200 text-sm">Empresa</p>
-                      <p className="text-xs text-gray-400 dark:text-slate-500">Mensajes directos con tu empresa</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 dark:text-slate-100">Empresa</p>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full" />
+                        <span className="text-xs text-gray-400 dark:text-slate-500">En línea</span>
+                      </div>
                     </div>
                   </>
                 )}
-                <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 flex-shrink-0">
-                  <span className="w-2 h-2 bg-green-500 rounded-full" />
-                  En línea
-                </span>
 
-                {/* Botón eliminar chat — solo empresa con contacto seleccionado */}
+                {/* Botón eliminar */}
                 {isEmpresa && selectedDM && (
                   confirmDeleteChat ? (
-                    <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg px-3 py-1.5 flex-shrink-0">
-                      <span className="text-xs text-red-600 dark:text-red-400 font-medium whitespace-nowrap">¿Eliminar chat?</span>
+                    <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl px-3 py-1.5 flex-shrink-0">
+                      <span className="text-xs text-red-600 dark:text-red-400 font-medium whitespace-nowrap">¿Eliminar?</span>
                       <button
                         onClick={() => deleteConversation(selectedDM.id, selectedDM.type === 'client' ? 'client' : 'employee')}
                         disabled={deletingChat}
-                        className="text-xs text-white bg-red-500 hover:bg-red-600 rounded-lg px-2 py-1 font-medium disabled:opacity-50 whitespace-nowrap"
+                        className="text-xs text-white bg-red-500 hover:bg-red-600 rounded-lg px-2 py-1 font-medium disabled:opacity-50"
                       >
-                        {deletingChat ? '...' : 'Sí, eliminar'}
+                        {deletingChat ? '...' : 'Sí'}
                       </button>
-                      <button onClick={() => setConfirmDeleteChat(false)} className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 px-1">Cancelar</button>
+                      <button onClick={() => setConfirmDeleteChat(false)} className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 px-1">No</button>
                     </div>
                   ) : (
                     <button
                       onClick={() => setConfirmDeleteChat(true)}
                       title="Eliminar conversación"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all flex-shrink-0"
+                      className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all flex-shrink-0"
                     >
                       <i className="ri-delete-bin-line text-sm" />
                     </button>
@@ -605,83 +673,99 @@ export default function Comunicacion() {
 
               {/* Sin contacto seleccionado (empresa) */}
               {isEmpresa && !selectedDM && (
-                <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-slate-500 p-6">
-                  <i className="ri-chat-private-line text-4xl mb-3 text-orange-300 dark:text-orange-500/40" />
-                  <p className="text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Selecciona un contacto</p>
-                  <p className="text-xs text-center text-gray-400 dark:text-slate-500">Elige un empleado o cliente del panel izquierdo para iniciar una conversación privada</p>
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center mb-4">
+                    <i className="ri-chat-private-line text-2xl text-orange-200 dark:text-orange-500/30" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-600 dark:text-slate-400 mb-1">Selecciona un contacto</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 leading-relaxed max-w-xs">Elige un empleado o cliente del panel izquierdo para iniciar una conversación privada</p>
                 </div>
               )}
 
-              {/* Sin ID propio aún (empleado/cliente cargando) */}
+              {/* Cargando (empleado/cliente) */}
               {(isEmpleado || isCliente) && !myDirectId && (
-                <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-slate-500">
+                <div className="flex-1 flex flex-col items-center justify-center">
                   <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mb-3" />
-                  <p className="text-sm">Conectando...</p>
+                  <p className="text-sm text-gray-400 dark:text-slate-500">Conectando...</p>
                 </div>
               )}
-
 
               {/* Mensajes DM */}
               {showDmChat && (
                 <>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
                     {dmMessages.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-slate-500">
-                        <i className="ri-chat-private-line text-3xl mb-2" />
-                        <p className="text-sm">Sin mensajes aún. ¡Empieza la conversación!</p>
+                      <div className="flex flex-col items-center justify-center h-full text-center">
+                        <div className="w-16 h-16 rounded-2xl bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center mb-3">
+                          <i className="ri-chat-smile-3-line text-3xl text-orange-200 dark:text-orange-500/30" />
+                        </div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Sin mensajes aún</p>
+                        <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Empieza la conversación</p>
                       </div>
-                    ) : (
-                      dmMessages.map((msg, i) => {
-                        const mine = isMine(msg.sender_name);
-                        const prevMsg = dmMessages[i - 1];
-                        const showDate = !prevMsg || formatDate(prevMsg.created_at) !== formatDate(msg.created_at);
-                        return (
-                          <div key={msg.id}>
-                            {showDate && (
-                              <div className="flex items-center gap-3 my-2">
-                                <div className="flex-1 h-px bg-gray-100 dark:bg-orange-500/10" />
-                                <span className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">{formatDate(msg.created_at)}</span>
-                                <div className="flex-1 h-px bg-gray-100 dark:bg-orange-500/10" />
-                              </div>
-                            )}
-                            <div className={`flex gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
-                              {!mine && (
-                                <div className="w-7 h-7 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 text-orange-600 dark:text-orange-400 font-bold text-xs self-end">
-                                  {msg.sender_name?.charAt(0)?.toUpperCase() || '?'}
-                                </div>
-                              )}
-                              <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm
-                                ${mine
-                                  ? 'bg-orange-500 text-white rounded-br-md'
-                                  : 'bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 rounded-bl-md'}`}>
-                                {!mine && <p className="text-[10px] font-semibold opacity-70 mb-0.5">{msg.sender_name}</p>}
-                                <MessageContent text={msg.text} mine={mine} />
-                                <p className={`text-[10px] mt-1 text-right ${mine ? 'text-orange-100' : 'text-gray-400 dark:text-slate-500'}`}>
-                                  {formatTime(msg.created_at)}
-                                </p>
-                              </div>
-                              {mine && (
-                                <div className="w-7 h-7 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 text-orange-600 dark:text-orange-400 font-bold text-xs self-end">
-                                  {(user?.full_name || 'T').charAt(0).toUpperCase()}
-                                </div>
-                              )}
+                    ) : dmMessages.map((msg, i) => {
+                      const mine = isMine(msg.sender_name);
+                      const prevMsg = dmMessages[i - 1];
+                      const showDate = !prevMsg || formatDate(prevMsg.created_at) !== formatDate(msg.created_at);
+                      const isConsecutive = !showDate && prevMsg && isMine(prevMsg.sender_name) === mine;
+                      return (
+                        <div key={msg.id}>
+                          {showDate && (
+                            <div className="flex items-center gap-3 my-4">
+                              <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700/40" />
+                              <span className="text-[11px] text-gray-400 dark:text-slate-500 px-2">{formatDate(msg.created_at)}</span>
+                              <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700/40" />
                             </div>
+                          )}
+                          <div className={`flex gap-2.5 items-end ${mine ? 'justify-end' : 'justify-start'} ${isConsecutive ? 'mt-0.5' : 'mt-3'}`}>
+                            {/* Avatar recibido */}
+                            {!mine ? (
+                              isConsecutive
+                                ? <div className="w-8 flex-shrink-0" />
+                                : <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 text-orange-600 dark:text-orange-400 font-bold text-xs">
+                                    {msg.sender_name?.charAt(0)?.toUpperCase() || '?'}
+                                  </div>
+                            ) : null}
+
+                            {/* Burbuja */}
+                            <div className="max-w-[68%]">
+                              {!mine && !isConsecutive && (
+                                <p className="text-[10px] font-semibold text-gray-500 dark:text-slate-400 mb-1 pl-1">{msg.sender_name}</p>
+                              )}
+                              <div className={`px-4 py-2.5 text-sm leading-relaxed
+                                ${mine
+                                  ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-2xl rounded-br-sm shadow-sm shadow-orange-200 dark:shadow-orange-900/40'
+                                  : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 rounded-2xl rounded-bl-sm shadow-sm'}`}>
+                                <MessageContent text={msg.text} mine={mine} />
+                              </div>
+                              <p className={`text-[10px] mt-1 ${mine ? 'text-right pr-1 text-gray-400 dark:text-slate-500' : 'pl-1 text-gray-400 dark:text-slate-500'}`}>
+                                {formatTime(msg.created_at)}
+                              </p>
+                            </div>
+
+                            {/* Avatar enviado */}
+                            {mine ? (
+                              isConsecutive
+                                ? <div className="w-8 flex-shrink-0" />
+                                : <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 text-orange-600 dark:text-orange-400 font-bold text-xs">
+                                    {(user?.full_name || 'T').charAt(0).toUpperCase()}
+                                  </div>
+                            ) : null}
                           </div>
-                        );
-                      })
-                    )}
+                        </div>
+                      );
+                    })}
                     <div ref={dmEndRef} />
                   </div>
 
                   {/* Input DM */}
-                  <div className="p-3 border-t border-gray-100 dark:border-orange-500/10 flex-shrink-0 space-y-2">
+                  <div className="px-4 py-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-700/50 flex-shrink-0 space-y-2">
                     {dmSendError && (
-                      <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg">
+                      <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl">
                         <i className="ri-error-warning-line text-red-500 flex-shrink-0 text-sm" />
                         <p className="text-xs text-red-600 dark:text-red-400 flex-1">{dmSendError}</p>
                       </div>
                     )}
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2 bg-gray-100 dark:bg-slate-800 rounded-2xl px-3 py-1">
                       <EmojiPicker onSelect={emoji => setDmInput(prev => prev + emoji)} direction="up" />
                       <ChatInputAddons onSendAttachment={att => sendDM(att, user?.full_name || 'Tú', user?.avatar_url || undefined)} />
                       <input
@@ -690,10 +774,13 @@ export default function Comunicacion() {
                         onChange={e => setDmInput(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && sendDirectMsg()}
                         placeholder={`Escribe a ${dmTitle}...`}
-                        className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-slate-800 rounded-lg text-sm outline-none text-gray-800 dark:text-slate-200"
+                        className="flex-1 bg-transparent py-2.5 text-sm outline-none text-gray-800 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-600"
                       />
-                      <button onClick={sendDirectMsg} className="w-10 h-10 flex items-center justify-center bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex-shrink-0">
-                        <i className="ri-send-plane-fill" />
+                      <button
+                        onClick={sendDirectMsg}
+                        className="w-9 h-9 flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 flex-shrink-0 transition-all shadow-sm shadow-orange-200 dark:shadow-orange-900/30"
+                      >
+                        <i className="ri-send-plane-fill text-sm" />
                       </button>
                     </div>
                   </div>
