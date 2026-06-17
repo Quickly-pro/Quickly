@@ -50,7 +50,7 @@ export default function ChatWidget({ sharedChannel }: Props = {}) {
 
   // También escuchar el canal general para recibir respuestas de la empresa
   const { messages: generalMessages } = useChatMessages(
-    (!isSharedMode && isReady) ? 'general' : '__none__'
+    isSharedMode ? '__none__' : 'general'
   );
 
   // Combinar DM + general, deduplicar por id, ordenar por fecha
