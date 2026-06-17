@@ -1214,7 +1214,7 @@ export default function Incidencias() {
           </div>
         )}
       </Modal>
-      <ChatWidget sharedChannel="incidencias" />
+      <ChatWidget />
     </div>
   );
 }

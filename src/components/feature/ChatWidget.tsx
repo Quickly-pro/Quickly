@@ -107,17 +107,15 @@ export default function ChatWidget({ sharedChannel }: Props = {}) {
   const headerColor = isSharedMode ? channelCfg!.color : 'bg-orange-500 dark:bg-orange-600';
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end">
+    <div className="fixed z-50 flex flex-col items-end sm:bottom-4 sm:right-4 bottom-[72px] right-3">
 
       {/* ── Panel de chat ─────────────────────────────────────────────── */}
       {open && (
         <div
           className="mb-3 flex flex-col bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-orange-500/15 overflow-hidden"
           style={{
-            /* Ancho: máximo 380px pero nunca más del viewport menos 16px de margen */
-            width: 'min(380px, calc(100vw - 16px))',
-            /* Alto: máximo 440px pero nunca más del viewport menos la barra nav (~70px) y el botón (~70px) */
-            height: 'min(440px, calc(100dvh - 150px))',
+            width: 'min(390px, calc(100vw - 12px))',
+            height: 'min(580px, calc(100svh - 160px))',
           }}
         >
           {/* Header */}
