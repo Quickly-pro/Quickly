@@ -67,7 +67,7 @@ export default function Comunicacion() {
   const [myDirectId, setMyDirectId] = useState<string | null>(null);
   const [dmInput, setDmInput] = useState('');
   const [dmSearch, setDmSearch] = useState('');
-  const [lastMessages, setLastMessages] = useState<Record<string, { text: string; time: string; mine: boolean }>>({});
+  const [lastMessages, setLastMessages] = useState<Record<string, { text: string; time: string; mine: boolean; at?: string }>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dmEndRef = useRef<HTMLDivElement>(null);
 
@@ -105,13 +105,14 @@ export default function Comunicacion() {
     ]);
 
     // Construir mapa de último mensaje por target_id
-    const lastMap: Record<string, { text: string; time: string; mine: boolean }> = {};
+    const lastMap: Record<string, { text: string; time: string; mine: boolean; at?: string }> = {};
     for (const msg of (recentMsgs || [])) {
       if (msg.target_id && !lastMap[msg.target_id]) {
         lastMap[msg.target_id] = {
           text: msg.text,
           time: new Date(msg.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-          mine: false, // se actualiza abajo
+          mine: false,
+          at: msg.created_at,
         };
       }
     }
@@ -137,17 +138,11 @@ export default function Comunicacion() {
       }
     }
 
-    // Solo se muestran contactos reales (profiles empleados + clientes registrados)
-    // NO se añaden conversaciones huérfanas de chat_messages
+    // Solo mostrar contactos que han enviado al menos un mensaje, ordenados por más reciente
+    const withMessages = list.filter(c => !!lastMap[c.id]);
+    withMessages.sort((a, b) => (lastMap[b.id]?.at || '').localeCompare(lastMap[a.id]?.at || ''));
 
-    // Ordenar: primero los que tienen mensajes recientes
-    list.sort((a, b) => {
-      const aHas = lastMap[a.id] ? 1 : 0;
-      const bHas = lastMap[b.id] ? 1 : 0;
-      return bHas - aHas;
-    });
-
-    setDirectContacts(list);
+    setDirectContacts(withMessages);
   }, [isEmpresa]);
 
   // Buscar propio ID para empleado/cliente y auto-abrir DM
@@ -188,6 +183,7 @@ export default function Comunicacion() {
           text: last.text,
           time: new Date(last.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
           mine: last.sender_name === (user?.full_name || 'Tú'),
+          at: last.created_at,
         },
       }));
     }
@@ -269,6 +265,13 @@ export default function Comunicacion() {
   };
 
   const isMine = (senderName: string) => senderName === (user?.full_name || 'Tú');
+
+  const SENDER_COLORS = ['text-blue-400', 'text-emerald-400', 'text-purple-400', 'text-pink-400', 'text-yellow-400', 'text-teal-400', 'text-cyan-400'];
+  const getSenderColor = (name: string) => {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+    return SENDER_COLORS[Math.abs(h) % SENDER_COLORS.length];
+  };
 
   // Nombre del DM activo
   const dmTitle = useMemo(() => {
@@ -518,7 +521,7 @@ export default function Comunicacion() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5">
                 {(isEmpresa ? allMessages : messages).length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center">
                     <div className="w-16 h-16 rounded-2xl bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center mb-3">
@@ -530,45 +533,65 @@ export default function Comunicacion() {
                     </p>
                   </div>
                 ) : (isEmpresa ? allMessages : messages).map((msg, idx) => {
-                  const channelBadge =
-                    msg.channel === 'client'
-                      ? { label: 'Cliente', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' }
-                      : msg.channel === 'employee'
-                        ? { label: 'Empleado', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' }
-                        : null;
+                  const mine = isMine(msg.sender_name);
                   const prevMsg = (isEmpresa ? allMessages : messages)[idx - 1];
                   const showDate = !prevMsg || formatDate(prevMsg.created_at) !== formatDate(msg.created_at);
-                  const avatarColor =
-                    msg.channel === 'client' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
-                    msg.channel === 'employee' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
-                    'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400';
+                  const isConsecutive = !showDate && prevMsg && prevMsg.sender_name === msg.sender_name;
+                  const senderColor = getSenderColor(msg.sender_name || '');
+                  const channelLabel = msg.channel === 'client' ? 'CLI' : msg.channel === 'employee' ? 'EMP' : null;
+                  const avatarCls =
+                    msg.channel === 'client' ? 'bg-blue-100 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400' :
+                    msg.channel === 'employee' ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' :
+                    'bg-orange-100 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400';
                   return (
                     <div key={msg.id}>
                       {showDate && (
-                        <div className="flex items-center gap-3 my-3">
-                          <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700/40" />
-                          <span className="text-[11px] text-gray-400 dark:text-slate-500 px-2">{formatDate(msg.created_at)}</span>
-                          <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700/40" />
+                        <div className="flex items-center gap-3 my-4">
+                          <div className="flex-1 h-px bg-gray-200/60 dark:bg-slate-700/30" />
+                          <span className="text-[11px] text-gray-400 dark:text-slate-500 px-3 py-1 bg-gray-100 dark:bg-slate-800/60 rounded-full">{formatDate(msg.created_at)}</span>
+                          <div className="flex-1 h-px bg-gray-200/60 dark:bg-slate-700/30" />
                         </div>
                       )}
-                      <div className="flex gap-3 items-start">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${avatarColor}`}>
-                          {msg.sender_name?.charAt(0)?.toUpperCase() || '?'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                            <span className="text-sm font-semibold text-gray-800 dark:text-slate-200">{msg.sender_name}</span>
-                            {channelBadge && (
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${channelBadge.color}`}>
-                                {channelBadge.label}
-                              </span>
-                            )}
-                            <span className="text-[11px] text-gray-400 dark:text-slate-500">{formatTime(msg.created_at)}</span>
+                      <div className={`flex gap-2 items-end ${mine ? 'justify-end pl-10' : 'justify-start pr-10'} ${isConsecutive ? 'mt-0.5' : 'mt-3'}`}>
+                        {/* Avatar recibido */}
+                        {!mine && (
+                          isConsecutive
+                            ? <div className="w-7 flex-shrink-0" />
+                            : <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] flex-shrink-0 self-end ${avatarCls}`}>
+                                {msg.sender_name?.charAt(0)?.toUpperCase() || '?'}
+                              </div>
+                        )}
+                        {/* Burbuja */}
+                        <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                          {!mine && !isConsecutive && (
+                            <div className="flex items-center gap-1.5 mb-1 pl-1">
+                              <span className={`text-[11px] font-semibold ${senderColor}`}>{msg.sender_name}</span>
+                              {channelLabel && (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold
+                                  ${msg.channel === 'client' ? 'bg-blue-100 dark:bg-blue-500/15 text-blue-500 dark:text-blue-400' : 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-500 dark:text-emerald-400'}`}>
+                                  {channelLabel}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <div className={`px-3.5 py-2.5 text-sm
+                            ${mine
+                              ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-[18px] rounded-br-[5px] shadow-sm shadow-orange-200 dark:shadow-orange-900/30'
+                              : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-100 rounded-[18px] rounded-bl-[5px] shadow-sm'}`}>
+                            <MessageContent text={msg.text} mine={mine} />
                           </div>
-                          <div className="bg-white dark:bg-slate-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 shadow-sm inline-block max-w-[80%]">
-                            <MessageContent text={msg.text} mine={false} />
-                          </div>
+                          <span className={`text-[10px] mt-0.5 ${mine ? 'pr-1 text-gray-400 dark:text-slate-500' : 'pl-1 text-gray-400 dark:text-slate-500'}`}>
+                            {formatTime(msg.created_at)}
+                          </span>
                         </div>
+                        {/* Avatar enviado */}
+                        {mine && (
+                          isConsecutive
+                            ? <div className="w-7 flex-shrink-0" />
+                            : <div className="w-7 h-7 rounded-full bg-orange-100 dark:bg-orange-500/15 flex items-center justify-center flex-shrink-0 text-orange-600 dark:text-orange-400 font-bold text-[11px] self-end">
+                                {(user?.full_name || 'T').charAt(0).toUpperCase()}
+                              </div>
+                        )}
                       </div>
                     </div>
                   );
