@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useChatMessages } from '@/hooks/useChatMessages';
@@ -46,7 +46,21 @@ export default function ChatWidget({ sharedChannel }: Props = {}) {
   const effectiveChannel = isSharedMode ? sharedChannel! : (myTargetId ? dmChannel : '__none__');
   const effectiveTarget  = isSharedMode ? null : myTargetId;   // canal compartido → target_id = null
 
-  const { messages, sendMessage, sendError } = useChatMessages(effectiveChannel, effectiveTarget);
+  const { messages: dmMessages, sendMessage, sendError } = useChatMessages(effectiveChannel, effectiveTarget);
+
+  // También escuchar el canal general para recibir respuestas de la empresa
+  const { messages: generalMessages } = useChatMessages(
+    (!isSharedMode && isReady) ? 'general' : '__none__'
+  );
+
+  // Combinar DM + general, deduplicar por id, ordenar por fecha
+  const messages = useMemo(() => {
+    const combined = [...dmMessages, ...generalMessages];
+    const seen = new Set<number>();
+    return combined
+      .filter(m => { if (seen.has(m.id)) return false; seen.add(m.id); return true; })
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }, [dmMessages, generalMessages]);
 
   // Lookup del propio DM target (solo en modo DM, no en canal compartido)
   const findMyRecord = useCallback(async () => {
