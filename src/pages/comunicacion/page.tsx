@@ -67,6 +67,7 @@ export default function Comunicacion() {
   const [myDirectId, setMyDirectId] = useState<string | null>(null);
   const [dmInput, setDmInput] = useState('');
   const [dmSearch, setDmSearch] = useState('');
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>(isEmpresa ? 'list' : 'chat');
   const [lastMessages, setLastMessages] = useState<Record<string, { text: string; time: string; mine: boolean; at?: string }>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dmEndRef = useRef<HTMLDivElement>(null);
@@ -351,7 +352,7 @@ export default function Comunicacion() {
       <div className="flex min-h-0 rounded-2xl border border-gray-100 dark:border-slate-700/60 overflow-hidden shadow-sm" style={{ height: 'calc(100vh - 280px)' }}>
 
         {/* ── Sidebar ── */}
-        <div className="w-[260px] flex-shrink-0 border-r border-gray-100 dark:border-slate-700/60 flex flex-col bg-white dark:bg-slate-900">
+        <div className={`${mobileView === 'list' ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-[260px] flex-shrink-0 border-r border-gray-100 dark:border-slate-700/60 bg-white dark:bg-slate-900`}>
 
           {/* Sidebar header */}
           <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-slate-700/40 flex-shrink-0">
@@ -373,7 +374,7 @@ export default function Comunicacion() {
           {isEmpresa && (
             <>
               <button
-                onClick={() => { setDmMode(false); setSelectedDM(null); setActiveChannel('general'); setConfirmDeleteChat(false); }}
+                onClick={() => { setDmMode(false); setSelectedDM(null); setActiveChannel('general'); setConfirmDeleteChat(false); setMobileView('chat'); }}
                 className={`flex items-center gap-3 w-full px-4 py-3 transition-all border-l-[3px] flex-shrink-0
                   ${!dmMode
                     ? 'bg-orange-50 dark:bg-orange-900/10 border-l-orange-500'
@@ -420,7 +421,7 @@ export default function Comunicacion() {
                     return (
                       <button
                         key={contact.id}
-                        onClick={() => { setSelectedDM(contact); setDmMode(true); setActiveChannel('general'); setConfirmDeleteChat(false); }}
+                        onClick={() => { setSelectedDM(contact); setDmMode(true); setActiveChannel('general'); setConfirmDeleteChat(false); setMobileView('chat'); }}
                         className={`flex items-center gap-3 w-full px-4 py-3 transition-all border-l-[3px]
                           ${isActive
                             ? 'bg-orange-50 dark:bg-orange-900/10 border-l-orange-500'
@@ -470,7 +471,7 @@ export default function Comunicacion() {
           {(isEmpleado || isCliente) && (
             <div className="flex-1 flex flex-col overflow-hidden">
               <button
-                onClick={() => setDmMode(true)}
+                onClick={() => { setDmMode(true); setMobileView('chat'); }}
                 className={`flex items-center gap-3 w-full px-4 py-3 border-l-[3px] transition-all flex-shrink-0
                   ${dmMode
                     ? 'bg-orange-50 dark:bg-orange-900/10 border-l-orange-500'
@@ -502,12 +503,18 @@ export default function Comunicacion() {
         </div>
 
         {/* ── Área de chat ── */}
-        <div className="flex-1 flex flex-col bg-gray-50 dark:bg-slate-950 min-w-0">
+        <div className={`${mobileView === 'chat' ? 'flex' : 'hidden'} md:flex flex-col flex-1 bg-gray-50 dark:bg-slate-950 min-w-0`}>
 
           {/* ── Vista: Canal general ── */}
           {!dmMode && (
             <>
               <div className="px-5 py-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-700/50 flex items-center gap-3 flex-shrink-0">
+                <button
+                  onClick={() => setMobileView('list')}
+                  className="md:hidden w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 flex-shrink-0 -ml-1"
+                >
+                  <i className="ri-arrow-left-line text-base" />
+                </button>
                 <div className="w-10 h-10 rounded-2xl bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center flex-shrink-0">
                   <i className="ri-global-line text-orange-500 text-lg" />
                 </div>
@@ -633,6 +640,12 @@ export default function Comunicacion() {
             <>
               {/* Header DM */}
               <div className="px-5 py-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-700/50 flex items-center gap-3 flex-shrink-0">
+                <button
+                  onClick={() => setMobileView('list')}
+                  className="md:hidden w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 flex-shrink-0 -ml-1"
+                >
+                  <i className="ri-arrow-left-line text-base" />
+                </button>
                 {isEmpresa && selectedDM && (
                   <>
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0
