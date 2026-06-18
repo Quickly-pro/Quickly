@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRole } from '@/hooks/useRole';
 import { useChatMessages } from '@/hooks/useChatMessages';
@@ -20,6 +20,26 @@ export default function Comunicacion() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Notificación push cuando llega mensaje nuevo y la pestaña está en segundo plano
+  const prevLengthRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (prevLengthRef.current === null) { prevLengthRef.current = messages.length; return; }
+    if (messages.length > prevLengthRef.current) {
+      const newMsgs = messages.slice(prevLengthRef.current);
+      for (const msg of newMsgs) {
+        if (msg.sender_name !== (user?.full_name || 'Tú')) {
+          if ('Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+            const body = msg.text.length > 80 ? msg.text.slice(0, 80) + '…' : msg.text;
+            const n = new Notification(`💬 ${msg.sender_name}`, { body, icon: '/favicon.svg' });
+            n.onclick = () => { window.focus(); n.close(); };
+            setTimeout(() => n.close(), 6000);
+          }
+        }
+      }
+      prevLengthRef.current = messages.length;
+    }
+  }, [messages, user?.full_name]);
 
   const send = () => {
     if (!inputMessage.trim()) return;

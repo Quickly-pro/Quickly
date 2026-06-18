@@ -14,7 +14,7 @@ export default function Navbar() {
   const [langOpen, setLangOpen] = useState(false);
 
   const { isDark, toggle } = useTheme();
-  const { notifications, unreadCount, markAllRead, markRead } = useNotificationsContext();
+  const { notifications, unreadCount, markAllRead, markRead, browserPermission, requestBrowserPermission } = useNotificationsContext();
   const { data: company } = useCompany();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -169,6 +169,27 @@ export default function Navbar() {
                   <button onClick={markAllRead} className="text-xs text-orange-600 hover:underline">Marcar todas leídas</button>
                 )}
               </div>
+              {browserPermission === 'default' && (
+                <button
+                  onClick={requestBrowserPermission}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors border-b border-orange-100 dark:border-orange-900/30"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center flex-shrink-0">
+                    <i className="ri-notification-badge-line text-orange-500 text-sm" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">Activar notificaciones push</p>
+                    <p className="text-[10px] text-orange-500/80 dark:text-orange-500/60">Recibe avisos aunque la app esté en segundo plano</p>
+                  </div>
+                  <i className="ri-arrow-right-s-line text-orange-400 ml-auto flex-shrink-0" />
+                </button>
+              )}
+              {browserPermission === 'granted' && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/10 border-b border-green-100 dark:border-green-900/20">
+                  <i className="ri-checkbox-circle-line text-green-500 text-sm" />
+                  <p className="text-[11px] text-green-700 dark:text-green-400">Notificaciones push activadas</p>
+                </div>
+              )}
               <div className="flex-1 overflow-y-auto">
                 {notifications.length === 0 ? (
                   <div className="p-8 text-center">

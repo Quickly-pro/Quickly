@@ -6,6 +6,15 @@ import EmojiPicker from '@/components/base/EmojiPicker';
 import ChatInputAddons from '@/components/base/ChatInputAddons';
 import MessageContent from '@/components/base/MessageContent';
 
+function fireChatNotif(senderName: string, text: string) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (document.visibilityState === 'visible') return;
+  const body = text.length > 80 ? text.slice(0, 80) + '…' : text;
+  const n = new Notification(`💬 ${senderName}`, { body, icon: '/favicon.svg' });
+  n.onclick = () => { window.focus(); n.close(); };
+  setTimeout(() => n.close(), 6000);
+}
+
 export default function ChatWidget() {
   const { user } = useAuth();
   const { isEmpleado, isCliente } = useRole();
@@ -18,6 +27,21 @@ export default function ChatWidget() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { messages, sendMessage, sendError } = useChatMessages('general');
+
+  // Notificación push cuando llega un mensaje nuevo y la pestaña está en segundo plano
+  const prevLengthRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (prevLengthRef.current === null) { prevLengthRef.current = messages.length; return; }
+    if (messages.length > prevLengthRef.current) {
+      const newMsgs = messages.slice(prevLengthRef.current);
+      for (const msg of newMsgs) {
+        if (msg.sender_name !== (user?.full_name || 'Tú')) {
+          fireChatNotif(msg.sender_name || 'Nuevo mensaje', msg.text);
+        }
+      }
+      prevLengthRef.current = messages.length;
+    }
+  }, [messages, user?.full_name]);
 
   useEffect(() => {
     if (open) endRef.current?.scrollIntoView({ behavior: 'smooth' });

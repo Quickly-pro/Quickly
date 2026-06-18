@@ -18,11 +18,32 @@ interface NotificationsContextType {
   markAllRead: () => void;
   markRead: (id: number) => void;
   clearAll: () => void;
+  browserPermission: NotificationPermission | 'unsupported';
+  requestBrowserPermission: () => Promise<boolean>;
+}
+
+function fireBrowserNotif(title: string, body: string) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (document.visibilityState === 'visible') return;
+  const n = new Notification(title, { body, icon: '/favicon.svg' });
+  n.onclick = () => { window.focus(); n.close(); };
+  setTimeout(() => n.close(), 6000);
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
+  const [browserPermission, setBrowserPermission] = useState<NotificationPermission | 'unsupported'>(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
+  );
+
+  const requestBrowserPermission = useCallback(async () => {
+    if (!('Notification' in window)) return false;
+    const result = await Notification.requestPermission();
+    setBrowserPermission(result);
+    return result === 'granted';
+  }, []);
+
   const [notifications, setNotifications] = useState<AppNotification[]>([
     { id: 1001, title: 'Nueva factura', text: 'Factura #F-2026-042 creada para Restaurante El Pino - €1,240.50', type: 'invoice', time: 'Hace 2 min', read: false },
     { id: 1002, title: 'Ruta completada', text: 'Carlos terminó la Ruta #5 con 8 entregas exitosas', type: 'route', time: 'Hace 15 min', read: false },
@@ -42,6 +63,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       read: false,
     };
     setNotifications(prev => [newNotif, ...prev]);
+    fireBrowserNotif(title, text);
   }, []);
 
   const markAllRead = useCallback(() => {
@@ -59,7 +81,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <NotificationsContext.Provider value={{ notifications, unreadCount, addNotification, markAllRead, markRead, clearAll }}>
+    <NotificationsContext.Provider value={{ notifications, unreadCount, addNotification, markAllRead, markRead, clearAll, browserPermission, requestBrowserPermission }}>
       {children}
     </NotificationsContext.Provider>
   );
