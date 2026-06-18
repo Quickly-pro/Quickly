@@ -105,10 +105,10 @@ export default function Comunicacion() {
   };
 
   return (
-    <div className="space-y-4 h-[calc(100vh-4rem)]">
+    <div className="flex flex-col gap-4 h-[calc(100vh-4rem)]">
 
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Comunicación</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Chat en tiempo real con todo el equipo</p>
@@ -124,8 +124,8 @@ export default function Comunicacion() {
         )}
       </div>
 
-      {/* Top action cards */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      {/* Top action cards — ocultas en móvil para maximizar espacio del chat */}
+      <div className="hidden md:grid grid-cols-3 gap-3 flex-shrink-0">
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
             <i className="ri-chat-smile-2-line text-blue-600 text-xl" />
@@ -164,10 +164,7 @@ export default function Comunicacion() {
       </div>
 
       {/* ── Chat panel ─────────────────────────────────────────────────────── */}
-      <div
-        className="flex flex-col rounded-2xl border border-gray-100 dark:border-slate-700/60 overflow-hidden shadow-sm bg-gray-50 dark:bg-slate-950"
-        style={{ height: 'calc(100vh - 280px)' }}
-      >
+      <div className="flex flex-col flex-1 min-h-0 rounded-2xl border border-gray-100 dark:border-slate-700/60 overflow-hidden shadow-sm bg-gray-50 dark:bg-slate-950">
         {/* Chat header */}
         <div className="px-5 py-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-700/50 flex items-center gap-3 flex-shrink-0">
           <div className="w-10 h-10 rounded-2xl bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center flex-shrink-0">
