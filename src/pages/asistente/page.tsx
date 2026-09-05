@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useProfile } from '@/hooks/useProfile';
 import PremiumGate from '@/components/feature/PremiumGate';
 
 interface Conversation {
@@ -7,15 +8,6 @@ interface Conversation {
   title: string;
   date: string;
 }
-
-const demoConversations: Conversation[] = [
-  { id: 1, title: '¿me puedes ayudar?', date: 'Hoy' },
-  { id: 2, title: 'Nueva conversación', date: 'Hoy' },
-  { id: 3, title: '¿Qué productos tienen...', date: 'Ayer' },
-  { id: 4, title: '¿Cuáles son las factura...', date: 'Ayer' },
-  { id: 5, title: 'Nueva conversación', date: '28/04/2026' },
-  { id: 6, title: 'Resumen de pedidos', date: '29/4/2026' },
-];
 
 interface QuickAction {
   icon: string;
@@ -39,19 +31,107 @@ interface ChatMessage {
   time: string;
   dataCards?: { title: string; value: string; icon: string }[];
   listItems?: { label: string; detail: string }[];
+  pendingAction?: { type: string; params: any; summary: string };
+  actionStatus?: 'pending' | 'done' | 'cancelled' | 'error';
+  actionError?: string;
 }
 
 export default function Asistente() {
-  const [conversations, setConversations] = useState<Conversation[]>(demoConversations);
+  const { profile } = useProfile();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    supabase.from('assistant_conversations').select('id, title, created_at').order('created_at', { ascending: false }).limit(30)
+      .then(({ data }) => {
+        if (data) setConversations(data.map((c: any) => ({
+          id: c.id, title: c.title,
+          date: new Date(c.created_at).toDateString() === new Date().toDateString() ? 'Hoy' : new Date(c.created_at).toLocaleDateString('es-ES'),
+        })));
+      });
+  }, []);
+
   const addMessage = useCallback((msg: ChatMessage) => {
     setMessages(prev => [...prev, msg]);
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   }, []);
+
+  // ── Ejecutar una acción que el asistente propuso, tras confirmación ──────
+  const executeAction = async (msgId: number, type: string, params: any) => {
+    try {
+      if (type === 'add_route_stop') {
+        const { error } = await supabase.from('route_stops').insert({
+          client: params.name,
+          address: params.address,
+          phone: params.phone || null,
+          notes: params.notes || null,
+          order_num: 9999,
+          status: 'pending',
+        });
+        if (error) throw error;
+      } else if (type === 'create_vehicle_incident') {
+        const { error } = await supabase.from('vehicle_incidents').insert({
+          vehicle: params.vehicle,
+          description: params.description,
+          type: 'general',
+          status: 'abierto',
+          date: new Date().toISOString().split('T')[0],
+        });
+        if (error) throw error;
+      } else if (type === 'create_invoice') {
+        const { count } = await supabase.from('invoices').select('*', { count: 'exact', head: true });
+        const year = new Date().getFullYear();
+        const seq = String((count || 0) + 1).padStart(3, '0');
+        const invoiceId = `F-${year}-${seq}`;
+        const subtotal = Number(params.qty) * Number(params.unitPrice);
+        const tax = subtotal * 0.21;
+        const total = subtotal + tax;
+
+        const { error: invErr } = await supabase.from('invoices').insert({
+          id: invoiceId,
+          invoice_number: invoiceId,
+          client: params.client,
+          amount: total,
+          subtotal,
+          tax,
+          status: 'pendiente',
+          date: new Date().toISOString().split('T')[0],
+          notes: params.notes || null,
+        });
+        if (invErr) throw invErr;
+
+        await supabase.from('invoice_items').insert({
+          invoice_id: invoiceId,
+          product: params.product,
+          qty: params.qty,
+          price: params.unitPrice,
+          total: subtotal,
+        });
+      } else if (type === 'add_pedido') {
+        const items = Array.isArray(params.items) ? params.items.slice(0, 20) : [];
+        const { data, error } = await supabase.rpc('create_order_row', {
+          p_employee: params.employee,
+          p_date: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+          p_address: params.address || '',
+          p_items: items,
+          p_turno: params.turno || 1,
+          p_phone: params.phone || '',
+        });
+        if (error || !data?.success) throw new Error(data?.error || error?.message || 'No se pudo crear el pedido');
+      }
+
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, actionStatus: 'done' } : m));
+    } catch (err: any) {
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, actionStatus: 'error', actionError: err?.message || 'No se pudo completar la acción' } : m));
+    }
+  };
+
+  const cancelAction = (msgId: number) => {
+    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, actionStatus: 'cancelled' } : m));
+  };
 
   const processQuery = async (query: string) => {
     const q = query.toLowerCase();
@@ -213,10 +293,11 @@ export default function Asistente() {
       // Intentar con la edge function de IA (Claude API)
       let aiText = '';
       let dataCards: ChatMessage['dataCards'];
+      let pendingAction: ChatMessage['pendingAction'];
 
       try {
         const res = await fetch(
-          'https://irbilfifptefmpudwxee.supabase.co/functions/v1/ai-assistant',
+          'https://wtelnoiuqaqnzgobuuce.supabase.co/functions/v1/ai-assistant',
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -226,6 +307,7 @@ export default function Asistente() {
         if (res.ok) {
           const json = await res.json();
           aiText = json.text;
+          pendingAction = json.pendingAction;
         }
       } catch { /* fall through to local */ }
 
@@ -242,16 +324,19 @@ export default function Asistente() {
         isUser: false,
         time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
         dataCards,
+        pendingAction,
+        actionStatus: pendingAction ? 'pending' : undefined,
       };
       addMessage(aiMsg);
 
-      // Guardar conversación en historial
-      setConversations(prev => {
-        const title = query.length > 40 ? query.slice(0, 37) + '...' : query;
-        const existing = prev.find(c => c.title === title);
-        if (existing) return prev;
-        return [{ id: Date.now(), title, date: 'Hoy' }, ...prev.slice(0, 20)];
-      });
+      // Guardar conversación en historial (real, en Supabase)
+      const title = query.length > 40 ? query.slice(0, 37) + '...' : query;
+      const { data: savedConv } = await supabase.from('assistant_conversations').insert({
+        title, query, response: aiText,
+      }).select('id').single();
+      if (savedConv) {
+        setConversations(prev => [{ id: savedConv.id, title, date: 'Hoy' }, ...prev.slice(0, 29)]);
+      }
 
     } catch {
       const fallbackMsg: ChatMessage = {
@@ -305,7 +390,7 @@ export default function Asistente() {
                 <span className="truncate flex-1">{conv.title}</span>
                 {conv.date !== 'Hoy' && conv.date !== 'Ayer' && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); setConversations(prev => prev.filter(c => c.id !== conv.id)); }}
+                    onClick={(e) => { e.stopPropagation(); supabase.from('assistant_conversations').delete().eq('id', conv.id); setConversations(prev => prev.filter(c => c.id !== conv.id)); }}
                     className="w-5 h-5 flex items-center justify-center text-gray-400 dark:text-slate-500 hover:text-red-500"
                   >
                     <i className="ri-delete-bin-line text-xs" />
@@ -317,10 +402,14 @@ export default function Asistente() {
 
           <div className="hidden md:block p-3 border-t border-gray-100 dark:border-slate-700">
             <div className="flex items-center gap-2 px-3 py-2">
-              <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-slate-700 flex items-center justify-center">
-                <span className="text-xs font-medium text-gray-600 dark:text-slate-300">Al</span>
+              <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden">
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xs font-medium text-gray-600 dark:text-slate-300">{(profile.full_name || 'U').charAt(0).toUpperCase()}</span>
+                )}
               </div>
-              <span className="text-sm text-gray-600 dark:text-slate-300">Alex</span>
+              <span className="text-sm text-gray-600 dark:text-slate-300 truncate">{profile.full_name || 'Tu cuenta'}</span>
             </div>
           </div>
         </div>
@@ -405,6 +494,41 @@ export default function Asistente() {
                       )}
 
                       <p className={`text-xs mt-1 ${msg.isUser ? 'text-orange-100' : 'text-gray-400 dark:text-slate-500'}`}>{msg.time}</p>
+
+                      {/* Tarjeta de confirmación de acción */}
+                      {!msg.isUser && msg.pendingAction && (
+                        <div className="mt-3 p-3 bg-white dark:bg-slate-700/50 rounded-xl border border-orange-200 dark:border-orange-700/40">
+                          <div className="flex items-start gap-2 mb-2">
+                            <i className="ri-flashlight-line text-orange-500 mt-0.5" />
+                            <p className="text-sm text-gray-700 dark:text-slate-200">{msg.pendingAction.summary}</p>
+                          </div>
+                          {msg.actionStatus === 'pending' && (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => executeAction(msg.id, msg.pendingAction!.type, msg.pendingAction!.params)}
+                                className="flex-1 px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600"
+                              >
+                                Confirmar
+                              </button>
+                              <button
+                                onClick={() => cancelAction(msg.id)}
+                                className="px-3 py-1.5 bg-gray-100 dark:bg-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-gray-200"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          )}
+                          {msg.actionStatus === 'done' && (
+                            <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1"><i className="ri-check-line" /> Hecho</p>
+                          )}
+                          {msg.actionStatus === 'cancelled' && (
+                            <p className="text-xs text-gray-400">Cancelado</p>
+                          )}
+                          {msg.actionStatus === 'error' && (
+                            <p className="text-xs text-red-500 flex items-center gap-1"><i className="ri-error-warning-line" /> {msg.actionError}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

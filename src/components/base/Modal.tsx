@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 interface ModalProps {
@@ -25,9 +25,11 @@ const sizeClasses: Record<string, string> = {
 /**
  * Reusable Modal component with smooth enter/exit animations.
  *
+ * - Uses position:fixed covering the current viewport, so it always opens
+ *   exactly where the user is looking — regardless of how far they've
+ *   scrolled down the page. No scroll-position math needed.
  * - Backdrop fades in/out with scale
  * - Content scales from 0.95 -> 1 and fades 0 -> 1
- * - Rendered inside <main> via portal so it scrolls naturally with the page
  * - Auto-handles click-outside and Escape key
  * - Delays unmount until exit animation completes
  */
@@ -44,8 +46,6 @@ export default function Modal({
 }: ModalProps) {
   const [isVisible, setIsVisible] = useState(isOpen);
   const [isExiting, setIsExiting] = useState(false);
-  const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
 
   // Handle mount/unmount with exit animation delay
   useEffect(() => {
@@ -61,27 +61,13 @@ export default function Modal({
     }
   }, [isOpen]);
 
-  // Create portal container inside <main> at the current scroll position
+  // Prevent the page behind the modal from scrolling while it's open
   useEffect(() => {
-    if (!isOpen) {
-      setPortalContainer(null);
-      return;
-    }
-
-    const main = document.querySelector('main');
-    if (!main) return;
-
-    const scrollTop = main.scrollTop;
-
-    const el = document.createElement('div');
-    el.style.cssText = `position:absolute;top:${scrollTop}px;left:0;width:100%;z-index:50;`;
-    main.appendChild(el);
-    setPortalContainer(el);
-
+    if (!isOpen) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     return () => {
-      if (main.contains(el)) {
-        main.removeChild(el);
-      }
+      document.body.style.overflow = original;
     };
   }, [isOpen]);
 
@@ -99,31 +85,44 @@ export default function Modal({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
-  // Click on backdrop closes the modal (but NOT on content)
+  // Click en el fondo cierra la ventana (pero NO en el contenido).
+  // Exigimos que el "mousedown" Y el "click" caigan ambos en el fondo
+  // — evita cierres fantasma cuando vuelve la cámara del móvil (el
+  // navegador a veces genera un clic sintético que cae fuera del
+  // contenido si este cambió de tamaño, p.ej. al aparecer una foto).
+  const mouseDownOnBackdropRef = useRef(false);
+
+  const handleBackdropMouseDown = (e: React.MouseEvent) => {
+    mouseDownOnBackdropRef.current = e.target === e.currentTarget;
+  };
+
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
+    const wasRealClick = e.target === e.currentTarget && mouseDownOnBackdropRef.current;
+    mouseDownOnBackdropRef.current = false;
+    if (wasRealClick) {
       onClose();
     }
   };
 
-  if (!isVisible || !portalContainer) return null;
+  if (!isVisible) return null;
 
   const contentClass = `bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full ${sizeClasses[size]} ${
     maxHeight ? `max-h-[${maxHeight}]` : 'max-h-[85vh]'
-  } overflow-y-auto relative transition-all duration-200 ease-out mt-8 sm:mt-12 ${
+  } overflow-y-auto relative transition-all duration-200 ease-out ${
     isExiting ? 'opacity-0 scale-95 translate-y-2' : 'opacity-100 scale-100 translate-y-0'
   } ${noPadding ? '' : ''} ${className}`;
 
   return createPortal(
     <div
-      className={`w-full min-h-screen flex items-start justify-center p-3 sm:p-4 transition-all duration-200 ease-out ${
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 transition-all duration-200 ease-out ${
         isExiting ? 'bg-black/0' : 'bg-black/40'
       }`}
+      onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
       aria-modal="true"
       role="dialog"
     >
-      <div ref={contentRef} className={contentClass}>
+      <div className={contentClass}>
         {title && !hideCloseButton && (
           <div className="flex items-center justify-between px-6 pt-6 pb-2 sticky top-0 bg-white dark:bg-slate-900 rounded-t-2xl z-10">
             {typeof title === 'string' ? (
@@ -154,6 +153,6 @@ export default function Modal({
         </div>
       </div>
     </div>,
-    portalContainer
+    document.body
   );
 }

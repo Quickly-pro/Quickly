@@ -60,14 +60,14 @@ function StatRing({ label, value, total, color, icon }: StatRingProps) {
 interface TrendStatProps {
   label: string;
   value: string;
-  trend: number;
-  trendLabel: string;
+  trend?: number;
+  trendLabel?: string;
   color: string;
   icon: string;
 }
 
 function TrendStat({ label, value, trend, trendLabel, color, icon }: TrendStatProps) {
-  const isUp = trend >= 0;
+  const isUp = (trend ?? 0) >= 0;
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-4 flex flex-col justify-between">
       <div className="flex items-center justify-between mb-3">
@@ -80,13 +80,15 @@ function TrendStat({ label, value, trend, trendLabel, color, icon }: TrendStatPr
       </div>
       <div>
         <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{value}</p>
-        <div className={`flex items-center gap-1 mt-1 ${isUp ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-          <div className="w-4 h-4 flex items-center justify-center">
-            <i className={`${isUp ? 'ri-arrow-up-line' : 'ri-arrow-down-line'} text-sm`} />
+        {trend !== undefined && trendLabel && (
+          <div className={`flex items-center gap-1 mt-1 ${isUp ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+            <div className="w-4 h-4 flex items-center justify-center">
+              <i className={`${isUp ? 'ri-arrow-up-line' : 'ri-arrow-down-line'} text-sm`} />
+            </div>
+            <span className="text-sm font-semibold">{isUp ? '+' : ''}{trend}%</span>
+            <span className="text-xs text-gray-400 dark:text-slate-500 ml-1">{trendLabel}</span>
           </div>
-          <span className="text-sm font-semibold">{isUp ? '+' : ''}{trend}%</span>
-          <span className="text-xs text-gray-400 dark:text-slate-500 ml-1">{trendLabel}</span>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -190,16 +192,12 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
         <TrendStat
           label="Clientes Activos"
           value={String(statsData.clients)}
-          trend={12}
-          trendLabel="vs. mes pasado"
           color="#3b82f6"
           icon="ri-user-star-line"
         />
         <TrendStat
           label="Empleados"
           value={String(statsData.employees)}
-          trend={3}
-          trendLabel="vs. mes pasado"
           color="#8b5cf6"
           icon="ri-team-line"
         />

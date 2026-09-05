@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export type NotifType = 'invoice' | 'route' | 'stock' | 'order' | 'system' | 'maintenance' | 'email';
 
@@ -22,17 +24,47 @@ interface NotificationsContextType {
   requestBrowserPermission: () => Promise<boolean>;
 }
 
-function fireBrowserNotif(title: string, body: string) {
+async function fireBrowserNotif(title: string, body: string) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   if (document.visibilityState === 'visible') return;
-  const n = new Notification(title, { body, icon: '/favicon.svg' });
-  n.onclick = () => { window.focus(); n.close(); };
-  setTimeout(() => n.close(), 6000);
+
+  try {
+    // En apps instaladas (TWA/PWA) el navegador exige pasar por el Service
+    // Worker en vez del constructor directo — si no, lanza "Illegal
+    // constructor" y (si nadie lo atrapa) puede tirar abajo la pantalla.
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(title, { body, icon: '/favicon.svg' });
+      return;
+    }
+  } catch {
+    // seguir al método clásico de abajo
+  }
+
+  try {
+    const n = new Notification(title, { body, icon: '/favicon.svg' });
+    n.onclick = () => { window.focus(); n.close(); };
+    setTimeout(() => n.close(), 6000);
+  } catch {
+    // Una notificación fallida nunca debe romper la app — se ignora en silencio.
+  }
+}
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'Ahora';
+  if (mins < 60) return `Hace ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Hace ${hours} hora${hours !== 1 ? 's' : ''}`;
+  const days = Math.floor(hours / 24);
+  return `Hace ${days} día${days !== 1 ? 's' : ''}`;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [browserPermission, setBrowserPermission] = useState<NotificationPermission | 'unsupported'>(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
   );
@@ -44,39 +76,66 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     return result === 'granted';
   }, []);
 
-  const [notifications, setNotifications] = useState<AppNotification[]>([
-    { id: 1001, title: 'Nueva factura', text: 'Factura #F-2026-042 creada para Restaurante El Pino - €1,240.50', type: 'invoice', time: 'Hace 2 min', read: false },
-    { id: 1002, title: 'Ruta completada', text: 'Carlos terminó la Ruta #5 con 8 entregas exitosas', type: 'route', time: 'Hace 15 min', read: false },
-    { id: 1003, title: 'Stock bajo', text: 'Aceite Oliva 5L quedan solo 3 unidades en almacén', type: 'stock', time: 'Hace 30 min', read: true },
-    { id: 1004, title: 'Pedido confirmado', text: 'Pedido PED-100005 confirmado y pagado por €58.50', type: 'order', time: 'Hace 1 hora', read: true },
-    { id: 1005, title: 'Ruta en curso', text: 'María salió del almacén con Ruta #3', type: 'route', time: 'Hace 2 horas', read: true },
-    { id: 1006, title: 'Factura vencida', text: 'Factura #F-2026-038 de Frutería La Esperanza venció hoy', type: 'invoice', time: 'Hace 3 horas', read: true },
-  ]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user) { setNotifications([]); return; }
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (data) {
+      setNotifications(data.map((n: any) => ({
+        id: n.id,
+        title: n.title || '',
+        text: n.text || '',
+        type: (n.type || 'system') as NotifType,
+        time: timeAgo(n.created_at),
+        read: !!n.read,
+      })));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchNotifications();
+    if (!user) return;
+
+    const sub = supabase
+      .channel(`notifications_${user.id}_${Math.random()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+
+    return () => { sub.unsubscribe(); };
+  }, [user, fetchNotifications]);
 
   const addNotification = useCallback((title: string, text: string, type: NotifType) => {
-    const newNotif: AppNotification = {
-      id: Date.now(),
-      title,
-      text,
-      type,
-      time: 'Ahora',
-      read: false,
-    };
-    setNotifications(prev => [newNotif, ...prev]);
+    if (!user) return;
+    // Optimista: se muestra ya mismo, y luego se sincroniza con la fila real
+    const tempId = Date.now();
+    setNotifications(prev => [{ id: tempId, title, text, type, time: 'Ahora', read: false }, ...prev]);
     fireBrowserNotif(title, text);
-  }, []);
 
-  const markAllRead = useCallback(() => {
+    supabase.from('notifications').insert({ user_id: user.id, title, text, type, read: false })
+      .then(() => fetchNotifications());
+  }, [user, fetchNotifications]);
+
+  const markAllRead = useCallback(async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  }, []);
+    if (user) await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
+  }, [user]);
 
-  const markRead = useCallback((id: number) => {
+  const markRead = useCallback(async (id: number) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    await supabase.from('notifications').update({ read: true }).eq('id', id);
   }, []);
 
-  const clearAll = useCallback(() => {
+  const clearAll = useCallback(async () => {
     setNotifications([]);
-  }, []);
+    if (user) await supabase.from('notifications').delete().eq('user_id', user.id);
+  }, [user]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 

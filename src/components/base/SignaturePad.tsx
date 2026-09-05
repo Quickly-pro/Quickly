@@ -1,161 +1,101 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 
-interface SignaturePadProps {
-  onSave: (dataUrl: string) => void;
-  onCancel: () => void;
-  label?: string;
-  existingSignature?: string;
+interface Props {
+  onChange: (dataUrl: string | null) => void;
 }
 
-export default function SignaturePad({ onSave, onCancel, label, existingSignature }: SignaturePadProps) {
+/**
+ * Panel de firma táctil sencillo — dibuja con el dedo/ratón sobre un
+ * canvas y exporta el resultado como imagen (data URL PNG).
+ */
+export default function SignaturePad({ onChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [isEmpty, setIsEmpty] = useState(!existingSignature);
-  const lastPos = useRef<{ x: number; y: number } | null>(null);
+  const drawingRef = useRef(false);
+  const [hasSignature, setHasSignature] = useState(false);
+
+  const getCtx = () => canvasRef.current?.getContext('2d') || null;
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // DPI scaling for crisp rendering
-    const dpr = window.devicePixelRatio || 1;
+    // Ajustar resolución real al tamaño mostrado, para que no se vea borroso
+    const ratio = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    // Always fill white background so strokes are visible in dark mode
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, rect.width, rect.height);
-
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    if (existingSignature) {
-      const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
-      img.src = existingSignature;
-      setIsEmpty(false);
+    canvas.width = rect.width * ratio;
+    canvas.height = rect.height * ratio;
+    const ctx = getCtx();
+    if (ctx) {
+      ctx.scale(ratio, ratio);
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#1f2937';
     }
-  }, [existingSignature]);
+  }, []);
 
-  const getPos = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
-    const rect = canvas.getBoundingClientRect();
-    if ('touches' in e) {
-      const touch = e.touches[0];
-      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
-    }
-    return { x: (e as React.MouseEvent).clientX - rect.left, y: (e as React.MouseEvent).clientY - rect.top };
+  const getPoint = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
-  const startDrawing = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+  const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    setIsDrawing(true);
-    setIsEmpty(false);
-    lastPos.current = getPos(e, canvas);
-  }, []);
+    drawingRef.current = true;
+    const ctx = getCtx();
+    const { x, y } = getPoint(e);
+    ctx?.beginPath();
+    ctx?.moveTo(x, y);
+  };
 
-  const draw = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+  const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawingRef.current) return;
     e.preventDefault();
-    if (!isDrawing) return;
+    const ctx = getCtx();
+    const { x, y } = getPoint(e);
+    ctx?.lineTo(x, y);
+    ctx?.stroke();
+    if (!hasSignature) setHasSignature(true);
+  };
+
+  const end = () => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (canvas && hasSignature) onChange(canvas.toDataURL('image/png'));
+  };
 
-    const pos = getPos(e, canvas);
-    if (!lastPos.current) { lastPos.current = pos; return; }
-
-    ctx.beginPath();
-    ctx.moveTo(lastPos.current.x, lastPos.current.y);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-    lastPos.current = pos;
-  }, [isDrawing]);
-
-  const stopDrawing = useCallback(() => {
-    setIsDrawing(false);
-    lastPos.current = null;
-  }, []);
-
-  const clearCanvas = useCallback(() => {
+  const clear = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    // Refill white so the canvas doesn't go transparent after clearing
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    setIsEmpty(true);
-  }, []);
-
-  const handleSave = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || isEmpty) return;
-    onSave(canvas.toDataURL('image/png'));
-  }, [isEmpty, onSave]);
+    const ctx = getCtx();
+    if (canvas && ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      setHasSignature(false);
+      onChange(null);
+    }
+  }, [onChange]);
 
   return (
-    <div className="space-y-3">
-      {label && (
-        <p className="text-sm font-medium text-gray-700 dark:text-slate-200">{label}</p>
-      )}
-
-      <div className="relative border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-xl overflow-hidden bg-white dark:bg-slate-800">
-        {isEmpty && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center">
-              <i className="ri-pencil-line text-2xl text-gray-300 dark:text-slate-600" />
-              <p className="text-xs text-gray-300 dark:text-slate-600 mt-1">Firma aquí</p>
-            </div>
-          </div>
+    <div>
+      <div className="relative border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 overflow-hidden" style={{ height: 140 }}>
+        {!hasSignature && (
+          <span className="absolute inset-0 flex items-center justify-center text-xs text-gray-300 dark:text-slate-600 pointer-events-none">
+            Firma aquí con el dedo
+          </span>
         )}
         <canvas
           ref={canvasRef}
-          className="w-full h-36 cursor-crosshair touch-none"
-          style={{ display: 'block', background: '#ffffff' }}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onTouchStart={startDrawing}
-          onTouchMove={draw}
-          onTouchEnd={stopDrawing}
+          className="w-full h-full touch-none"
+          onPointerDown={start}
+          onPointerMove={move}
+          onPointerUp={end}
+          onPointerLeave={end}
         />
       </div>
-
-      <div className="flex gap-2 justify-end">
-        <button
-          onClick={clearCanvas}
-          type="button"
-          className="px-3 py-1.5 text-xs text-gray-500 dark:text-slate-400 border border-gray-200 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-1.5"
-        >
-          <i className="ri-eraser-line" />
-          Borrar
+      {hasSignature && (
+        <button type="button" onClick={clear} className="mt-1 text-xs text-gray-400 hover:text-red-500">
+          <i className="ri-eraser-line mr-1" />Borrar firma
         </button>
-        <button
-          onClick={onCancel}
-          type="button"
-          className="px-3 py-1.5 text-xs text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800"
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={handleSave}
-          type="button"
-          disabled={isEmpty}
-          className="px-4 py-1.5 text-xs bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-        >
-          <i className="ri-check-line" />
-          Aceptar firma
-        </button>
-      </div>
+      )}
     </div>
   );
 }

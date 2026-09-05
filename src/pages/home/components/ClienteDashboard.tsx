@@ -58,7 +58,18 @@ export default function ClienteDashboard() {
       .eq('user_id', user?.id)
       .eq('read', false);
 
-    setFeaturedProducts(products || []);
+    // Supabase puede devolver la relación product_categories como objeto
+    // único o como array de un elemento según cómo detecte la FK — se
+    // normaliza aquí para que el resto del componente siempre reciba un
+    // objeto (o null), tal y como espera la interfaz Product.
+    const normalizedProducts = (products || []).map((p: any) => ({
+      ...p,
+      product_categories: Array.isArray(p.product_categories)
+        ? (p.product_categories[0] ?? null)
+        : (p.product_categories ?? null),
+    }));
+
+    setFeaturedProducts(normalizedProducts);
     setMyInvoices(invoices || []);
     setUnreadNotifs(count || 0);
     setLoading(false);

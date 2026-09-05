@@ -5,6 +5,14 @@ import { useProfile } from '@/hooks/useProfile';
 import { useRole } from '@/hooks/useRole';
 import { useNotificationsContext } from '@/context/NotificationsContext';
 import Modal from '@/components/base/Modal';
+import SignaturePad from '@/components/base/SignaturePad';
+import CameraCapture from '@/components/base/CameraCapture';
+import LiveRouteMap, { type MapStop, type MapDriver } from '@/components/base/LiveRouteMap';
+import { geocodeAddresses } from '@/lib/geocoding';
+import { optimizeRoute } from '@/lib/routeOptimizer';
+import { useLiveLocationBroadcast } from '@/hooks/useLiveLocationBroadcast';
+import { useCompanyDriverLocations } from '@/hooks/useCompanyDriverLocations';
+import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { useArrivalToasts, ArrivalToastContainer } from './components/ArrivalToast';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -23,6 +31,8 @@ interface Destination {
   deliveredAt?: string;
   deliveredTo?: string;
   deliveryNotes?: string;
+  photoUrl?: string;
+  trackingToken?: string;
 }
 
 interface Vehicle {
@@ -39,23 +49,6 @@ interface Vehicle {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function getMapEmbedUrl(addresses: string[]) {
-  if (addresses.length === 0) return 'https://maps.google.com/maps?q=Madrid,España&output=embed&hl=es';
-  if (addresses.length === 1) return `https://maps.google.com/maps?q=${encodeURIComponent(addresses[0])}&output=embed&hl=es`;
-  const stops = addresses.map(a => encodeURIComponent(a)).join('/');
-  return `https://maps.google.com/maps/dir/${stops}?output=embed&hl=es`;
-}
-
-function getOptimizedRouteUrl(addresses: string[]) {
-  if (addresses.length === 0) return '#';
-  const origin = encodeURIComponent(addresses[0]);
-  const destination = encodeURIComponent(addresses[addresses.length - 1]);
-  const waypoints = addresses.slice(1, -1).map(a => encodeURIComponent(a)).join('|');
-  let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
-  if (waypoints) url += `&waypoints=${waypoints}`;
-  return url;
-}
-
 function getNavigationUrl(address: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
@@ -160,14 +153,11 @@ function TrajectoryStrip({ destinations, vehicles }: { destinations: Destination
 
       {/* Route track with trajectory */}
       <div className="relative h-14 bg-gray-50 dark:bg-slate-800 rounded-xl overflow-hidden">
-        {/* Completed portion */}
         <div
           className="absolute left-3 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-green-400 dark:bg-green-500 transition-all duration-500 z-[1]"
           style={{ width: `calc(${visitedPercent}% - 12px)` }}
         />
-        {/* Remaining portion */}
         <div className="absolute left-3 right-3 top-1/2 -translate-y-1/2 h-1 bg-gray-200 dark:bg-slate-700 rounded-full" />
-        {/* Stop markers */}
         {destinations.map((dest, idx) => {
           const percent = (idx / Math.max(1, destinations.length - 1)) * 94 + 3;
           return (
@@ -186,11 +176,9 @@ function TrajectoryStrip({ destinations, vehicles }: { destinations: Destination
             </div>
           );
         })}
-        {/* Animated vehicles */}
         {vehicles.map(v => <VehicleRouteMarker key={v.id} vehicle={v} destinations={destinations} />)}
       </div>
 
-      {/* Labels */}
       <div className="flex justify-between mt-2 px-1">
         <div className="flex items-center gap-1 max-w-[35%]">
           <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
@@ -202,7 +190,6 @@ function TrajectoryStrip({ destinations, vehicles }: { destinations: Destination
         </div>
       </div>
 
-      {/* Legend */}
       <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 dark:border-slate-700">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-1.5 rounded-full bg-green-400" />
@@ -222,21 +209,15 @@ function TrajectoryStrip({ destinations, vehicles }: { destinations: Destination
 }
 
 // ── Client tracking view ────────────────────────────────────────────────────
-function ClientTrackingView({ destinations, vehicles }: { destinations: Destination[]; vehicles: Vehicle[] }) {
+function ClientTrackingView({ destinations, vehicles, mapStops, mapDrivers }: { destinations: Destination[]; vehicles: Vehicle[]; mapStops: MapStop[]; mapDrivers: MapDriver[] }) {
   const activeVehicle = vehicles.find(v => v.status !== 'idle') || vehicles[0];
   const nextStop = activeVehicle ? destinations[activeVehicle.currentStopIndex] : null;
   const visitedCount = destinations.filter(d => d.visited).length;
   const totalStops = destinations.length;
   const progressPercent = totalStops > 1 ? Math.round((visitedCount / (totalStops - 1)) * 100) : 0;
 
-  const mapUrl = useMemo(() => {
-    const addrs = destinations.map(d => d.address);
-    return getMapEmbedUrl(addrs);
-  }, [destinations]);
-
   return (
     <div className="space-y-4">
-      {/* Status hero */}
       {activeVehicle ? (
         <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-900/20 dark:to-orange-900/10 rounded-xl border border-orange-200 dark:border-orange-800/40 p-5">
           <div className="flex items-start gap-4">
@@ -263,7 +244,6 @@ function ClientTrackingView({ destinations, vehicles }: { destinations: Destinat
             </div>
           </div>
 
-          {/* Progress bar */}
           <div className="mt-4">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">{visitedCount} de {totalStops} paradas completadas</span>
@@ -277,7 +257,6 @@ function ClientTrackingView({ destinations, vehicles }: { destinations: Destinat
             </div>
           </div>
 
-          {/* Next stop */}
           {nextStop && !nextStop.visited && (
             <div className="mt-3 flex items-start gap-2 p-3 bg-white/70 dark:bg-slate-800/50 rounded-lg">
               <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -301,29 +280,16 @@ function ClientTrackingView({ destinations, vehicles }: { destinations: Destinat
         </div>
       )}
 
-      {/* Trajectory strip */}
       {destinations.length >= 2 && <TrajectoryStrip destinations={destinations} vehicles={vehicles} />}
 
-      {/* Map */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center gap-2">
           <i className="ri-map-2-line text-orange-500" />
           <span className="text-sm font-semibold text-gray-800 dark:text-slate-100">Mapa de la ruta</span>
         </div>
-        <iframe
-          key={mapUrl}
-          src={mapUrl}
-          width="100%"
-          height="340"
-          style={{ border: 0 }}
-          allowFullScreen
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-          className="w-full block"
-        />
+        <LiveRouteMap stops={mapStops} drivers={mapDrivers} height={340} />
       </div>
 
-      {/* Stops list */}
       {destinations.length > 0 && (
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700">
           <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
@@ -359,7 +325,7 @@ function ClientTrackingView({ destinations, vehicles }: { destinations: Destinat
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function MapaReparto() {
   const { profile } = useProfile();
-  const { isCliente } = useRole();
+  const { isCliente, isEmpleado } = useRole();
   const { addNotification } = useNotificationsContext();
   const { toasts, pushToast, removeToast } = useArrivalToasts();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -371,15 +337,85 @@ export default function MapaReparto() {
   const [showDelivery, setShowDelivery] = useState<Destination | null>(null);
   const [deliveryReceptor, setDeliveryReceptor] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [deliveryPhotoFile, setDeliveryPhotoFile] = useState<File | null>(null);
+  const [deliveryPhotoPreview, setDeliveryPhotoPreview] = useState<string | null>(null);
+  const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [uploadingProof, setUploadingProof] = useState(false);
   const [newDest, setNewDest] = useState({ name: '', address: '', phone: '', notes: '' });
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const prevVehiclesRef = useRef<Vehicle[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locLoading, setLocLoading] = useState(false);
   const [geolocationError, setGeolocationError] = useState<string | null>(null);
-  const [userMapUrl, setUserMapUrl] = useState<string | null>(null);
 
-  // Request notifications
+  // Optimización de rutas
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimizeProgress, setOptimizeProgress] = useState({ done: 0, total: 0 });
+  const [optimizeResult, setOptimizeResult] = useState<{ savedKm: number; savedPercent: number } | null>(null);
+
+  // Enlace de seguimiento público
+  const [showTrackingLink, setShowTrackingLink] = useState<Destination | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  // GPS real: los empleados con paradas pendientes transmiten su ubicación;
+  // todos los demás (empresa, otros empleados, cliente) la leen en vivo.
+  const hasPendingStops = destinations.some(d => !d.visited);
+  useLiveLocationBroadcast(isEmpleado && hasPendingStops);
+  const { byName: driverLocsByName, isFresh } = useCompanyDriverLocations();
+
+  const mapStops: MapStop[] = useMemo(() => destinations.map(d => ({
+    id: d.id, name: d.name, address: d.address, lat: d.lat, lng: d.lng, visited: d.visited, driver: d.created_by,
+  })), [destinations]);
+
+  const mapDrivers: MapDriver[] = useMemo(() => Object.values(driverLocsByName).map(loc => ({
+    name: loc.driver_name || '',
+    lat: loc.lat,
+    lng: loc.lng,
+    fresh: isFresh(loc),
+    speedKmh: loc.speed_kmh,
+  })), [driverLocsByName, isFresh]);
+
+  // Modo sin conexión: confirmar entregas y añadir paradas se guardan
+  // localmente si no hay señal, y se sincronizan solos al recuperarla.
+  const { isOnline, queueLength, enqueue } = useOfflineQueue('quickly_offline_rutas', {
+    confirm_delivery: async (payload: any) => {
+      let photoUrl: string | null = null;
+      if (payload.photoBase64) {
+        const blob = await (await fetch(payload.photoBase64)).blob();
+        const path = `${crypto.randomUUID()}.jpg`;
+        const { error: upErr } = await supabase.storage.from('delivery-proofs').upload(path, blob, { contentType: blob.type || 'image/jpeg' });
+        if (!upErr) {
+          const { data: pub } = supabase.storage.from('delivery-proofs').getPublicUrl(path);
+          photoUrl = pub.publicUrl;
+        }
+      }
+      const { error } = await supabase.from('route_stops').update({
+        status: 'completed',
+        delivered_at: payload.deliveredAt,
+        delivered_to: payload.receptor || null,
+        delivery_notes: payload.notes || null,
+        photo_url: photoUrl,
+        signature_data: payload.signatureData || null,
+      }).eq('id', payload.stopId);
+      if (error) throw error;
+    },
+    add_stop: async (payload: any) => {
+      const { error } = await supabase.from('route_stops').insert({
+        client: payload.name, address: payload.address, phone: payload.phone || null, notes: payload.notes || null,
+        order_num: 9999, status: 'pending', driver: payload.driver || 'Sin asignar', route_id: null,
+      });
+      if (error) throw error;
+    },
+  });
+
+  useEffect(() => {
+    if (isOnline && queueLength > 0) {
+      addNotification('Sincronizando', `${queueLength} acción${queueLength !== 1 ? 'es' : ''} pendiente${queueLength !== 1 ? 's' : ''} de cuando no había conexión…`, 'system');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline]);
+
   useEffect(() => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission();
@@ -401,6 +437,11 @@ export default function MapaReparto() {
         order_num: d.order_num || idx + 1,
         visited: d.status === 'completed',
         created_by: d.driver || '',
+        deliveredAt: d.delivered_at || undefined,
+        deliveredTo: d.delivered_to || undefined,
+        deliveryNotes: d.delivery_notes || undefined,
+        photoUrl: d.photo_url || undefined,
+        trackingToken: d.tracking_token || undefined,
       }));
       const withETA = generateEstimatedMinutes(mapped);
       setDestinations(withETA);
@@ -414,7 +455,6 @@ export default function MapaReparto() {
 
   useEffect(() => { fetchDestinations(); }, [fetchDestinations]);
 
-  // Prefill from URL params (when coming from /clientes)
   useEffect(() => {
     if (prefillHandledRef.current) return;
     const name = searchParams.get('name');
@@ -441,7 +481,6 @@ export default function MapaReparto() {
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams, profile.full_name, addNotification, fetchDestinations]);
 
-  // Watch GPS position
   const userLocationRef = useRef<{ lat: number; lng: number } | null>(null);
   useEffect(() => { userLocationRef.current = userLocation; }, [userLocation]);
 
@@ -458,7 +497,6 @@ export default function MapaReparto() {
   const getUserLocation = useCallback(() => {
     const cached = userLocationRef.current;
     if (cached) {
-      setUserMapUrl(`https://maps.google.com/maps?q=${cached.lat},${cached.lng}&output=embed&hl=es&z=16`);
       addNotification('Mi ubicación', `Lat ${cached.lat.toFixed(5)}, Lng ${cached.lng.toFixed(5)}`, 'route');
       return;
     }
@@ -470,7 +508,6 @@ export default function MapaReparto() {
         const { latitude: lat, longitude: lng } = pos.coords;
         setUserLocation({ lat, lng });
         setLocLoading(false);
-        setUserMapUrl(`https://maps.google.com/maps?q=${lat},${lng}&output=embed&hl=es&z=16`);
         addNotification('Mi ubicación', `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`, 'route');
       },
       err => {
@@ -481,7 +518,6 @@ export default function MapaReparto() {
     );
   }, [addNotification]);
 
-  // Animate vehicles
   useEffect(() => {
     const interval = setInterval(() => {
       setVehicles(prev => prev.map(v => {
@@ -506,7 +542,6 @@ export default function MapaReparto() {
     return () => clearInterval(interval);
   }, []);
 
-  // Detect arrivals and notify
   useEffect(() => {
     const prev = prevVehiclesRef.current;
     if (!prev.length || !vehicles.length) { prevVehiclesRef.current = vehicles; return; }
@@ -537,7 +572,6 @@ export default function MapaReparto() {
     setDestinations(prev => { const u = [...prev, tempDest]; setVehicles(createDemoVehicles(u)); return u; });
     setShowAdd(false);
     setNewDest({ name: '', address: '', phone: '', notes: '' });
-    setUserMapUrl(null);
     addNotification('Destino añadido', `${newDest.name.trim()} añadido a la ruta`, 'route');
     const { error } = await supabase.from('route_stops').insert({
       client: newDest.name.trim(), address: newDest.address.trim(),
@@ -561,30 +595,168 @@ export default function MapaReparto() {
     if (!error) setDestinations(prev => prev.map(d => d.id === id ? { ...d, visited: !visited } : d));
   };
 
+  // ── Optimizar orden de la ruta (algoritmo propio) ─────────────────────
+  const handleOptimizeRoute = useCallback(async () => {
+    if (destinations.length < 3) return;
+    setOptimizing(true);
+    setOptimizeResult(null);
+    setOptimizeProgress({ done: 0, total: destinations.length });
+
+    const geocoded = await geocodeAddresses(
+      destinations.map(d => d.address),
+      (done, total) => setOptimizeProgress({ done, total })
+    );
+
+    const points = destinations
+      .map(d => {
+        const g = (d.lat && d.lng) ? { lat: d.lat, lng: d.lng } : geocoded.get(d.address.trim());
+        return g ? { id: d.id, lat: g.lat, lng: g.lng } : null;
+      })
+      .filter((p): p is { id: number; lat: number; lng: number } => p !== null);
+
+    if (points.length < 3) {
+      setOptimizing(false);
+      addNotification('No se pudo optimizar', 'No se localizaron suficientes direcciones para calcular la mejor ruta. Revisa que estén completas.', 'system');
+      return;
+    }
+
+    const result = optimizeRoute(points);
+
+    await Promise.all(result.ordered.map((p, idx) =>
+      supabase.from('route_stops').update({ order_num: idx + 1, lat: p.lat, lng: p.lng }).eq('id', p.id)
+    ));
+
+    setOptimizeResult({ savedKm: result.savedKm, savedPercent: result.savedPercent });
+    setOptimizing(false);
+    fetchDestinations();
+  }, [destinations, addNotification, fetchDestinations]);
+
+  // ── Prueba de entrega (foto + firma) ──────────────────────────────────
+  const handleCameraCapture = (file: File) => {
+    setDeliveryPhotoFile(file);
+    setDeliveryPhotoPreview(URL.createObjectURL(file));
+    setShowCamera(false);
+  };
+
   const confirmDelivery = async (dest: Destination, receptor: string, notes: string) => {
     const now = new Date();
+
+    // Sin conexión: guardar localmente y sincronizar después
+    if (!isOnline) {
+      let photoBase64: string | null = null;
+      if (deliveryPhotoFile) {
+        photoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(deliveryPhotoFile);
+        });
+      }
+      enqueue('confirm_delivery', {
+        stopId: dest.id,
+        deliveredAt: now.toISOString(),
+        receptor: receptor || null,
+        notes: notes || null,
+        photoBase64,
+        signatureData,
+      });
+      setDestinations(prev => prev.map(d => d.id === dest.id ? {
+        ...d, visited: true, deliveredAt: now.toISOString(), deliveredTo: receptor || undefined, deliveryNotes: notes || undefined,
+      } : d));
+      addNotification('Guardado sin conexión', `La entrega de ${dest.name} se sincronizará automáticamente cuando vuelva la señal.`, 'route');
+      setShowDelivery(null); setDeliveryReceptor(''); setDeliveryNotes('');
+      setDeliveryPhotoFile(null); setDeliveryPhotoPreview(null); setSignatureData(null);
+      return;
+    }
+
+    setUploadingProof(true);
+    let photoUrl: string | null = null;
+
+    if (deliveryPhotoFile) {
+      const ext = deliveryPhotoFile.name.split('.').pop() || 'jpg';
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('delivery-proofs')
+        .upload(path, deliveryPhotoFile, { contentType: deliveryPhotoFile.type });
+      if (!upErr) {
+        const { data: pub } = supabase.storage.from('delivery-proofs').getPublicUrl(path);
+        photoUrl = pub.publicUrl;
+      }
+    }
+
     const hhmm = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-    const { error } = await supabase.from('route_stops').update({ status: 'completed' }).eq('id', dest.id);
+    const { error } = await supabase.from('route_stops').update({
+      status: 'completed',
+      delivered_at: now.toISOString(),
+      delivered_to: receptor || null,
+      delivery_notes: notes || null,
+      photo_url: photoUrl,
+      signature_data: signatureData,
+    }).eq('id', dest.id);
+
+    setUploadingProof(false);
     if (!error) {
-      setDestinations(prev => prev.map(d => d.id === dest.id ? { ...d, visited: true, deliveredAt: now.toISOString(), deliveredTo: receptor || undefined, deliveryNotes: notes || undefined } : d));
+      setDestinations(prev => prev.map(d => d.id === dest.id ? {
+        ...d, visited: true, deliveredAt: now.toISOString(), deliveredTo: receptor || undefined,
+        deliveryNotes: notes || undefined, photoUrl: photoUrl || undefined,
+      } : d));
       const repartidor = profile?.full_name || profile?.email || 'Repartidor';
       addNotification(`Entrega confirmada · ${dest.name}`, `${repartidor} entregó en ${dest.address} a las ${hhmm}${receptor ? ` · Recibido por ${receptor}` : ''}${notes ? ` · ${notes}` : ''}`, 'route');
       pushToast('Entrega', dest.name, '#10b981');
       setShowDelivery(null); setDeliveryReceptor(''); setDeliveryNotes('');
+      setDeliveryPhotoFile(null); setDeliveryPhotoPreview(null); setSignatureData(null);
     }
   };
 
   const visitedCount = destinations.filter(d => d.visited).length;
-  const addressesKey = useMemo(() => destinations.map(d => d.address).join('|'), [destinations]);
-  const routeMapUrl = useMemo(() => getMapEmbedUrl(destinations.map(d => d.address)), [addressesKey]);
-  const mapUrl = userMapUrl || routeMapUrl;
-  const optimizedUrl = useMemo(() => getOptimizedRouteUrl(destinations.map(d => d.address)), [addressesKey]);
   const totalRouteMinutes = useMemo(() => destinations.reduce((acc, d) => acc + (d.estimated_minutes || getLegDistanceMinutes()), 0), [destinations]);
   const totalEstimatedKm = useMemo(() => Math.round(totalRouteMinutes * 0.45), [totalRouteMinutes]);
+
+  // ── Confirmar entrega SIN detalles (rápido, sin abrir el formulario) ──
+  const confirmDeliveryQuick = async (dest: Destination) => {
+    const now = new Date();
+    const hhmm = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+    if (!isOnline) {
+      enqueue('confirm_delivery', {
+        stopId: dest.id, deliveredAt: now.toISOString(),
+        receptor: null, notes: null, photoBase64: null, signatureData: null,
+      });
+      setDestinations(prev => prev.map(d => d.id === dest.id ? { ...d, visited: true, deliveredAt: now.toISOString() } : d));
+      addNotification('Guardado sin conexión', `La entrega de ${dest.name} se sincronizará automáticamente cuando vuelva la señal.`, 'route');
+      return;
+    }
+
+    const { error } = await supabase.from('route_stops').update({
+      status: 'completed',
+      delivered_at: now.toISOString(),
+      delivered_to: null,
+      delivery_notes: null,
+      photo_url: null,
+      signature_data: null,
+    }).eq('id', dest.id);
+
+    if (!error) {
+      setDestinations(prev => prev.map(d => d.id === dest.id ? { ...d, visited: true, deliveredAt: now.toISOString() } : d));
+      const repartidor = profile?.full_name || profile?.email || 'Repartidor';
+      addNotification(`Entrega confirmada · ${dest.name}`, `${repartidor} entregó en ${dest.address} a las ${hhmm} (sin detalles adicionales)`, 'route');
+      pushToast('Entrega', dest.name, '#10b981');
+    }
+  };
 
   const getVehicleETA = (vehicle: Vehicle) => {
     if (!destinations.length || vehicle.status === 'idle') return 0;
     return Math.max(0, (1 - vehicle.progress) * getLegDistanceMinutes());
+  };
+
+  const trackingUrl = (dest: Destination) =>
+    dest.trackingToken ? `${window.location.origin}/seguimiento/${dest.trackingToken}` : '';
+
+  const copyTrackingLink = (dest: Destination) => {
+    const url = trackingUrl(dest);
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -596,7 +768,6 @@ export default function MapaReparto() {
     );
   }
 
-  // Cliente → vista de seguimiento simplificada
   if (isCliente) {
     return (
       <div className="space-y-4">
@@ -607,17 +778,15 @@ export default function MapaReparto() {
             Sigue en tiempo real el trayecto de tu pedido
           </p>
         </div>
-        <ClientTrackingView destinations={destinations} vehicles={vehicles} />
+        <ClientTrackingView destinations={destinations} vehicles={vehicles} mapStops={mapStops} mapDrivers={mapDrivers} />
       </div>
     );
   }
 
-  // Empresa / Empleado → vista completa de administración
   return (
     <div className="space-y-4">
       <ArrivalToastContainer toasts={toasts} onClose={removeToast} />
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Rutas y Localización</h1>
@@ -637,11 +806,16 @@ export default function MapaReparto() {
             {locLoading ? 'Localizando...' : 'Mi ubicación'}
           </button>
           {destinations.length > 1 && (
-            <a href={optimizedUrl} target="_blank" rel="noopener noreferrer nofollow"
-              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-all flex items-center gap-2">
-              <div className="w-4 h-4 flex items-center justify-center"><i className="ri-route-line" /></div>
-              Ruta optimizada
-            </a>
+            <button
+              onClick={handleOptimizeRoute}
+              disabled={optimizing}
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-60"
+            >
+              <div className="w-4 h-4 flex items-center justify-center">
+                {optimizing ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <i className="ri-route-line" />}
+              </div>
+              {optimizing ? `Calculando... ${optimizeProgress.done}/${optimizeProgress.total}` : 'Optimizar ruta'}
+            </button>
           )}
           <a href={destinations.length > 0 ? getNavigationUrl(destinations[0].address) : '#'} target="_blank" rel="noopener noreferrer nofollow"
             className="px-3 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-all flex items-center gap-2">
@@ -656,7 +830,30 @@ export default function MapaReparto() {
         </div>
       </div>
 
-      {/* Geolocation error */}
+      {!isOnline && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-gray-800 dark:bg-slate-800 border border-gray-700 dark:border-slate-600 rounded-lg text-sm text-white">
+          <i className="ri-wifi-off-line" />
+          Sin conexión — las entregas que confirmes se guardarán en el teléfono y se sincronizarán solas al volver la señal.
+        </div>
+      )}
+
+      {isOnline && queueLength > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 rounded-lg text-sm text-blue-700 dark:text-blue-400">
+          <div className="w-3.5 h-3.5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin flex-shrink-0" />
+          Sincronizando {queueLength} entrega{queueLength !== 1 ? 's' : ''} guardadas sin conexión…
+        </div>
+      )}
+
+      {optimizeResult && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 rounded-lg text-sm text-blue-700 dark:text-blue-400">
+          <i className="ri-route-line" />
+          {optimizeResult.savedKm > 0.1
+            ? <span>Ruta reordenada — te ahorras <strong>{optimizeResult.savedKm.toFixed(1)} km</strong> ({optimizeResult.savedPercent}%) frente al orden anterior.</span>
+            : <span>La ruta ya estaba en un orden eficiente — no había margen de mejora.</span>}
+          <button onClick={() => setOptimizeResult(null)} className="ml-auto text-xs underline">Cerrar</button>
+        </div>
+      )}
+
       {geolocationError && (
         <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg text-sm text-red-600 dark:text-red-400">
           <i className="ri-error-warning-line" />
@@ -665,7 +862,6 @@ export default function MapaReparto() {
         </div>
       )}
 
-      {/* GPS badge */}
       {userLocation && (
         <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/40 rounded-lg text-sm text-purple-700 dark:text-purple-400">
           <i className="ri-map-pin-user-line" />
@@ -678,7 +874,6 @@ export default function MapaReparto() {
         </div>
       )}
 
-      {/* Stats */}
       {destinations.length > 1 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
@@ -700,10 +895,8 @@ export default function MapaReparto() {
         </div>
       )}
 
-      {/* Trajectory strip */}
       <TrajectoryStrip destinations={destinations} vehicles={vehicles} />
 
-      {/* Vehicles status */}
       {vehicles.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {vehicles.map(vehicle => {
@@ -737,7 +930,6 @@ export default function MapaReparto() {
                   </span>
                 </div>
 
-                {/* Route leg */}
                 <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 mb-2">
                   <span className="font-medium text-gray-600 dark:text-slate-300 truncate max-w-[40%]">{fromDest?.name || 'Origen'}</span>
                   <i className="ri-arrow-right-line flex-shrink-0" />
@@ -745,7 +937,6 @@ export default function MapaReparto() {
                 </div>
                 <p className="text-xs text-gray-400 dark:text-slate-500 mb-3">Parada {stopsCompleted + 1}/{totalStops} &middot; {vehicle.speed} km/h</p>
 
-                {/* Progress */}
                 <div className="flex items-center gap-3">
                   <div className="relative w-12 h-12 flex-shrink-0">
                     <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 36 36">
@@ -773,10 +964,9 @@ export default function MapaReparto() {
         </div>
       )}
 
-      {/* Map + route list */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden" style={{ height: 520 }}>
-          <iframe key={mapUrl} src={mapUrl} width="100%" height="100%" style={{ border: 0, height: '100%' }} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" className="w-full block" />
+          <LiveRouteMap stops={mapStops} drivers={mapDrivers} height={520} userLocation={userLocation} />
         </div>
 
         <div className="lg:col-span-1 bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 flex flex-col overflow-hidden" style={{ height: 520 }}>
@@ -804,7 +994,6 @@ export default function MapaReparto() {
               return (
                 <div key={dest.id}>
                   <div className="flex gap-3">
-                    {/* Timeline */}
                     <div className="flex flex-col items-center flex-shrink-0">
                       <button
                         onClick={() => toggleVisited(dest.id, dest.visited)}
@@ -816,7 +1005,6 @@ export default function MapaReparto() {
                       {!isLast && <div className={`w-0.5 flex-1 min-h-[24px] mt-1 ${dest.visited ? 'bg-green-300 dark:bg-green-700' : 'bg-gray-200 dark:bg-slate-700'}`} />}
                     </div>
 
-                    {/* Card */}
                     <div className="flex-1 pb-3">
                       <div className={`p-3 rounded-lg border transition-all ${dest.visited ? 'bg-green-50/60 dark:bg-green-900/10 border-green-200 dark:border-green-800/30' : 'bg-gray-50 dark:bg-slate-800/60 border-gray-100 dark:border-slate-700'}`}>
                         <div className="flex items-start gap-2">
@@ -841,8 +1029,17 @@ export default function MapaReparto() {
                                 <span className="font-semibold">Entregado {new Date(dest.deliveredAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}{dest.deliveredTo ? ` · ${dest.deliveredTo}` : ''}</span>
                               </div>
                             )}
+                            {dest.visited && dest.photoUrl && (
+                              <a href={dest.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                                <i className="ri-image-line" /> Ver foto de entrega
+                              </a>
+                            )}
                           </div>
                           <div className="flex flex-col gap-1 flex-shrink-0">
+                            <button onClick={() => setShowTrackingLink(dest)} title="Compartir seguimiento con el cliente"
+                              className="w-7 h-7 rounded-md bg-purple-50 dark:bg-purple-900/20 text-purple-600 flex items-center justify-center hover:bg-purple-100 dark:hover:bg-purple-900/30">
+                              <i className="ri-share-line text-sm" />
+                            </button>
                             <a href={getNavigationUrl(dest.address)} target="_blank" rel="noopener noreferrer nofollow"
                               className="w-7 h-7 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/30">
                               <i className="ri-map-pin-2-line text-sm" />
@@ -853,14 +1050,24 @@ export default function MapaReparto() {
                             </button>
                           </div>
                         </div>
-                        {!dest.visited && (
-                          <button
-                            onClick={() => { setDeliveryReceptor(''); setDeliveryNotes(''); setShowDelivery(dest); }}
-                            className="mt-3 w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-[0.98]"
-                          >
-                            <i className="ri-check-double-line text-base" />
-                            He entregado
-                          </button>
+                        {!dest.visited && isEmpleado && (
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              onClick={() => { setDeliveryReceptor(''); setDeliveryNotes(''); setDeliveryPhotoFile(null); setDeliveryPhotoPreview(null); setSignatureData(null); setShowCamera(false); setShowDelivery(dest); }}
+                              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-[0.98]"
+                            >
+                              <i className="ri-check-double-line text-base" />
+                              Con detalles
+                            </button>
+                            <button
+                              onClick={() => confirmDeliveryQuick(dest)}
+                              title="Confirma la entrega sin foto, firma ni notas"
+                              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/40 rounded-lg text-sm font-semibold transition-all active:scale-[0.98]"
+                            >
+                              <i className="ri-check-line text-base" />
+                              Sin detalles
+                            </button>
+                          </div>
                         )}
                       </div>
                       {!isLast && legTime > 0 && (
@@ -897,10 +1104,59 @@ export default function MapaReparto() {
               <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Observaciones <span className="text-gray-400 text-xs">(opcional)</span></label>
               <textarea value={deliveryNotes} onChange={e => setDeliveryNotes(e.target.value)} rows={2} placeholder="Ej: Mercancía revisada sin incidencias." className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-green-400 resize-none" />
             </div>
+            <div>
+              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Foto de la entrega <span className="text-gray-400 text-xs">(opcional)</span></label>
+              {deliveryPhotoPreview ? (
+                <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700">
+                  <img src={deliveryPhotoPreview} alt="Foto de entrega" className="w-full h-32 object-cover" />
+                  <button type="button" onClick={() => { setDeliveryPhotoFile(null); setDeliveryPhotoPreview(null); }}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-black/60 text-white rounded-md hover:bg-black/80">
+                    <i className="ri-close-line text-xs" />
+                  </button>
+                </div>
+              ) : showCamera ? (
+                <CameraCapture onCapture={handleCameraCapture} onCancel={() => setShowCamera(false)} />
+              ) : (
+                <button type="button" onClick={() => setShowCamera(true)}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-lg py-3 text-sm text-gray-500 dark:text-slate-400 hover:border-green-300">
+                  <i className="ri-camera-line" /> Tomar o subir foto
+                </button>
+              )}
+            </div>
+            <div>
+              <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Firma de recepción <span className="text-gray-400 text-xs">(opcional)</span></label>
+              <SignaturePad onChange={setSignatureData} />
+            </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-slate-800">
-              <button onClick={() => setShowDelivery(null)} className="px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium">Cancelar</button>
-              <button onClick={() => confirmDelivery(showDelivery, deliveryReceptor.trim(), deliveryNotes.trim())} className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold inline-flex items-center gap-1">
-                <i className="ri-check-double-line" />Confirmar entrega
+              <button onClick={() => { setShowDelivery(null); setShowCamera(false); }} className="px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium">Cancelar</button>
+              <button
+                onClick={() => confirmDelivery(showDelivery, deliveryReceptor.trim(), deliveryNotes.trim())}
+                disabled={uploadingProof}
+                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold inline-flex items-center gap-1 disabled:opacity-60"
+              >
+                {uploadingProof
+                  ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <i className="ri-check-double-line" />}
+                {uploadingProof ? 'Guardando...' : 'Confirmar entrega'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Tracking link share modal */}
+      <Modal isOpen={!!showTrackingLink} onClose={() => setShowTrackingLink(null)} title="Compartir seguimiento" size="sm">
+        {showTrackingLink && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500 dark:text-slate-400">
+              Envía este enlace a <strong>{showTrackingLink.name}</strong> por WhatsApp o email — podrá ver el estado de su entrega sin necesidad de crear cuenta.
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs text-gray-700 dark:text-slate-200 truncate">
+                {trackingUrl(showTrackingLink)}
+              </code>
+              <button onClick={() => copyTrackingLink(showTrackingLink)} className="px-3 py-2 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 whitespace-nowrap">
+                {linkCopied ? '¡Copiado!' : 'Copiar'}
               </button>
             </div>
           </div>

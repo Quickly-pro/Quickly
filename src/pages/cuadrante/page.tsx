@@ -334,7 +334,7 @@ export default function Cuadrante() {
     }
   };
 
-  const handleSendCuadrante = () => {
+  const handleSendCuadrante = async () => {
     if (displayedEmployees.length === 0) return;
     const scheduleData = displayedEmployees.map(emp => ({
       id: emp.id,
@@ -351,17 +351,13 @@ export default function Cuadrante() {
       }),
       totalHours: weeklyHours(emp.id),
     }));
-    const newEntry = {
-      id: Date.now(),
-      weekLabel,
-      weekStartStr,
-      sentAt: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    const sentAtLabel = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    await supabase.from('sent_schedules').insert({
+      week_label: weekLabel,
+      week_start_date: weekStartStr,
+      sent_at: sentAtLabel,
       employees: scheduleData,
-    };
-    try {
-      const existing = JSON.parse(localStorage.getItem('cuadrante-sent') || '[]');
-      localStorage.setItem('cuadrante-sent', JSON.stringify([newEntry, ...existing].slice(0, 20)));
-    } catch { /* ignore */ }
+    });
     setSendOk(true);
     setTimeout(() => setSendOk(false), 3500);
   };
@@ -408,9 +404,16 @@ export default function Cuadrante() {
             <i className="ri-calendar-check-line text-2xl text-gray-700 dark:text-slate-200" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Turnos</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Turnos</h1>
+              {!isEmpresa && (
+                <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 text-xs font-medium rounded-full border border-gray-200 dark:border-slate-700">
+                  Solo lectura
+                </span>
+              )}
+            </div>
             {!isEmpresa && (
-              <p className="text-sm text-gray-500 dark:text-slate-400">Tu horario semanal</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400">Tu horario semanal asignado por la empresa</p>
             )}
           </div>
         </div>
@@ -454,23 +457,25 @@ export default function Cuadrante() {
             </button>
           </div>
 
-          {/* Pending swaps button */}
-          <button
-            onClick={() => setShowPendingSwaps(!showPendingSwaps)}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap
-              ${pendingSwapsCount > 0 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400'}
-            `}
-          >
-            <div className="w-4 h-4 flex items-center justify-center">
-              <i className="ri-swap-line" />
-            </div>
-            Intercambios
-            {pendingSwapsCount > 0 && (
-              <span className="w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center">
-                {pendingSwapsCount}
-              </span>
-            )}
-          </button>
+          {/* Pending swaps button — solo empresa */}
+          {isEmpresa && (
+            <button
+              onClick={() => setShowPendingSwaps(!showPendingSwaps)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap
+                ${pendingSwapsCount > 0 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400'}
+              `}
+            >
+              <div className="w-4 h-4 flex items-center justify-center">
+                <i className="ri-swap-line" />
+              </div>
+              Intercambios
+              {pendingSwapsCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {pendingSwapsCount}
+                </span>
+              )}
+            </button>
+          )}
 
           {isEmpresa && (
             <button
@@ -849,8 +854,8 @@ export default function Cuadrante() {
                           )}
                         </div>
 
-                        {/* Swap button - appears on hover if there's a shift */}
-                        {type !== '' && (
+                        {/* Swap button - solo empresa */}
+                        {isEmpresa && type !== '' && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -893,7 +898,7 @@ export default function Cuadrante() {
       <div className="text-xs text-gray-500 dark:text-slate-400">
         {isEmpresa
           ? `Mostrando ${displayedEmployees.length} empleados — Haz clic en cualquier celda para cambiar el turno.`
-          : 'Tu horario semanal. Pasa el ratón sobre un turno para solicitar un intercambio.'}
+          : 'Tu cuadrante es de solo lectura. Contacta con la empresa si necesitas un cambio.'}
       </div>
     </div>
   );

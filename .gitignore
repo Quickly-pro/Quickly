@@ -49,3 +49,10 @@ supabase/.temp
 
 .vercel
 .env*.local
+.env*
+
+# carpeta de build antigua de Vercel (contiene un .env.production.local con claves reales)
+.vercel_old/
+
+# checkouts de worktree de Claude Code (no son parte del proyecto)
+.claude/worktrees/

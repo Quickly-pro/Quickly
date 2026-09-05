@@ -3,6 +3,7 @@ import { useClickOutside } from '@/hooks/useClickOutside';
 import { supabase } from '@/lib/supabase';
 import { useRole } from '@/hooks/useRole';
 import Modal from '@/components/base/Modal';
+import EmojiPicker from '@/components/base/EmojiPicker';
 import { useNotificationsContext } from '@/context/NotificationsContext';
 import { useAuth } from '@/context/AuthContext';
 
@@ -18,6 +19,29 @@ const typeConfig: Record<string, { label: string; bg: string; text: string; dot:
 const weekDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const weekDaysFull = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const hoursRange = Array.from({ length: 17 }, (_, i) => 6 + i);
+
+const priorityConfig: Record<string, { label: string; color: string; ring: string }> = {
+  baja:  { label: 'Baja',  color: 'bg-gray-400',   ring: 'ring-gray-300' },
+  media: { label: 'Media', color: 'bg-sky-400',    ring: 'ring-sky-300' },
+  alta:  { label: 'Alta',  color: 'bg-red-500',     ring: 'ring-red-300' },
+};
+
+const priorityOrder: Record<string, number> = { baja: 1, media: 2, alta: 3 };
+
+// Fondo del cuadro del día según la prioridad más alta que tenga ese día —
+// así se distingue de un vistazo qué días son más importantes.
+function getDayPriorityBg(dayEvents: any[]): string {
+  if (!dayEvents.length) return '';
+  let top = 'baja';
+  let topVal = 0;
+  dayEvents.forEach((e) => {
+    const val = priorityOrder[e.priority] || priorityOrder.media;
+    if (val > topVal) { topVal = val; top = e.priority || 'media'; }
+  });
+  if (top === 'alta') return 'bg-red-50/70 dark:bg-red-900/10 border-l-4 border-l-red-400';
+  if (top === 'media') return 'bg-sky-50/50 dark:bg-sky-900/5 border-l-4 border-l-sky-300';
+  return 'border-l-4 border-l-gray-200 dark:border-l-slate-700';
+}
 
 function getWeekStart(d: Date): Date {
   const date = new Date(d);
@@ -65,6 +89,7 @@ function EventChip({
   onClick?: (e: React.MouseEvent) => void;
 }) {
   const cfg = typeConfig[evt.type] || typeConfig.reparto;
+  const prio = priorityConfig[evt.priority] || priorityConfig.media;
   return (
     <div
       draggable={draggableFlag}
@@ -73,6 +98,7 @@ function EventChip({
       onClick={onClick}
       title={`${evt.title}${evt.time ? ' · ' + evt.time : ''}`}
       className={`
+        relative
         ${cfg.bg} ${cfg.text} rounded-md w-full
         ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1'}
         ${draggableFlag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
@@ -80,19 +106,35 @@ function EventChip({
         transition-all select-none overflow-hidden
       `}
     >
+      {evt.priority === 'alta' && (
+        <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-white animate-pulse" title="Prioridad alta" />
+      )}
       {compact ? (
         <p className="text-[10px] font-medium truncate leading-tight">
+          {evt.emoji && <span className="mr-1">{evt.emoji}</span>}
           {evt.time && <span className="opacity-80 mr-1">{evt.time}</span>}
           {evt.title}
         </p>
       ) : (
         <>
           <div className="flex items-center gap-1.5">
-            <i className={`${cfg.icon} text-[11px] flex-shrink-0`} />
+            {evt.emoji ? <span className="text-xs flex-shrink-0">{evt.emoji}</span> : <i className={`${cfg.icon} text-[11px] flex-shrink-0`} />}
             <span className="text-xs font-semibold truncate leading-tight">{evt.title}</span>
           </div>
-          {evt.time && (
-            <p className="text-[10px] opacity-80 mt-0.5 pl-0.5">{evt.time}</p>
+          {(evt.time || evt.all_day) && (
+            <p className="text-[10px] opacity-80 mt-0.5 pl-0.5">
+              {evt.all_day ? 'Todo el día' : evt.time}{evt.end_time ? ` – ${evt.end_time}` : ''}
+            </p>
+          )}
+          {evt.location && (
+            <p className="text-[10px] opacity-80 mt-0.5 pl-0.5 truncate flex items-center gap-1">
+              <i className="ri-map-pin-line" />{evt.location}
+            </p>
+          )}
+          {evt.assigned_to && (
+            <p className="text-[10px] opacity-80 mt-0.5 pl-0.5 truncate flex items-center gap-1">
+              <i className="ri-user-line" />{evt.assigned_to}
+            </p>
           )}
           {!compact && evt.description && (
             <p className="text-[10px] opacity-70 mt-0.5 truncate pl-0.5">{evt.description}</p>
@@ -111,7 +153,11 @@ export default function Calendario() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showNewEvent, setShowNewEvent] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: '', type: 'reparto', time: '', description: '' });
+  const [newEvent, setNewEvent] = useState({
+    title: '', type: 'reparto', time: '', description: '',
+    emoji: '', location: '', assigned_to: '', priority: 'media', all_day: false, end_time: '',
+  });
+  const [employees, setEmployees] = useState<{ name: string }[]>([]);
   const [draggingEventId, setDraggingEventId] = useState<number | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [detailEvent, setDetailEvent] = useState<any | null>(null);
@@ -173,6 +219,10 @@ export default function Calendario() {
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
+  useEffect(() => {
+    supabase.from('employees').select('name').then(({ data }) => { if (data) setEmployees(data); });
+  }, []);
+
   const notifiedMaintenanceRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!maintenanceEvents.length) return;
@@ -206,7 +256,7 @@ export default function Calendario() {
     } else {
       setShowNewEvent(false);
       setSaveError(null);
-      setNewEvent({ title: '', type: 'reparto', time: '', description: '' });
+      setNewEvent({ title: '', type: 'reparto', time: '', description: '', emoji: '', location: '', assigned_to: '', priority: 'media', all_day: false, end_time: '' });
       fetchEvents();
     }
   };
@@ -284,6 +334,14 @@ export default function Calendario() {
         ))}
       </div>
 
+      {/* Priority cell-color legend */}
+      <div className="flex items-center gap-3 flex-wrap text-xs text-gray-500 dark:text-slate-400">
+        <span className="text-gray-400 dark:text-slate-500">Color del cuadro según prioridad:</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm border-l-4 border-l-red-400 bg-red-50 dark:bg-red-900/10" />Alta</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm border-l-4 border-l-sky-300 bg-sky-50 dark:bg-sky-900/5" />Media</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm border-l-4 border-l-gray-200 dark:border-l-slate-700" />Baja</span>
+      </div>
+
       {/* ────────── MONTH VIEW ────────── */}
       {viewMode === 'month' && (
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
@@ -333,6 +391,7 @@ export default function Calendario() {
                     setDraggingEventId(null);
                   }}
                   className={`min-h-[90px] md:min-h-[120px] border-b border-r border-gray-100 dark:border-slate-800/60 p-1.5 cursor-pointer transition-colors group
+                    ${getDayPriorityBg(dayEvents)}
                     ${isDragOver ? 'bg-orange-50 dark:bg-orange-900/20 ring-2 ring-orange-400 ring-inset' : 'hover:bg-gray-50/60 dark:hover:bg-slate-800/30'}`}
                 >
                   {/* Day number */}
@@ -344,7 +403,7 @@ export default function Calendario() {
                     {isEmpresa && (
                       <button
                         onClick={(e) => { e.stopPropagation(); openNewEventModal(dateStr); }}
-                        className="w-5 h-5 flex items-center justify-center rounded text-gray-300 dark:text-slate-600 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 opacity-0 group-hover:opacity-100 transition-all"
+                        className="w-5 h-5 flex items-center justify-center rounded text-gray-300 dark:text-slate-600 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 opacity-40 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
                       >
                         <i className="ri-add-line text-xs" />
                       </button>
@@ -422,6 +481,7 @@ export default function Calendario() {
                     setDraggingEventId(null);
                   }}
                   className={`border-r last:border-r-0 border-gray-100 dark:border-slate-800 p-2 cursor-pointer transition-colors
+                    ${getDayPriorityBg(dayEvents)}
                     ${isToday ? 'bg-orange-50/20 dark:bg-orange-900/5' : ''}
                     ${isDragOver ? 'bg-orange-50 dark:bg-orange-900/20 ring-2 ring-orange-400 ring-inset' : 'hover:bg-gray-50/60 dark:hover:bg-slate-800/30'}`}
                 >
@@ -528,15 +588,36 @@ export default function Calendario() {
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-slate-200 block mb-1.5">Título *</label>
-            <input
-              type="text" autoFocus
-              placeholder="Ej: Ruta Centro, Reunión cliente..."
-              value={newEvent.title}
-              onChange={e => setNewEvent({...newEvent, title: e.target.value})}
-              onKeyDown={e => e.key === 'Enter' && newEvent.title && addEvent()}
-              className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-300"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text" autoFocus
+                placeholder="Ej: Ruta Centro, Reunión cliente..."
+                value={newEvent.title}
+                onChange={e => setNewEvent({...newEvent, title: e.target.value})}
+                onKeyDown={e => e.key === 'Enter' && newEvent.title && addEvent()}
+                className="flex-1 px-3 py-2.5 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-300"
+              />
+            </div>
           </div>
+
+          {/* Emoji picker */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-200 block mb-1.5">Emoji <span className="text-gray-400 text-xs font-normal">(opcional)</span></label>
+            <div className="flex items-center gap-2">
+              <EmojiPicker direction="down" onSelect={(emoji) => setNewEvent({ ...newEvent, emoji })} />
+              {newEvent.emoji ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                  <span className="text-xl">{newEvent.emoji}</span>
+                  <button onClick={() => setNewEvent({ ...newEvent, emoji: '' })} className="text-gray-400 hover:text-red-500">
+                    <i className="ri-close-line" />
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs text-gray-400 dark:text-slate-500">Elige uno de la gama completa — igual que en WhatsApp</span>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-slate-200 block mb-1.5">Tipo</label>
@@ -546,16 +627,71 @@ export default function Calendario() {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-slate-200 block mb-1.5">Hora</label>
-              <input type="time" value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})}
-                className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-400" />
+              <label className="text-sm font-medium text-gray-700 dark:text-slate-200 block mb-1.5">Prioridad</label>
+              <div className="flex gap-1.5">
+                {Object.entries(priorityConfig).map(([k, p]) => (
+                  <button
+                    key={k}
+                    onClick={() => setNewEvent({ ...newEvent, priority: k })}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg text-xs font-medium border-2 transition-all ${newEvent.priority === k ? `${p.color} text-white border-transparent` : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300'}`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
+
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={newEvent.all_day}
+                onChange={e => setNewEvent({ ...newEvent, all_day: e.target.checked, time: e.target.checked ? '' : newEvent.time, end_time: e.target.checked ? '' : newEvent.end_time })}
+                className="w-4 h-4 accent-orange-500"
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-slate-200">Todo el día</span>
+            </label>
+          </div>
+
+          {!newEvent.all_day && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-slate-200 block mb-1.5">Hora inicio</label>
+                <input type="time" value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})}
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-400" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-slate-200 block mb-1.5">Hora fin <span className="text-gray-400 text-xs font-normal">(opcional)</span></label>
+                <input type="time" value={newEvent.end_time} onChange={e => setNewEvent({...newEvent, end_time: e.target.value})}
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-400" />
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-slate-200 block mb-1.5">Ubicación <span className="text-gray-400 text-xs font-normal">(opcional)</span></label>
+              <input type="text" placeholder="Dirección o lugar..." value={newEvent.location} onChange={e => setNewEvent({...newEvent, location: e.target.value})}
+                className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-400" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-slate-200 block mb-1.5">Asignado a <span className="text-gray-400 text-xs font-normal">(opcional)</span></label>
+              <input
+                type="text" list="empleados-list" placeholder="Nombre del responsable..."
+                value={newEvent.assigned_to} onChange={e => setNewEvent({...newEvent, assigned_to: e.target.value})}
+                className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-orange-400" />
+              <datalist id="empleados-list">
+                {employees.map((e, i) => <option key={i} value={e.name} />)}
+              </datalist>
+            </div>
+          </div>
+
           {/* Preview chip */}
           {newEvent.title && (
             <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
               <p className="text-xs text-gray-400 dark:text-slate-500 mb-2">Vista previa:</p>
-              <div className="max-w-[200px]">
+              <div className="max-w-[220px]">
                 <EventChip evt={{ ...newEvent, id: 'preview' }} compact={false} />
               </div>
             </div>
@@ -607,7 +743,7 @@ export default function Calendario() {
                   className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-left"
                 >
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
-                    <i className={`${cfg.icon} text-white text-sm`} />
+                    {evt.emoji ? <span className="text-base">{evt.emoji}</span> : <i className={`${cfg.icon} text-white text-sm`} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">{evt.title}</p>
@@ -638,12 +774,16 @@ export default function Calendario() {
               {/* Header chip preview */}
               <div className={`${cfg.bg} ${cfg.text} rounded-xl p-4`}>
                 <div className="flex items-center gap-2 mb-1">
-                  <i className={`${cfg.icon} text-lg`} />
+                  {detailEvent.emoji ? <span className="text-lg">{detailEvent.emoji}</span> : <i className={`${cfg.icon} text-lg`} />}
                   <span className="font-bold text-base">{detailEvent.title}</span>
                 </div>
-                <div className="flex items-center gap-3 text-sm opacity-90">
+                <div className="flex items-center gap-3 text-sm opacity-90 flex-wrap">
                   <span className="flex items-center gap-1"><i className="ri-calendar-line text-xs" />{new Date(detailEvent.date + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-                  {detailEvent.time && <span className="flex items-center gap-1"><i className="ri-time-line text-xs" />{detailEvent.time}</span>}
+                  {detailEvent.all_day ? (
+                    <span className="flex items-center gap-1"><i className="ri-time-line text-xs" />Todo el día</span>
+                  ) : detailEvent.time && (
+                    <span className="flex items-center gap-1"><i className="ri-time-line text-xs" />{detailEvent.time}{detailEvent.end_time ? ` – ${detailEvent.end_time}` : ''}</span>
+                  )}
                 </div>
               </div>
 
@@ -655,10 +795,29 @@ export default function Calendario() {
                   </span>
                 </div>
                 <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
-                  <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Hora</p>
-                  <p className="text-sm font-medium text-gray-800 dark:text-slate-200">{detailEvent.time || '—'}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Prioridad</p>
+                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-white ${(priorityConfig[detailEvent.priority] || priorityConfig.media).color}`}>
+                    {(priorityConfig[detailEvent.priority] || priorityConfig.media).label}
+                  </span>
                 </div>
               </div>
+
+              {(detailEvent.location || detailEvent.assigned_to) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {detailEvent.location && (
+                    <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                      <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Ubicación</p>
+                      <p className="text-sm font-medium text-gray-800 dark:text-slate-200 flex items-center gap-1"><i className="ri-map-pin-line text-gray-400" />{detailEvent.location}</p>
+                    </div>
+                  )}
+                  {detailEvent.assigned_to && (
+                    <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                      <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Asignado a</p>
+                      <p className="text-sm font-medium text-gray-800 dark:text-slate-200 flex items-center gap-1"><i className="ri-user-line text-gray-400" />{detailEvent.assigned_to}</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {detailEvent.description && (
                 <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">

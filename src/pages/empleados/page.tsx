@@ -539,10 +539,7 @@ export default function Empleados() {
           <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Fichaje de Empleados</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Registro de fichajes</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => setActiveTab('list')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeTab === 'list' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50'}`}>Empleados</button>
-          <button onClick={() => setActiveTab('time')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeTab === 'time' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50'}`}>Control Horario</button>
-        </div>
+        <TabBar />
       </div>
 
       {/* Top row: check-in card + working now cards */}

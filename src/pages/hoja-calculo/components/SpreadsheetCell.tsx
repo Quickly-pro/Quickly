@@ -24,6 +24,7 @@ interface SpreadsheetCellProps {
   onStartEdit: (row: number, col: number) => void;
   onFinishEdit: (row: number, col: number, value: string) => void;
   onColorToggle: (row: number, col: number) => void;
+  readOnly?: boolean;
 }
 
 export default function SpreadsheetCell({
@@ -41,6 +42,7 @@ export default function SpreadsheetCell({
   onStartEdit,
   onFinishEdit,
   onColorToggle,
+  readOnly = false,
 }: SpreadsheetCellProps) {
   const [editValue, setEditValue] = useState(meta.value);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,9 +59,9 @@ export default function SpreadsheetCell({
   }, [isEditing]);
 
   const handleDoubleClick = useCallback(() => {
-    if (isHeader) return;
+    if (isHeader || readOnly) return;
     onStartEdit(row, col);
-  }, [isHeader, row, col, onStartEdit]);
+  }, [isHeader, readOnly, row, col, onStartEdit]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (e.shiftKey) {
@@ -98,7 +100,7 @@ export default function SpreadsheetCell({
     <div
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
-      className={`w-20 sm:w-32 h-8 border-r border-gray-100 dark:border-slate-700 flex items-center px-1.5 text-xs flex-shrink-0 cursor-pointer select-none truncate
+      className={`w-20 sm:w-32 h-8 border-r border-gray-100 dark:border-slate-700 flex items-center px-1.5 text-xs flex-shrink-0 ${readOnly ? 'cursor-default' : 'cursor-pointer'} select-none truncate
         ${isHeader ? 'font-semibold text-gray-700 dark:text-slate-200' : meta.is_bold ? 'font-bold text-gray-800 dark:text-slate-100' : 'text-gray-600 dark:text-slate-300'}
         ${isSelected ? 'ring-2 ring-orange-400 ring-inset z-10' : ''}
         ${isInRange ? 'bg-orange-50/50 dark:bg-orange-900/20' : ''}

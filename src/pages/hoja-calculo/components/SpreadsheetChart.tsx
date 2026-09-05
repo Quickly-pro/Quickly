@@ -46,6 +46,29 @@ export default function SpreadsheetChart({ data, type, title, color, onRemove }:
     );
   }
 
+  if (data.length === 0) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-4">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 flex items-center justify-center text-orange-500">
+              <i className="ri-bar-chart-box-line" />
+            </div>
+            <span className="text-sm font-medium text-gray-700">{title}</span>
+          </div>
+          <button onClick={onRemove} className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 rounded hover:bg-red-50">
+            <i className="ri-close-line" />
+          </button>
+        </div>
+        <div className="px-4 py-8 text-center">
+          <i className="ri-error-warning-line text-2xl text-amber-400 mb-2 block" />
+          <p className="text-sm text-gray-500">No se encontraron datos válidos para este gráfico.</p>
+          <p className="text-xs text-gray-400 mt-1">Revisa que la columna de valores tenga números, y vuelve a crearlo.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-4">
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
@@ -67,8 +90,8 @@ export default function SpreadsheetChart({ data, type, title, color, onRemove }:
       </div>
 
       <div className="px-4 py-4">
-        <ResponsiveContainer width="100%" height={280}>
-          {type === 'bar' && (
+        <ResponsiveContainer key={`${type}-${data.length}`} width="100%" height={280}>
+          {type === 'bar' ? (
             <BarChart data={formattedData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -77,10 +100,9 @@ export default function SpreadsheetChart({ data, type, title, color, onRemove }:
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '13px' }}
                 formatter={(v: number) => [v.toLocaleString('es-ES'), 'Valor']}
               />
-              <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} isAnimationActive={false} />
             </BarChart>
-          )}
-          {type === 'pie' && (
+          ) : type === 'pie' ? (
             <PieChart>
               <Pie
                 data={formattedData}
@@ -90,8 +112,9 @@ export default function SpreadsheetChart({ data, type, title, color, onRemove }:
                 cy="50%"
                 outerRadius={90}
                 innerRadius={40}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={(props: any) => `${props.name} ${((props.percent || 0) * 100).toFixed(0)}%`}
                 labelLine={false}
+                isAnimationActive={false}
               >
                 {formattedData.map((_, i) => (
                   <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
@@ -103,8 +126,7 @@ export default function SpreadsheetChart({ data, type, title, color, onRemove }:
               />
               <Legend fontSize={11} />
             </PieChart>
-          )}
-          {type === 'line' && (
+          ) : (
             <LineChart data={formattedData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -120,6 +142,7 @@ export default function SpreadsheetChart({ data, type, title, color, onRemove }:
                 strokeWidth={2.5}
                 dot={{ r: 4, fill: color, strokeWidth: 1, stroke: '#fff' }}
                 activeDot={{ r: 6 }}
+                isAnimationActive={false}
               />
             </LineChart>
           )}

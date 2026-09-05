@@ -6,7 +6,7 @@ interface SubscriptionBannerProps {
 }
 
 export default function SubscriptionBanner({ variant = 'compact' }: SubscriptionBannerProps) {
-  const { subscription, loading, isPremium, isTrial, trialDaysLeft, plan } = usePremium();
+  const { subscription, loading, isPremium, isTrial, trialDaysLeft, isSharedFromCompany } = usePremium();
 
   if (loading) return null;
 
@@ -25,8 +25,13 @@ export default function SubscriptionBanner({ variant = 'compact' }: Subscription
           <div>
             <p className="text-sm font-medium text-amber-800 dark:text-amber-400">
               Plan Premium activo
+              {isSharedFromCompany && (
+                <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
+                  Vía tu empresa
+                </span>
+              )}
             </p>
-            {periodEnd && (
+            {periodEnd && !isSharedFromCompany && (
               <p className="text-xs text-amber-600 dark:text-amber-400">
                 Renovación: {periodEnd}
               </p>
@@ -37,7 +42,7 @@ export default function SubscriptionBanner({ variant = 'compact' }: Subscription
           to="/upgrade-premium"
           className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:text-amber-800 hover:underline whitespace-nowrap"
         >
-          Gestionar plan
+          {isSharedFromCompany ? 'Ver detalles' : 'Gestionar plan'}
         </Link>
       </div>
     );

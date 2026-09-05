@@ -336,3 +336,63 @@
 .dark .hover\:bg-orange-600:hover {
   box-shadow: 0 0 20px rgba(249,115,22,0.5);
 }
+
+/* ── Chat input field (WhatsApp-style bar) ──────────────────────────────
+   La regla genérica de arriba (.dark input[type="text"]) fuerza un fondo
+   oscuro sólido + borde en TODOS los inputs, lo cual rompe el diseño
+   transparente de la barra de chat y hacía que el texto se viera casi
+   invisible contra un fondo que no combinaba con el contenedor. Esta
+   regla, al ir después, gana el empate de especificidad. */
+.dark input.chat-input-field {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+input.chat-input-field:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Avión de papel volando al enviar un mensaje ───────────────────── */
+@keyframes send-fly-away {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  30% {
+    transform: translate(3px, -2px) rotate(6deg) scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(70px, -60px) rotate(45deg) scale(0.35);
+    opacity: 0;
+  }
+}
+.send-fly-animate {
+  animation: send-fly-away 0.6s cubic-bezier(0.25, 0.9, 0.4, 1) forwards;
+}
+
+@keyframes send-fly-in {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.send-fly-in-animate {
+  animation: send-fly-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ── Forma de onda animada mientras se graba una nota de voz (solo visual) ── */
+@keyframes rec-bar-pulse {
+  0%, 100% { height: 25%; opacity: 0.6; }
+  50% { height: 90%; opacity: 1; }
+}
+.rec-bar {
+  height: 25%;
+  animation: rec-bar-pulse 0.9s ease-in-out infinite;
+}
+
+/* ── Transición suave al marcar/cambiar un estado tipo check/X (Hoja de Pedidos, etc.) ── */
+@keyframes popIn {
+  0%   { transform: scale(0.4); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}

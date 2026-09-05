@@ -48,7 +48,6 @@ export default function PromoPage() {
         trial_ends_at: trialEnd,
         current_period_start: now,
         current_period_end: trialEnd,
-        company_id: null,
       }, { onConflict: 'user_id' });
 
       if (error) {

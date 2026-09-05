@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from './AuthContext';
 
 export type SubscriptionStatus = 'active' | 'inactive' | 'trial' | 'cancelled' | 'expired';
 export type SubscriptionPlan = 'free' | 'premium';
@@ -25,12 +26,14 @@ interface PremiumContextValue {
   isTrial: boolean;
   trialDaysLeft: number;
   plan: SubscriptionPlan;
+  isSharedFromCompany: boolean;
   refetch: () => Promise<void>;
 }
 
 const PremiumContext = createContext<PremiumContextValue | null>(null);
 
 export function PremiumProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,20 +48,25 @@ export function PremiumProvider({ children }: { children: ReactNode }) {
     : false;
   const isPremium = subscription !== null && ['active', 'trial'].includes(subscription.status) && !trialExpired;
 
+  // Si el usuario se unió a la empresa de otro con un código, el
+  // premium que ve viene de la suscripción del propietario, no de la suya.
+  const isSharedFromCompany = !!user?.company_id;
+
   const fetchSubscription = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setSubscription(null);
         setLoading(false);
         return;
       }
 
+      const effectiveOwnerId = user.company_id || user.id;
+
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveOwnerId)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -75,19 +83,10 @@ export function PremiumProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchSubscription();
-
-    // Una sola suscripción de auth para toda la app
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      fetchSubscription();
-    });
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
   }, [fetchSubscription]);
 
   return (
@@ -99,6 +98,7 @@ export function PremiumProvider({ children }: { children: ReactNode }) {
       isTrial,
       trialDaysLeft,
       plan: subscription?.plan || 'free',
+      isSharedFromCompany,
       refetch: fetchSubscription,
     }}>
       {children}

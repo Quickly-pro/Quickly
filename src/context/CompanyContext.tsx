@@ -23,6 +23,7 @@ export interface CompanyData {
   paymentIban?: string;
   paymentPaypal?: string;
   paymentStripe?: string;
+  inviteCode?: string;
 }
 
 const STORAGE_KEY = 'quickly_company_data';
@@ -48,6 +49,7 @@ function fromDb(row: any): CompanyData {
     paymentIban:    row.payment_iban   || '',
     paymentPaypal:  row.payment_paypal || '',
     paymentStripe:  row.payment_stripe || '',
+    inviteCode:     row.invite_code    || '',
   };
 }
 
@@ -85,8 +87,11 @@ function loadCache(): CompanyData {
 
 interface CompanyContextValue {
   data: CompanyData;
-  update: (partial: Partial<CompanyData>) => Promise<void>;
+  update: (partial: Partial<CompanyData>) => Promise<{ success: boolean; error?: string }>;
   loading: boolean;
+  isOwner: boolean;
+  ownerId: string | null;
+  refetch: () => Promise<void>;
 }
 
 const CompanyContext = createContext<CompanyContextValue | null>(null);
@@ -96,57 +101,78 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<CompanyData>(loadCache);
   const [loading, setLoading] = useState(true);
 
+  // Si el usuario se unió a otra empresa con un código, todas las
+  // lecturas/escrituras de "empresa" deben apuntar al dueño original,
+  // no a su propia fila (que estaría vacía).
+  const effectiveOwnerId = user?.company_id || user?.id || null;
+  const isOwner = !user?.company_id;
+
+  const fetchFromDb = useCallback(async () => {
+    if (!effectiveOwnerId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const { data: row, error } = await supabase
+        .from('company_settings')
+        .select('*')
+        .eq('user_id', effectiveOwnerId)
+        .maybeSingle();
+
+      if (!error && row) {
+        const mapped = fromDb(row);
+        setData(mapped);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+      }
+    } catch {
+      // Si falla Supabase, usa el caché de localStorage
+    } finally {
+      setLoading(false);
+    }
+  }, [effectiveOwnerId]);
+
   useEffect(() => {
     if (!user) {
       setLoading(false);
       return;
     }
-
-    const fetchFromDb = async () => {
-      try {
-        const { data: row, error } = await supabase
-          .from('company_settings')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (!error && row) {
-          const mapped = fromDb(row);
-          setData(mapped);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
-        }
-      } catch {
-        // Si falla Supabase, usa el caché de localStorage
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchFromDb();
-  }, [user]);
+  }, [user, fetchFromDb]);
 
-  const update = useCallback(async (partial: Partial<CompanyData>) => {
+  const update = useCallback(async (partial: Partial<CompanyData>): Promise<{ success: boolean; error?: string }> => {
+    if (!effectiveOwnerId) {
+      return { success: false, error: 'No hay una empresa asociada a tu cuenta todavía' };
+    }
+
+    const dbFields = toDb(partial);
+    if (Object.keys(dbFields).length === 0) return { success: true };
+
+    const { error } = await supabase
+      .from('company_settings')
+      .upsert(
+        { user_id: effectiveOwnerId, ...dbFields, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      );
+
+    if (error) {
+      console.error('Error guardando datos de empresa:', error);
+      return { success: false, error: error.message || 'No se pudieron guardar los cambios' };
+    }
+
+    // Solo se actualiza el estado local (y la caché) UNA VEZ confirmado que
+    // Supabase guardó de verdad — antes se actualizaba antes de comprobarlo,
+    // por lo que un fallo silencioso hacía parecer que se había guardado.
     setData((prev) => {
       const next = { ...prev, ...partial };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
 
-    if (!user) return;
-
-    const dbFields = toDb(partial);
-    if (Object.keys(dbFields).length === 0) return;
-
-    await supabase
-      .from('company_settings')
-      .upsert(
-        { user_id: user.id, ...dbFields, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id' }
-      );
-  }, [user]);
+    return { success: true };
+  }, [effectiveOwnerId]);
 
   return (
-    <CompanyContext.Provider value={{ data, update, loading }}>
+    <CompanyContext.Provider value={{ data, update, loading, isOwner, ownerId: effectiveOwnerId, refetch: fetchFromDb }}>
       {children}
     </CompanyContext.Provider>
   );

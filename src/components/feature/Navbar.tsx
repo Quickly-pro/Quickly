@@ -51,7 +51,6 @@ export default function Navbar() {
   const displayName = user?.full_name || 'Invitado';
   const avatarUrl = user?.avatar_url;
   const hasAvatar = !!avatarUrl;
-  const isOnline = true;
 
   const handleLogout = async () => {
     await logout();
@@ -244,7 +243,6 @@ export default function Navbar() {
                 ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 : <i className="ri-user-line text-orange-600" />
               }
-              <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
             </div>
             <span className="hidden md:block text-sm text-gray-700 dark:text-slate-200 font-medium">{displayName}</span>
             <i className="hidden md:block ri-arrow-down-s-line text-gray-400 text-xs" />
@@ -258,7 +256,6 @@ export default function Navbar() {
                     ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                     : <i className="ri-user-line text-orange-600 text-sm" />
                   }
-                  <span className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-white dark:border-slate-900 ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">{displayName}</p>

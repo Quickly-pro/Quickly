@@ -16,6 +16,22 @@ interface CartItem {
   image: string;
 }
 
+const SUGGESTED_CATEGORIES = [
+  // Alimentación
+  'Alimentación General', 'Panadería y Bollería', 'Lácteos y Derivados',
+  'Frutas y Verduras', 'Carnes y Embutidos', 'Pescados y Mariscos',
+  'Bebidas y Refrescos', 'Conservas y Enlatados', 'Congelados',
+  'Dulces y Confitería', 'Aceites y Condimentos', 'Cereales y Granos',
+  // Otros repartos
+  'Farmacia y Medicamentos', 'Higiene y Limpieza', 'Papelería y Oficina',
+  'Flores y Plantas', 'Paquetería General', 'Documentos y Correspondencia',
+  'Electrónica y Tecnología', 'Textil y Ropa', 'Muebles y Hogar',
+  'Material de Construcción', 'Repuestos y Automoción', 'Material Médico',
+  'Equipos Deportivos', 'Juguetes y Juegos', 'Mascotas y Accesorios',
+  'Joyería y Accesorios', 'Productos Industriales', 'Herramientas',
+  'Libros y Revistas', 'Cosméticos y Perfumería',
+];
+
 export default function Productos() {
   const { isCliente } = useRole();
   const navigate = useNavigate();
@@ -49,6 +65,7 @@ export default function Productos() {
     name: '', categoryId: '', price: '', stock: '', minStock: '', description: '', weight: '', dimensions: '',
   });
   const [newCategory, setNewCategory] = useState({ name: '', color: '#f97316' });
+  const [addingAllCategories, setAddingAllCategories] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedImageName, setUploadedImageName] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
@@ -69,7 +86,7 @@ export default function Productos() {
       return;
     }
     const prevMap = new Map(prevProductsRef.current.map(p => [p.id, p]));
-    const newAlerts: { id: number; name: string; stock: number; min_stock: number }[] = [];
+    const newAlerts: { id: string; name: string; stock: number; min_stock: number }[] = [];
 
     products.forEach(p => {
       const prev = prevMap.get(p.id);
@@ -277,6 +294,23 @@ export default function Productos() {
     const { error } = await supabase.from('product_categories').insert({ name: newCategory.name });
     if (!error) {
       setNewCategory({ name: '', color: '#f97316' });
+      setShowNewCategory(false);
+      fetchAll();
+    }
+  };
+
+  const existingCategoryNames = useMemo(
+    () => new Set(categories.map(c => c.name.trim().toLowerCase())),
+    [categories]
+  );
+
+  const addAllSuggestedCategories = async () => {
+    const missing = SUGGESTED_CATEGORIES.filter(name => !existingCategoryNames.has(name.toLowerCase()));
+    if (missing.length === 0) return;
+    setAddingAllCategories(true);
+    const { error } = await supabase.from('product_categories').insert(missing.map(name => ({ name })));
+    setAddingAllCategories(false);
+    if (!error) {
       setShowNewCategory(false);
       fetchAll();
     }
@@ -1386,8 +1420,50 @@ export default function Productos() {
                 value={newCategory.name}
                 onChange={e => setNewCategory(prev => ({ ...prev, name: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
+                autoFocus
               />
             </div>
+
+            {/* Sugerencias de categorías para reparto */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Sugerencias</p>
+                <button
+                  type="button"
+                  onClick={addAllSuggestedCategories}
+                  disabled={addingAllCategories || SUGGESTED_CATEGORIES.every(name => existingCategoryNames.has(name.toLowerCase()))}
+                  className="text-xs font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                >
+                  <i className={`ri-${addingAllCategories ? 'loader-4-line animate-spin' : 'add-circle-line'} text-sm`} />
+                  Añadir todas
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5 max-h-52 overflow-y-auto pr-1">
+                {SUGGESTED_CATEGORIES.map(cat => {
+                  const alreadyAdded = existingCategoryNames.has(cat.toLowerCase());
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      disabled={alreadyAdded}
+                      onClick={() => setNewCategory(prev => ({ ...prev, name: cat }))}
+                      title={alreadyAdded ? 'Ya existe' : undefined}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all flex items-center gap-1
+                        ${alreadyAdded
+                          ? 'bg-emerald-50 dark:bg-emerald-900/15 text-emerald-600 dark:text-emerald-500 border-emerald-200 dark:border-emerald-800/40 cursor-default'
+                          : newCategory.name === cat
+                            ? 'bg-orange-500 text-white border-orange-500'
+                            : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-orange-300 hover:text-orange-600 dark:hover:text-orange-400'
+                        }`}
+                    >
+                      {alreadyAdded && <i className="ri-check-line text-xs" />}
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-700">
               <button onClick={() => setShowNewCategory(false)} className="px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">
                 Cancelar

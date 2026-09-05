@@ -158,16 +158,30 @@ export default function Configuracion() {
   const { user } = useAuth();
   const { isDark, toggle: toggleTheme } = useTheme();
 
-  const [settings, setSettings] = useState({
+  // Interruptores booleanos: se cargan de localStorage si el usuario ya los
+  // cambió antes; si no, usan estos valores por defecto.
+  const TOGGLE_DEFAULTS = {
     emailNotifications: true,
     smsAlerts: false,
     weeklyReport: true,
     autoAssignRoutes: false,
+    pushNotifications: true,
+    soundAlerts: true,
+  };
+
+  const loadStoredToggles = () => {
+    try {
+      const raw = localStorage.getItem('quickly_toggles');
+      if (raw) return { ...TOGGLE_DEFAULTS, ...JSON.parse(raw) };
+    } catch { /* ignore */ }
+    return TOGGLE_DEFAULTS;
+  };
+
+  const [settings, setSettings] = useState({
+    ...loadStoredToggles(),
     language: localStorage.getItem('quickly_lang') || 'es',
     currency: localStorage.getItem('quickly_currency') || 'EUR',
     timezone: localStorage.getItem('quickly_timezone') || 'Europe/Madrid',
-    pushNotifications: true,
-    soundAlerts: true,
   });
 
   const [saved, setSaved] = useState(false);
@@ -211,8 +225,14 @@ export default function Configuracion() {
     if (user) check2FA();
   }, [user]);
 
-  const toggle = (key: keyof typeof settings) => {
-    setSettings((s) => ({ ...s, [key]: !s[key] }));
+  const toggle = (key: keyof typeof TOGGLE_DEFAULTS) => {
+    setSettings((s) => {
+      const next = { ...s, [key]: !s[key] };
+      // Guardar solo los interruptores booleanos (no idioma/moneda/zona horaria)
+      const { language: _l, currency: _c, timezone: _tz, ...toggleValues } = next;
+      localStorage.setItem('quickly_toggles', JSON.stringify(toggleValues));
+      return next;
+    });
   };
 
   const handleSave = () => {
@@ -233,10 +253,53 @@ export default function Configuracion() {
 
   const handleExport = async (type: string) => {
     setExporting(type);
-    setTimeout(() => {
+    try {
+      let rows: any[] = [];
+      let filename = type;
+
+      if (type === 'clients') {
+        const { data } = await supabase.from('clients').select('*');
+        rows = (data || []).map(c => ({ Nombre: c.name, Contacto: c.contact, Telefono: c.phone, Email: c.email, Direccion: c.address, Estado: c.status, Total_Gastado: c.total_spent }));
+        filename = 'clientes';
+      } else if (type === 'orders') {
+        const { data } = await supabase.from('order_headers').select('*');
+        rows = (data || []).map(o => ({ ID: o.id, Estado: o.status, Total: o.total, Pago: o.payment_provider, Fecha: o.created_at }));
+        filename = 'pedidos';
+      } else if (type === 'invoices') {
+        const { data } = await supabase.from('invoices').select('*');
+        rows = (data || []).map(i => ({ Numero: i.invoice_number, Cliente: i.client, Importe: i.amount, Estado: i.status, Fecha: i.date }));
+        filename = 'facturas';
+      } else if (type === 'routes') {
+        const { data } = await supabase.from('route_stops').select('*');
+        rows = (data || []).map(r => ({ Cliente: r.client, Direccion: r.address, Estado: r.status, Conductor: r.driver, Entregado: r.delivered_at }));
+        filename = 'rutas';
+      } else if (type === 'employees') {
+        const { data } = await supabase.from('employees').select('*');
+        rows = (data || []).map(e => ({ Nombre: e.name, Rol: e.role, Telefono: e.phone, Email: e.email }));
+        filename = 'empleados';
+      }
+
+      if (rows.length === 0) {
+        setExporting(null);
+        return;
+      }
+
+      const headers = Object.keys(rows[0]);
+      const csv = [
+        headers.join(';'),
+        ...rows.map(r => headers.map(h => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(';')),
+      ].join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filename}-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
       setExporting(null);
       setShowExportModal(false);
-    }, 1500);
+    }
   };
 
   const handlePasswordChange = async () => {

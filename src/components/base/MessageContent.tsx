@@ -4,9 +4,10 @@
  *
  * Formato de adjuntos (almacenado en el campo `text` de chat_messages):
  *   [[ATTACH]]{"type":"image","data":"data:image/...","name":"foto.jpg"}
- *   [[ATTACH]]{"type":"audio","data":"data:audio/..."}
+ *   [[ATTACH]]{"type":"audio","data":"https://.../chat-audio/xxx.webm","duration":12}
  *   [[ATTACH]]{"type":"file","data":"data:application/...","name":"doc.pdf","size":1234}
  */
+import VoiceMessagePlayer from './VoiceMessagePlayer';
 
 export const ATTACH_PREFIX = '[[ATTACH]]';
 
@@ -15,6 +16,7 @@ export interface Attachment {
   data: string;
   name?: string;
   size?: number;
+  duration?: number;
 }
 
 export function parseAttachment(text: string): Attachment | null {
@@ -69,17 +71,8 @@ export default function MessageContent({ text, mine }: Props) {
 
   if (att.type === 'audio') {
     return (
-      <div className={`flex flex-col gap-1 min-w-[200px]`}>
-        <div className="flex items-center gap-2">
-          <i className={`ri-mic-line text-sm ${mine ? 'text-orange-100' : 'text-orange-500'}`} />
-          <span className={`text-xs ${mine ? 'text-orange-100' : 'text-gray-500 dark:text-slate-400'}`}>Nota de voz</span>
-        </div>
-        <audio
-          controls
-          src={att.data}
-          className="w-full max-w-[240px]"
-          style={{ height: '36px' }}
-        />
+      <div className="flex flex-col gap-1.5 min-w-[220px]">
+        <VoiceMessagePlayer src={att.data} mine={mine} knownDuration={att.duration} />
       </div>
     );
   }

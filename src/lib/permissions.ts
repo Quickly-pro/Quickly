@@ -22,7 +22,6 @@ export const ROUTE_PERMISSIONS: Record<UserRole, string[]> = {
   empresa: [
     '/',
     '/clientes',
-    '/rutas',
     '/productos',
     '/pedidos',
     '/facturacion',
@@ -68,6 +67,9 @@ export const ROUTE_PERMISSIONS: Record<UserRole, string[]> = {
     '/documentos',
     '/perfil',
     '/configuracion',
+    '/combustible',
+    '/estadisticas',
+    '/asistente',
   ],
   cliente: [
     '/',
@@ -110,7 +112,6 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   // ── EMPRESA: acceso total ─────────────────────────────────────────
   { path: '/',               label: 'Dashboard',           icon: 'ri-dashboard-line',        section: 'GESTIÓN EMPRESARIAL', roles: ['empresa'] },
   { path: '/clientes',       label: 'Gestión de Clientes', icon: 'ri-team-line',              section: 'GESTIÓN EMPRESARIAL', roles: ['empresa'] },
-  { path: '/rutas',          label: 'Rutas y Localización', icon: 'ri-map-2-line',            section: 'GESTIÓN EMPRESARIAL', roles: ['empresa'] },
   { path: '/productos',      label: 'Productos y Stock',   icon: 'ri-box-3-line',             section: 'GESTIÓN EMPRESARIAL', roles: ['empresa'] },
   { path: '/pedidos',        label: 'Gestión de Pedidos',  icon: 'ri-shopping-cart-2-line',   section: 'GESTIÓN EMPRESARIAL', roles: ['empresa'] },
   { path: '/facturacion',    label: 'Facturas',             icon: 'ri-bill-line',             section: 'GESTIÓN EMPRESARIAL', roles: ['empresa'] },
@@ -122,6 +123,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   { path: '/mapa-reparto',   label: 'Rutas y Localización', icon: 'ri-route-line',             section: 'OPERACIONES',         roles: ['empresa'] },
   { path: '/hoja-ruta',      label: 'Hoja de Ruta',        icon: 'ri-route-line',             section: 'OPERACIONES',         roles: ['empresa'] },
   { path: '/hoja-pedidos',   label: 'Hoja de Pedidos',     icon: 'ri-file-list-3-line',       section: 'OPERACIONES',         roles: ['empresa'] },
+  { path: '/hoja-calculo',   label: 'Hoja de Cálculo',     icon: 'ri-table-line',             section: 'OPERACIONES',         roles: ['empresa'], premium: true },
   { path: '/cuadrante',      label: 'Cuadrante',           icon: 'ri-calendar-check-line',    section: 'OPERACIONES',         roles: ['empresa'] },
 
   { path: '/empresa',        label: 'Perfil Empresa',      icon: 'ri-building-2-line',        section: 'EMPRESA',             roles: ['empresa'] },
@@ -136,7 +138,6 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   { path: '/notificaciones', label: 'Notificaciones',      icon: 'ri-notification-3-line',    section: 'COMUNICACIÓN',        roles: ['empresa'] },
 
   { path: '/documentos',     label: 'Documentos',          icon: 'ri-folder-3-line',          section: 'DOCUMENTOS',          roles: ['empresa'] },
-  { path: '/hoja-calculo',   label: 'Hoja de Cálculo',     icon: 'ri-table-line',             section: 'DOCUMENTOS',          roles: ['empresa'], premium: true },
 
   { path: '/asistente',      label: 'Asistente IA',        icon: 'ri-sparkling-line',         section: 'ASISTENTE',           roles: ['empresa'], premium: true },
 
@@ -159,6 +160,10 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   { path: '/calendario',     label: 'Calendario',          icon: 'ri-calendar-line',          section: 'PERSONAL',            roles: ['empleado'] },
   { path: '/control-horario', label: 'Control Horario',    icon: 'ri-time-line',              section: 'PERSONAL',            roles: ['empleado'] },
   { path: '/documentos',     label: 'Documentos',          icon: 'ri-folder-3-line',          section: 'PERSONAL',            roles: ['empleado'] },
+
+  { path: '/combustible',    label: 'Combustible',         icon: 'ri-gas-station-line',       section: 'EMPRESA',             roles: ['empleado'], premium: true },
+  { path: '/estadisticas',   label: 'Estadísticas',        icon: 'ri-bar-chart-box-line',     section: 'EMPRESA',             roles: ['empleado'], premium: true },
+  { path: '/asistente',      label: 'Asistente IA',        icon: 'ri-sparkling-line',         section: 'EMPRESA',             roles: ['empleado'], premium: true },
 
   { path: '/comunicacion',   label: 'Chat',                icon: 'ri-chat-3-line',            section: 'COMUNICACIÓN',        roles: ['empleado'] },
   { path: '/notificaciones', label: 'Notificaciones',      icon: 'ri-notification-3-line',    section: 'COMUNICACIÓN',        roles: ['empleado'] },

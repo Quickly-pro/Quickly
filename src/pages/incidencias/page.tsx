@@ -33,6 +33,11 @@ const productIncidentTypes = [
 ];
 
 const statusConfig: Record<string, { label: string; color: string }> = {
+  reportada: { label: 'Reportada', color: 'bg-red-50 text-red-600' },
+  vista:     { label: 'Vista', color: 'bg-blue-50 text-blue-600' },
+  en_taller: { label: 'En Taller', color: 'bg-amber-50 text-amber-600' },
+  lista:     { label: 'Lista', color: 'bg-green-50 text-green-600' },
+  // Compatibilidad con incidencias de producto, que siguen usando 3 estados
   abierta: { label: 'Abierta', color: 'bg-red-50 text-red-600' },
   en_proceso: { label: 'En Proceso', color: 'bg-amber-50 text-amber-600' },
   resuelta: { label: 'Resuelta', color: 'bg-green-50 text-green-600' },
@@ -146,6 +151,11 @@ export default function Incidencias() {
     if (isEmpresa) return fuelTickets;
     return fuelTickets.filter(f => f.employee === profile.full_name);
   }, [fuelTickets, isEmpresa, profile.full_name]);
+
+  const filteredProductIncidents = useMemo(() => {
+    if (!isCliente) return productIncidents;
+    return productIncidents.filter(p => p.reported_by === profile.full_name);
+  }, [productIncidents, isCliente, profile.full_name]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -302,10 +312,11 @@ export default function Incidencias() {
     setSubmittingIncident(true);
     const { error } = await supabase.from('vehicle_incidents').insert([{
       ...newIncident,
-      status: 'abierta',
+      status: 'reportada',
       date: new Date().toISOString().split('T')[0],
       cost: 0,
       photo: incidentPhoto || null,
+      reporter_name: profile.full_name || '',
     }]);
     setSubmittingIncident(false);
     if (error) {
@@ -313,7 +324,7 @@ export default function Incidencias() {
     } else {
       addNotification(
         'Nueva incidencia registrada',
-        `Incidencia ${newIncident.type} de ${newIncident.vehicle} registrada con estado Abierta`,
+        `Incidencia ${newIncident.type} de ${newIncident.vehicle} reportada`,
         'system'
       );
       showSuccessToast(`✅ Incidencia de ${newIncident.vehicle} registrada correctamente`);
@@ -356,22 +367,18 @@ export default function Incidencias() {
     }
   };
 
-  const updateIncidentStatus = async (id: number, newStatus: string) => {
-    const oldStatus = selectedIncident?.status;
+  const advanceIncident = async (id: number, newStatus: 'vista' | 'en_taller' | 'lista') => {
     setUpdatingStatus(true);
-    const { error } = await supabase.from('vehicle_incidents').update({ status: newStatus }).eq('id', id);
+    const { data, error } = await supabase.rpc('advance_incident_status', { p_incident_id: id, p_new_status: newStatus });
     setUpdatingStatus(false);
-    if (!error) {
+    if (!error && data?.success) {
       setSelectedIncident((prev: any) => prev ? { ...prev, status: newStatus } : null);
-      if (oldStatus && oldStatus !== newStatus) {
-        const vehicle = selectedIncident?.vehicle || 'Vehículo';
-        const statusLabels: Record<string, string> = { abierta: 'Abierta', en_proceso: 'En Proceso', resuelta: 'Resuelta' };
-        addNotification(
-          'Estado de incidencia actualizado',
-          `La incidencia de ${vehicle} pasó de ${statusLabels[oldStatus] || oldStatus} a ${statusLabels[newStatus] || newStatus}`,
-          'system'
-        );
-      }
+      const labels: Record<string, string> = { vista: 'Vista', en_taller: 'En Taller', lista: 'Lista' };
+      addNotification(
+        'Estado de incidencia actualizado',
+        `La incidencia de ${selectedIncident?.vehicle || 'vehículo'} pasa a "${labels[newStatus]}"${newStatus === 'lista' ? ' — se avisó al empleado' : ''}`,
+        'system'
+      );
       fetchData();
     }
   };
@@ -500,27 +507,33 @@ export default function Incidencias() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-gray-100 dark:border-slate-700">
-                <p className="text-xs text-gray-500 dark:text-slate-400">Abiertas</p>
-                <p className="text-xl font-bold text-red-600">{incidents.filter(i => i.status === 'abierta').length}</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400">Reportadas</p>
+                <p className="text-xl font-bold text-red-600">{incidents.filter(i => i.status === 'reportada').length}</p>
               </div>
               <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-gray-100 dark:border-slate-700">
-                <p className="text-xs text-gray-500 dark:text-slate-400">En Proceso</p>
-                <p className="text-xl font-bold text-amber-600">{incidents.filter(i => i.status === 'en_proceso').length}</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400">Vistas</p>
+                <p className="text-xl font-bold text-blue-600">{incidents.filter(i => i.status === 'vista').length}</p>
               </div>
               <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-gray-100 dark:border-slate-700">
-                <p className="text-xs text-gray-500 dark:text-slate-400">Resueltas</p>
-                <p className="text-xl font-bold text-green-600">{incidents.filter(i => i.status === 'resuelta').length}</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400">En Taller</p>
+                <p className="text-xl font-bold text-amber-600">{incidents.filter(i => i.status === 'en_taller').length}</p>
+              </div>
+              <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-gray-100 dark:border-slate-700">
+                <p className="text-xs text-gray-500 dark:text-slate-400">Listas</p>
+                <p className="text-xl font-bold text-green-600">{incidents.filter(i => i.status === 'lista').length}</p>
               </div>
             </div>
-            <button
-              onClick={() => setShowNewIncident(true)}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-all flex items-center gap-2 whitespace-nowrap"
-            >
-              <div className="w-4 h-4 flex items-center justify-center">
-                <i className="ri-add-line" />
-              </div>
-              Nueva Incidencia
-            </button>
+            {isEmpleado && (
+              <button
+                onClick={() => setShowNewIncident(true)}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-all flex items-center gap-2 whitespace-nowrap"
+              >
+                <div className="w-4 h-4 flex items-center justify-center">
+                  <i className="ri-add-line" />
+                </div>
+                Nueva Incidencia
+              </button>
+            )}
           </div>
 
           {/* Filters */}
@@ -551,9 +564,10 @@ export default function Incidencias() {
               className="px-3 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-300"
             >
               <option value="all">Todos los estados</option>
-              <option value="abierta">Abierta</option>
-              <option value="en_proceso">En Proceso</option>
-              <option value="resuelta">Resuelta</option>
+              <option value="reportada">Reportada</option>
+              <option value="vista">Vista</option>
+              <option value="en_taller">En Taller</option>
+              <option value="lista">Lista</option>
             </select>
             <select
               value={selectedTypeFilter}
@@ -607,7 +621,7 @@ export default function Incidencias() {
                   {incident.cost > 0 && <span className="font-medium text-gray-600 dark:text-slate-300">€{Number(incident.cost).toFixed(2)}</span>}
                 </div>
                 <div className="mt-3 pt-3 border-t border-gray-50 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-xs text-gray-400 dark:text-slate-500">{incident.assigned_to || 'Sin asignar'}</span>
+                  <span className="text-xs text-gray-400 dark:text-slate-500">{incident.reporter_name ? `Reportó: ${incident.reporter_name}` : 'Sin reportador'}</span>
                   <button
                     onClick={() => { setSelectedIncident(incident); setShowIncidentDetail(true); }}
                     className="text-xs text-orange-600 hover:underline whitespace-nowrap"
@@ -708,15 +722,15 @@ export default function Incidencias() {
             <div className="flex items-center gap-3">
               <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-gray-100 dark:border-slate-700">
                 <p className="text-xs text-gray-500 dark:text-slate-400">Abiertas</p>
-                <p className="text-xl font-bold text-red-600">{productIncidents.filter(p => p.status === 'abierta').length}</p>
+                <p className="text-xl font-bold text-red-600">{filteredProductIncidents.filter(p => p.status === 'abierta').length}</p>
               </div>
               <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-gray-100 dark:border-slate-700">
                 <p className="text-xs text-gray-500 dark:text-slate-400">En Proceso</p>
-                <p className="text-xl font-bold text-amber-600">{productIncidents.filter(p => p.status === 'en_proceso').length}</p>
+                <p className="text-xl font-bold text-amber-600">{filteredProductIncidents.filter(p => p.status === 'en_proceso').length}</p>
               </div>
               <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-gray-100 dark:border-slate-700">
                 <p className="text-xs text-gray-500 dark:text-slate-400">Resueltas</p>
-                <p className="text-xl font-bold text-green-600">{productIncidents.filter(p => p.status === 'resuelta').length}</p>
+                <p className="text-xl font-bold text-green-600">{filteredProductIncidents.filter(p => p.status === 'resuelta').length}</p>
               </div>
             </div>
             <button
@@ -731,7 +745,7 @@ export default function Incidencias() {
             <div className="flex justify-center py-12">
               <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : productIncidents.length === 0 ? (
+          ) : filteredProductIncidents.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-12 text-center">
               <div className="w-14 h-14 mx-auto bg-orange-50 dark:bg-orange-900/20 rounded-full flex items-center justify-center mb-3">
                 <i className="ri-box-3-line text-orange-400 text-2xl" />
@@ -741,7 +755,7 @@ export default function Incidencias() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {productIncidents.map((prod) => (
+              {filteredProductIncidents.map((prod) => (
                 <div key={prod.id} className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-5 hover:shadow-md transition-all">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -867,26 +881,16 @@ export default function Incidencias() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500 dark:text-slate-400">Estado</span>
-              <div className="flex items-center gap-2">
-                {updatingStatus && (
-                  <div className="w-4 h-4 border-2 border-orange-300 border-t-orange-500 rounded-full animate-spin" />
-                )}
-                <select
-                  value={selectedIncident.status}
-                  onChange={(e) => updateIncidentStatus(selectedIncident.id, e.target.value)}
-                  disabled={updatingStatus}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border outline-none cursor-pointer transition-all
-                    ${selectedIncident.status === 'abierta' ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800' : ''}
-                    ${selectedIncident.status === 'en_proceso' ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800' : ''}
-                    ${selectedIncident.status === 'resuelta' ? 'bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800' : ''}
-                    disabled:opacity-60 disabled:cursor-not-allowed`}
-                >
-                  <option value="abierta">Abierta</option>
-                  <option value="en_proceso">En Proceso</option>
-                  <option value="resuelta">Resuelta</option>
-                </select>
-              </div>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig[selectedIncident.status]?.color || 'bg-gray-50 text-gray-600'}`}>
+                {statusConfig[selectedIncident.status]?.label || selectedIncident.status}
+              </span>
             </div>
+            {selectedIncident.reporter_name && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500 dark:text-slate-400">Reportado por</span>
+                <span className="text-sm text-gray-700 dark:text-slate-200">{selectedIncident.reporter_name}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500 dark:text-slate-400">Tipo</span>
               <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded text-xs">{selectedIncident.type}</span>
@@ -926,6 +930,44 @@ export default function Incidencias() {
                 <button onClick={() => window.open(selectedIncident.photo, '_blank')} className="mt-2 text-xs text-orange-600 hover:underline flex items-center gap-1.5">
                   <i className="ri-external-link-line" /> Abrir imagen en nueva pestaña
                 </button>
+              </div>
+            )}
+
+            {/* Flujo de la empresa: ver → taller → lista */}
+            {isEmpresa && selectedIncident.status !== 'lista' && (
+              <div className="p-4 bg-orange-50/50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-xl">
+                <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">Siguiente paso</p>
+                {selectedIncident.status === 'reportada' && (
+                  <button onClick={() => advanceIncident(selectedIncident.id, 'vista')} disabled={updatingStatus}
+                    className="w-full py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
+                    {updatingStatus ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <i className="ri-eye-line" />}
+                    Marcar como vista
+                  </button>
+                )}
+                {selectedIncident.status === 'vista' && (
+                  <button onClick={() => advanceIncident(selectedIncident.id, 'en_taller')} disabled={updatingStatus}
+                    className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
+                    {updatingStatus ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <i className="ri-tools-line" />}
+                    Enviar a taller
+                  </button>
+                )}
+                {selectedIncident.status === 'en_taller' && (
+                  <button onClick={() => advanceIncident(selectedIncident.id, 'lista')} disabled={updatingStatus}
+                    className="w-full py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
+                    {updatingStatus ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <i className="ri-check-double-line" />}
+                    Marcar como lista y avisar al empleado
+                  </button>
+                )}
+              </div>
+            )}
+            {selectedIncident.status === 'lista' && (
+              <div className="p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/30 rounded-lg text-sm text-green-700 dark:text-green-400 flex items-center gap-2">
+                <i className="ri-check-double-line" /> Vehículo listo{selectedIncident.reporter_name ? ` — se avisó a ${selectedIncident.reporter_name}` : ''}
+              </div>
+            )}
+            {!isEmpresa && selectedIncident.status !== 'lista' && (
+              <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg text-xs text-gray-500 dark:text-slate-400">
+                La empresa revisará esta incidencia y te avisará cuando el vehículo esté listo.
               </div>
             )}
             <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-slate-700">

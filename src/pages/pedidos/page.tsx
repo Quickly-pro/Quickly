@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useClickOutside } from '@/hooks/useClickOutside';
+import { useRole } from '@/hooks/useRole';
+import { useAuth } from '@/context/AuthContext';
 import Modal from '@/components/base/Modal';
 import { useNavigate } from 'react-router-dom';
 import ChatWidget from '@/components/feature/ChatWidget';
@@ -40,6 +42,9 @@ const ITEMS_PER_PAGE = 10;
 
 export default function Pedidos() {
   const navigate = useNavigate();
+  const { isCliente } = useRole();
+  const { user } = useAuth();
+  const [myClientId, setMyClientId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'client' | 'factory'>('client');
   const [updatingOrderStatus, setUpdatingOrderStatus] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
@@ -70,21 +75,19 @@ export default function Pedidos() {
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
-    const [{ data: ohData }, { data: oiData }, { data: clData }] = await Promise.all([
+    const [{ data: ohData }, { data: oiData }, { data: clData }, { data: fData }] = await Promise.all([
       supabase.from('order_headers').select('*').order('created_at', { ascending: false }).limit(100),
       supabase.from('order_items').select('*'),
       supabase.from('clients').select('id, name'),
+      supabase.from('factory_orders').select('*').order('created_at', { ascending: false }),
     ]);
     if (ohData) setClientOrders(ohData);
     if (oiData) setOrderItems(oiData);
     if (clData) setClientsList(clData);
-    setFactoryOrders([
-      { id: 'FAB-001', factory: 'Aceites del Sur S.A.', product: 'Aceite Oliva Virgen 5L', qty: 500, unitPrice: 18.50, total: 9250, status: 'en_proceso', expectedDelivery: '2026-05-15' },
-      { id: 'FAB-002', factory: 'Lácteos del Norte', product: 'Leche Entera 1L pack x6', qty: 1200, unitPrice: 4.20, total: 5040, status: 'recibido', expectedDelivery: '2026-04-28' },
-      { id: 'FAB-003', factory: 'Conservas La Sierra', product: 'Tomate Triturado 400g', qty: 800, unitPrice: 1.85, total: 1480, status: 'en_proceso', expectedDelivery: '2026-05-10' },
-      { id: 'FAB-004', factory: 'Panadería El Horno', product: 'Harina de trigo 5kg', qty: 300, unitPrice: 3.50, total: 1050, status: 'en_proceso', expectedDelivery: '2026-05-05' },
-      { id: 'FAB-005', factory: 'Bebidas Premium', product: 'Agua mineral pack x12', qty: 2000, unitPrice: 2.10, total: 4200, status: 'recibido', expectedDelivery: '2026-04-25' },
-    ]);
+    if (fData) setFactoryOrders(fData.map((f: any) => ({
+      id: f.id, factory: f.factory, product: f.product, qty: f.qty, unitPrice: Number(f.unit_price),
+      total: Number(f.total), status: f.status, expectedDelivery: f.expected_delivery,
+    })));
     setLoading(false);
   }, []);
 
@@ -92,7 +95,20 @@ export default function Pedidos() {
     fetchOrders();
   }, [fetchOrders]);
 
+  // Resolver el id de "clients" que corresponde al cliente que ha iniciado sesión
+  useEffect(() => {
+    if (!isCliente || !user?.email) return;
+    supabase.from('clients').select('id').ilike('email', user.email).maybeSingle()
+      .then(({ data }) => setMyClientId(data?.id ?? null));
+  }, [isCliente, user?.email]);
+
   const getItemsForOrder = (orderId: number) => orderItems.filter(i => i.order_id === orderId);
+
+  // Pedidos visibles según el rol (para KPIs, sin aplicar búsqueda/filtros)
+  const visibleOrders = useMemo(() => {
+    if (!isCliente) return clientOrders;
+    return myClientId ? clientOrders.filter(o => String(o.client_id) === String(myClientId)) : [];
+  }, [clientOrders, isCliente, myClientId]);
 
   const getClientName = (order: any) => {
     const cid = order.client_id || order.customer_id;
@@ -122,6 +138,11 @@ export default function Pedidos() {
   // Filtering and sorting
   const filteredOrders = useMemo(() => {
     let data = [...clientOrders];
+
+    // Un cliente solo ve sus propios pedidos
+    if (isCliente) {
+      data = myClientId ? data.filter(o => String(o.client_id) === String(myClientId)) : [];
+    }
 
     if (searchText.trim()) {
       const q = searchText.toLowerCase();
@@ -159,7 +180,7 @@ export default function Pedidos() {
     });
 
     return data;
-  }, [clientOrders, searchText, filterStatus, filterPayment, filterDateFrom, filterDateTo, sortField, sortAsc, clientsList, orderItems]);
+  }, [clientOrders, isCliente, myClientId, searchText, filterStatus, filterPayment, filterDateFrom, filterDateTo, sortField, sortAsc, clientsList, orderItems]);
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ITEMS_PER_PAGE));
   const currentPageSafe = Math.min(currentPage, totalPages);
@@ -178,16 +199,20 @@ export default function Pedidos() {
 
   const activeFilterCount = [filterStatus, filterPayment, filterDateFrom, filterDateTo].filter(Boolean).length;
 
-  const addFactoryOrder = () => {
+  const addFactoryOrder = async () => {
     if (!newFactoryOrder.factory || !newFactoryOrder.product) return;
     const newId = `FAB-${String(factoryOrders.length + 1).padStart(3, '0')}`;
     const total = Number(newFactoryOrder.qty || 0) * Number(newFactoryOrder.unitPrice || 0);
-    setFactoryOrders(prev => [
-      { id: newId, factory: newFactoryOrder.factory, product: newFactoryOrder.product, qty: Number(newFactoryOrder.qty), unitPrice: Number(newFactoryOrder.unitPrice), total, status: 'en_proceso', expectedDelivery: newFactoryOrder.expectedDelivery },
-      ...prev,
-    ]);
-    setNewFactoryOrder({ factory: '', product: '', qty: '', unitPrice: '', expectedDelivery: '' });
-    setShowNewFactoryOrder(false);
+    const { error } = await supabase.from('factory_orders').insert({
+      id: newId, factory: newFactoryOrder.factory, product: newFactoryOrder.product,
+      qty: Number(newFactoryOrder.qty), unit_price: Number(newFactoryOrder.unitPrice), total,
+      status: 'en_proceso', expected_delivery: newFactoryOrder.expectedDelivery || null,
+    });
+    if (!error) {
+      setNewFactoryOrder({ factory: '', product: '', qty: '', unitPrice: '', expectedDelivery: '' });
+      setShowNewFactoryOrder(false);
+      fetchOrders();
+    }
   };
 
   const orderDetailRef = useRef<HTMLDivElement>(null);
@@ -228,25 +253,27 @@ export default function Pedidos() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Gestión de Pedidos</h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Pedidos de clientes y pedidos a fábricas</p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">{isCliente ? 'Mis Pedidos' : 'Gestión de Pedidos'}</h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{isCliente ? 'Historial de tus pedidos' : 'Pedidos de clientes y pedidos a fábricas'}</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setActiveTab('client')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap
-              ${activeTab === 'client' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
-          >
-            Pedidos Clientes
-          </button>
-          <button
-            onClick={() => setActiveTab('factory')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap
-              ${activeTab === 'factory' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
-          >
-            Pedidos Fábrica
-          </button>
-        </div>
+        {!isCliente && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab('client')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap
+                ${activeTab === 'client' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+            >
+              Pedidos Clientes
+            </button>
+            <button
+              onClick={() => setActiveTab('factory')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap
+                ${activeTab === 'factory' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+            >
+              Pedidos Fábrica
+            </button>
+          </div>
+        )}
       </div>
 
       {activeTab === 'client' && (
@@ -255,24 +282,24 @@ export default function Pedidos() {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700">
               <p className="text-xs text-gray-500 dark:text-slate-400">Total Pedidos</p>
-              <p className="text-xl font-bold text-gray-800 dark:text-slate-100">{clientOrders.length}{loading && '...'}</p>
+              <p className="text-xl font-bold text-gray-800 dark:text-slate-100">{visibleOrders.length}{loading && '...'}</p>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700">
               <p className="text-xs text-gray-500 dark:text-slate-400">Pendientes Pago</p>
-              <p className="text-xl font-bold text-amber-600">{clientOrders.filter(o => o.status === 'pending_payment').length}</p>
+              <p className="text-xl font-bold text-amber-600">{visibleOrders.filter(o => o.status === 'pending_payment').length}</p>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700">
               <p className="text-xs text-gray-500 dark:text-slate-400">Pagados</p>
-              <p className="text-xl font-bold text-green-600">{clientOrders.filter(o => o.status === 'paid').length}</p>
+              <p className="text-xl font-bold text-green-600">{visibleOrders.filter(o => o.status === 'paid').length}</p>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700">
               <p className="text-xs text-gray-500 dark:text-slate-400">Enviados</p>
-              <p className="text-xl font-bold text-blue-600">{clientOrders.filter(o => o.status === 'shipped').length}</p>
+              <p className="text-xl font-bold text-blue-600">{visibleOrders.filter(o => o.status === 'shipped').length}</p>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700">
               <p className="text-xs text-gray-500 dark:text-slate-400">Total Facturado</p>
               <p className="text-xl font-bold text-orange-600">
-                €{clientOrders.reduce((sum, o) => sum + totalAmount(o), 0).toFixed(2)}
+                €{visibleOrders.reduce((sum, o) => sum + totalAmount(o), 0).toFixed(2)}
               </p>
             </div>
           </div>
@@ -332,13 +359,15 @@ export default function Pedidos() {
                   Limpiar filtros ({activeFilterCount})
                 </button>
               )}
-              <button
-                onClick={() => setShowNewOrder(true)}
-                className="ml-auto px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-all flex items-center gap-2 whitespace-nowrap"
-              >
-                <div className="w-4 h-4 flex items-center justify-center"><i className="ri-add-line" /></div>
-                Nuevo Pedido
-              </button>
+              {!isCliente && (
+                <button
+                  onClick={() => setShowNewOrder(true)}
+                  className="ml-auto px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-all flex items-center gap-2 whitespace-nowrap"
+                >
+                  <div className="w-4 h-4 flex items-center justify-center"><i className="ri-add-line" /></div>
+                  Nuevo Pedido
+                </button>
+              )}
             </div>
 
             {/* Sort + Results info */}
@@ -641,41 +670,45 @@ export default function Pedidos() {
             </div>
 
             <div className="space-y-3 pt-2">
-              <div>
-                <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1.5">Cambiar estado del pedido</label>
-                <div className="flex gap-2">
-                  <select
-                    defaultValue={selectedOrder.status}
-                    id="order-status-select"
-                    className="flex-1 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 dark:bg-slate-800 outline-none"
-                  >
-                    {Object.entries(statusConfig).map(([val, cfg]) => (
-                      <option key={val} value={val}>{cfg.label}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => {
-                      const sel = document.getElementById('order-status-select') as HTMLSelectElement;
-                      if (sel) updateOrderStatus(selectedOrder.id, sel.value);
-                    }}
-                    disabled={updatingOrderStatus}
-                    className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
-                  >
-                    {updatingOrderStatus ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <i className="ri-truck-line" />}
-                    Actualizar Estado
-                  </button>
+              {!isCliente && (
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1.5">Cambiar estado del pedido</label>
+                  <div className="flex gap-2">
+                    <select
+                      defaultValue={selectedOrder.status}
+                      id="order-status-select"
+                      className="flex-1 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 dark:bg-slate-800 outline-none"
+                    >
+                      {Object.entries(statusConfig).map(([val, cfg]) => (
+                        <option key={val} value={val}>{cfg.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        const sel = document.getElementById('order-status-select') as HTMLSelectElement;
+                        if (sel) updateOrderStatus(selectedOrder.id, sel.value);
+                      }}
+                      disabled={updatingOrderStatus}
+                      className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+                    >
+                      {updatingOrderStatus ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <i className="ri-truck-line" />}
+                      Actualizar Estado
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <button
-                onClick={() => {
-                  setShowOrderDetail(false);
-                  navigate('/facturacion', { state: { fromOrder: selectedOrder, clientName: getClientName(selectedOrder) } });
-                }}
-                className="w-full py-2.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center gap-2"
-              >
-                <div className="w-4 h-4 flex items-center justify-center"><i className="ri-file-text-line" /></div>
-                Generar Factura
-              </button>
+              )}
+              {!isCliente && (
+                <button
+                  onClick={() => {
+                    setShowOrderDetail(false);
+                    navigate('/facturacion', { state: { fromOrder: selectedOrder, clientName: getClientName(selectedOrder) } });
+                  }}
+                  className="w-full py-2.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center gap-2"
+                >
+                  <div className="w-4 h-4 flex items-center justify-center"><i className="ri-file-text-line" /></div>
+                  Generar Factura
+                </button>
+              )}
             </div>
           </div>
         )}

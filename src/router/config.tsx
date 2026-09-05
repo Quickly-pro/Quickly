@@ -15,7 +15,6 @@ const Home           = lazy(() => import("../pages/home/page"));
 const Facturacion    = lazy(() => import("../pages/facturacion/page"));
 const Albaranes      = lazy(() => import("../pages/albaranes/page"));
 const Clientes       = lazy(() => import("../pages/clientes/page"));
-const Rutas          = lazy(() => import("../pages/rutas/page"));
 const Productos      = lazy(() => import("../pages/productos/page"));
 const Incidencias    = lazy(() => import("../pages/incidencias/page"));
 const IncidVehiculo  = lazy(() => import("../pages/incidencias-vehiculo/page"));
@@ -43,6 +42,7 @@ const Configuracion  = lazy(() => import("../pages/configuracion/page"));
 const Asistente      = lazy(() => import("../pages/asistente/page"));
 const UpgradePremium = lazy(() => import("../pages/upgrade-premium/page"));
 const TarjetaPromo   = lazy(() => import("../pages/tarjeta-promo/page"));
+const Seguimiento    = lazy(() => import("../pages/seguimiento/page"));
 
 const routes: RouteObject[] = [
   { path: "/login",          element: <Login /> },
@@ -50,6 +50,7 @@ const routes: RouteObject[] = [
   { path: "/recuperar",      element: <Recuperar /> },
   { path: "/reset-password", element: <ResetPassword /> },
   { path: "/promo",          element: <PromoPage /> },
+  { path: "/seguimiento/:token", element: <Seguimiento /> },
   {
     path: "/",
     element: <Layout />,
@@ -58,7 +59,6 @@ const routes: RouteObject[] = [
       { path: "/facturacion",     element: <Facturacion /> },
       { path: "/albaranes",       element: <Albaranes /> },
       { path: "/clientes",        element: <Clientes /> },
-      { path: "/rutas",           element: <Rutas /> },
       { path: "/productos",       element: <Productos /> },
       { path: "/incidencias",     element: <Incidencias /> },
       { path: "/incid-vehiculo",  element: <IncidVehiculo /> },

@@ -6,6 +6,176 @@ import AvatarCropEditor, { type CropData } from '@/components/feature/AvatarCrop
 import Modal from '@/components/base/Modal';
 import ImageWithFallback from '@/components/base/ImageWithFallback';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+import { useCompany } from '@/hooks/useCompany';
+import { useRole } from '@/hooks/useRole';
+
+function CompanyAccessSection() {
+  const { isCliente, isEmpleado } = useRole();
+  const { data: company, isOwner, refetch } = useCompany();
+  const { refreshUser } = useAuth();
+  const [copied, setCopied] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [joinMsg, setJoinMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [leaving, setLeaving] = useState(false);
+
+  if (isCliente) return null;
+
+  const handleCopy = () => {
+    if (!company.inviteCode) return;
+    navigator.clipboard.writeText(company.inviteCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    const { data } = await supabase.rpc('regenerate_invite_code');
+    if (data?.success) await refetch();
+    setRegenerating(false);
+  };
+
+  const handleJoin = async () => {
+    if (!joinCode.trim()) return;
+    setJoining(true);
+    setJoinMsg(null);
+    const { data, error } = await supabase.rpc('join_company_by_code', { p_code: joinCode.trim() });
+    setJoining(false);
+    if (error || !data?.success) {
+      setJoinMsg({ type: 'err', text: data?.error || 'No se pudo unir a la empresa' });
+      return;
+    }
+    setJoinMsg({ type: 'ok', text: `Te has unido a ${data.company_name || 'la empresa'}` });
+    setJoinCode('');
+    await refreshUser();
+    await refetch();
+  };
+
+  const handleLeave = async () => {
+    setLeaving(true);
+    await supabase.rpc('leave_company');
+    setLeaving(false);
+    await refreshUser();
+    await refetch();
+  };
+
+  // Ya pertenece a una empresa (propia si es Empresa-admin uniéndose a otra, o
+  // la de su empleador si es Empleado)
+  if (!isOwner) {
+    return (
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-6 space-y-3">
+        <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-100 flex items-center gap-2">
+          <i className="ri-vip-crown-line text-amber-500" /> Empresa y Premium
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-slate-300">
+          Formas parte de <strong>{company.name}</strong>. Tienes acceso Premium a través de esta empresa —
+          no necesitas pagar una suscripción aparte.
+        </p>
+        <button
+          onClick={handleLeave}
+          disabled={leaving}
+          className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-50"
+        >
+          {leaving ? 'Saliendo...' : 'Salir de esta empresa'}
+        </button>
+      </div>
+    );
+  }
+
+  // Empleado que aún no se ha unido a ninguna empresa: solo puede unirse con un código
+  if (isEmpleado) {
+    return (
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-6 space-y-3">
+        <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-100 flex items-center gap-2">
+          <i className="ri-vip-crown-line text-amber-500" /> Empresa y Premium
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-slate-400">
+          Pide el código de invitación a tu empresa para heredar su plan Premium — sin pagar nada por separado.
+        </p>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value)}
+            placeholder="Código de invitación"
+            className="flex-1 px-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none"
+          />
+          <button
+            onClick={handleJoin}
+            disabled={joining || !joinCode.trim()}
+            className="px-4 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 whitespace-nowrap"
+          >
+            {joining ? 'Uniendo...' : 'Unirme'}
+          </button>
+        </div>
+        {joinMsg && (
+          <p className={`text-xs ${joinMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>
+            {joinMsg.text}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Dueño de empresa (rol Empresa, sin company_id): invita a su equipo
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-6 space-y-4">
+      <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-100 flex items-center gap-2">
+        <i className="ri-vip-crown-line text-amber-500" /> Empresa y Premium
+      </h2>
+      <p className="text-xs text-gray-500 dark:text-slate-400">
+        Comparte este código con tus empleados y compañeros. Al unirse, heredan automáticamente
+        tu plan Premium — no tienen que pagar nada por separado.
+      </p>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 px-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm font-mono text-gray-800 dark:text-slate-100 tracking-wider">
+          {company.inviteCode || '—'}
+        </code>
+        <button
+          onClick={handleCopy}
+          className="px-3 py-2.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 whitespace-nowrap"
+        >
+          {copied ? '¡Copiado!' : 'Copiar'}
+        </button>
+        <button
+          onClick={handleRegenerate}
+          disabled={regenerating}
+          title="Generar nuevo código (invalida el anterior)"
+          className="px-3 py-2.5 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 rounded-lg text-xs hover:bg-gray-200 dark:hover:bg-slate-700 disabled:opacity-50"
+        >
+          <i className="ri-refresh-line" />
+        </button>
+      </div>
+
+      <div className="border-t border-gray-100 dark:border-slate-700 pt-3">
+        <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">¿Tienes un código de otra empresa?</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value)}
+            placeholder="Código de invitación"
+            className="flex-1 px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-800 dark:text-slate-100 outline-none"
+          />
+          <button
+            onClick={handleJoin}
+            disabled={joining || !joinCode.trim()}
+            className="px-3 py-2 bg-gray-800 dark:bg-slate-700 text-white rounded-lg text-xs font-medium hover:bg-gray-900 disabled:opacity-50 whitespace-nowrap"
+          >
+            {joining ? 'Uniendo...' : 'Unirme'}
+          </button>
+        </div>
+        {joinMsg && (
+          <p className={`text-xs mt-2 ${joinMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>
+            {joinMsg.text}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Perfil() {
   const { profile, saving, updateProfile, updateAvatar } = useProfile();
@@ -194,6 +364,9 @@ export default function Perfil() {
           Cambiar foto
         </button>
       </div>
+
+      {/* Empresa y Premium compartido */}
+      <CompanyAccessSection />
 
       {/* Form */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-6 space-y-5">

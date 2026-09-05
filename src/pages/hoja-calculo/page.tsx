@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useCompanyContext } from '@/context/CompanyContext';
 import SpreadsheetCell from './components/SpreadsheetCell';
 import CellPropertiesPanel from './components/CellPropertiesPanel';
 import CSVImporter from './components/CSVImporter';
@@ -8,6 +9,7 @@ import SpreadsheetChart from './components/SpreadsheetChart';
 import ChartConfigModal from './components/ChartConfigModal';
 import PremiumGate from '@/components/feature/PremiumGate';
 import { getDisplayValue, isFormula } from './lib/formulaEngine';
+import { parseNumericValue } from './lib/numberParser';
 
 const ROWS = 50;
 const COLS = 12;
@@ -43,7 +45,7 @@ interface ChartDef {
 const DEFAULT_PALETTES: Palette[] = [
   { name: 'Clásico', colors: ['#ffffff', '#ffebee', '#e8f5e9', '#e3f2fd', '#fff3e0', '#f3e5f5', '#e0f7fa', '#fce4ec', '#f1f8e9', '#ede7f6'] },
   { name: 'Pastel', colors: ['#ffffff', '#ffe0b2', '#c8e6c9', '#bbdefb', '#ffccbc', '#e1bee7', '#b2dfdb', '#f8bbd0', '#dcedc8', '#d1c4e9'] },
-  { name: 'Vivo', colors: ['#ffffff', '#ff5722', '#4caf50', '#2196f3', '#ff9800', '#9c27b0', '#00bcd4', '#e91e63', '#8bc34a', '#673ab7'] },
+  { name: 'Vivo', colors: ['#ffffff', '#ff5722', '#4caf50', '#2196f3', '#ff9800', '#9c27b0', '#00bcd4', '#e91e63', '#8bc34a', '#673ab7', '#f44336', '#ffeb3b', '#3f51b5', '#009688', '#cddc39', '#ff4081', '#651fff', '#00e676', '#ff1744', '#00b8d4'] },
 ];
 
 const SAMPLE_DATA: Record<string, string> = {
@@ -72,6 +74,10 @@ function buildInitialData(): Record<string, CellMeta> {
 
 export default function HojaCalculo() {
   const { user } = useAuth();
+  const { ownerId, isOwner } = useCompanyContext();
+  // Solo la empresa (dueña de la cuenta) puede editar la hoja de cálculo;
+  // los empleados la ven en modo solo lectura, compartida con la empresa.
+  const canEdit = isOwner;
   const [loading, setLoading] = useState(true);
   const [palettes, setPalettes] = useState<Palette[]>(DEFAULT_PALETTES);
   const [activePaletteIndex, setActivePaletteIndex] = useState(0);
@@ -84,6 +90,8 @@ export default function HojaCalculo() {
   const [showChartConfig, setShowChartConfig] = useState(false);
   const [charts, setCharts] = useState<ChartDef[]>([]);
   const [saving, setSaving] = useState(false);
+  const [savingToDocuments, setSavingToDocuments] = useState(false);
+  const [chartHint, setChartHint] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,21 +100,17 @@ export default function HojaCalculo() {
 
   const activePalette = palettes[activePaletteIndex] || DEFAULT_PALETTES[0];
 
-  // Load charts from localStorage
+  // Load charts from Supabase (compartidos: toda la empresa ve los mismos gráficos)
   useEffect(() => {
-    const saved = localStorage.getItem('spreadsheet_charts');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) setCharts(parsed);
-      } catch { /* ignore */ }
-    }
-  }, []);
-
-  // Save charts to localStorage
-  useEffect(() => {
-    localStorage.setItem('spreadsheet_charts', JSON.stringify(charts));
-  }, [charts]);
+    if (!ownerId) return;
+    supabase.from('spreadsheet_charts').select('*').eq('user_id', ownerId)
+      .then(({ data }) => {
+        if (data) setCharts(data.map((c: any) => ({
+          id: c.chart_id, title: c.title, type: c.type, color: c.color,
+          startRow: c.start_row, endRow: c.end_row, labelCol: c.label_col, valueCol: c.value_col,
+        })));
+      });
+  }, [ownerId]);
 
   // Range selection helpers
   const selectedRange = useMemo(() => {
@@ -132,11 +136,11 @@ export default function HojaCalculo() {
 
   // Load palettes from Supabase
   const loadPalettes = useCallback(async () => {
-    if (!user?.id) return;
+    if (!ownerId) return;
     const { data, error } = await supabase
       .from('spreadsheet_palettes')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .order('sort_order');
 
     if (error || !data || data.length === 0) {
@@ -154,11 +158,11 @@ export default function HojaCalculo() {
     setPalettes(loaded);
     const activeIdx = loaded.findIndex(p => p.is_active);
     if (activeIdx >= 0) setActivePaletteIndex(activeIdx);
-  }, [user?.id]);
+  }, [ownerId]);
 
   // Load cell data from Supabase
   const loadCellData = useCallback(async () => {
-    if (!user?.id) {
+    if (!ownerId) {
       setLoading(false);
       return;
     }
@@ -166,7 +170,7 @@ export default function HojaCalculo() {
     const { data, error } = await supabase
       .from('spreadsheet_cells')
       .select('row_index, col_index, value, color_index, is_bold, text_align, number_format')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .limit(2000);
 
     if (error) {
@@ -197,21 +201,21 @@ export default function HojaCalculo() {
     setCellData(loaded);
     setLoading(false);
     hasLoadedRef.current = true;
-  }, [user?.id]);
+  }, [ownerId]);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([loadPalettes(), loadCellData()]);
   }, [loadPalettes, loadCellData]);
 
-  // Realtime subscription
+  // Realtime subscription (misma fuente que el resto de la empresa)
   useEffect(() => {
-    if (!user?.id) return;
+    if (!ownerId) return;
     const channel = supabase
       .channel('spreadsheet-cells-realtime')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'spreadsheet_cells', filter: `user_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'spreadsheet_cells', filter: `user_id=eq.${ownerId}` },
         (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const cell = payload.new as any;
@@ -240,16 +244,16 @@ export default function HojaCalculo() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user?.id]);
+  }, [ownerId]);
 
   // Save cell to Supabase
   const saveCellToSupabase = useCallback(async (
     row: number, col: number, meta: CellMeta
   ) => {
-    if (!user?.id) return;
+    if (!canEdit || !ownerId) return;
     try {
       const { error } = await supabase.from('spreadsheet_cells').upsert({
-        user_id: user.id,
+        user_id: ownerId,
         row_index: row,
         col_index: col,
         value: meta.value || null,
@@ -269,13 +273,13 @@ export default function HojaCalculo() {
     } catch (e) {
       console.error('Save error:', e);
     }
-  }, [user?.id]);
+  }, [canEdit, ownerId]);
 
   const savePaletteSelection = useCallback(async (paletteId: number) => {
-    if (!user?.id) return;
-    await supabase.from('spreadsheet_palettes').update({ is_active: false }).eq('user_id', user.id);
-    await supabase.from('spreadsheet_palettes').update({ is_active: true }).eq('id', paletteId).eq('user_id', user.id);
-  }, [user?.id]);
+    if (!canEdit || !ownerId) return;
+    await supabase.from('spreadsheet_palettes').update({ is_active: false }).eq('user_id', ownerId);
+    await supabase.from('spreadsheet_palettes').update({ is_active: true }).eq('id', paletteId).eq('user_id', ownerId);
+  }, [canEdit, ownerId]);
 
   const getCellMeta = useCallback((row: number, col: number): CellMeta => {
     const key = getCellKey(row, col);
@@ -313,6 +317,7 @@ export default function HojaCalculo() {
     startRow: number;
     endRow: number;
   }) => {
+    if (!canEdit) return;
     const newChart: ChartDef = {
       id: `chart_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       title: config.title,
@@ -327,11 +332,19 @@ export default function HojaCalculo() {
     setShowChartConfig(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2000);
-  }, []);
+    if (ownerId) {
+      supabase.from('spreadsheet_charts').insert({
+        user_id: ownerId, chart_id: newChart.id, title: newChart.title, type: newChart.type, color: newChart.color,
+        start_row: newChart.startRow, end_row: newChart.endRow, label_col: newChart.labelCol, value_col: newChart.valueCol,
+      });
+    }
+  }, [canEdit, ownerId]);
 
   const handleRemoveChart = useCallback((id: string) => {
+    if (!canEdit) return;
     setCharts(prev => prev.filter(c => c.id !== id));
-  }, []);
+    if (ownerId) supabase.from('spreadsheet_charts').delete().eq('user_id', ownerId).eq('chart_id', id);
+  }, [canEdit, ownerId]);
 
   // Extract chart data from cellData
   const getChartData = useCallback((chart: ChartDef) => {
@@ -340,9 +353,7 @@ export default function HojaCalculo() {
       const labelMeta = cellData[getCellKey(r, chart.labelCol)];
       const valueMeta = cellData[getCellKey(r, chart.valueCol)];
       const label = labelMeta?.value || '';
-      const rawVal = valueMeta?.value || '';
-      const cleaned = rawVal.replace(/\./g, '').replace(/,/g, '.');
-      const num = parseFloat(cleaned);
+      const num = parseNumericValue(valueMeta?.value || '');
       if (label && !Number.isNaN(num)) {
         rows.push({ label, value: num });
       }
@@ -365,13 +376,15 @@ export default function HojaCalculo() {
   }, [selectedRange, cellData]);
 
   const handleStartEdit = useCallback((row: number, col: number) => {
+    if (!canEdit) return;
     if (row === 0) return;
     const key = getCellKey(row, col);
     setSelectedCell(key);
     setEditingCell(key);
-  }, []);
+  }, [canEdit]);
 
   const handleFinishEdit = useCallback((row: number, col: number, value: string) => {
+    if (!canEdit) { setEditingCell(null); return; }
     const key = getCellKey(row, col);
     setEditingCell(null);
     setFormulaBar(value);
@@ -394,13 +407,14 @@ export default function HojaCalculo() {
     saveTimeoutRef.current = setTimeout(() => {
       saveCellToSupabase(row, col, nextMeta);
     }, 500);
-  }, [cellData, saveCellToSupabase]);
+  }, [cellData, saveCellToSupabase, canEdit]);
 
-  const handleToggleColor = useCallback((row: number, col: number) => {
+  const handleToggleColor = useCallback((row: number, col: number, explicitIndex?: number) => {
+    if (!canEdit) return;
     const key = getCellKey(row, col);
     setCellData(prev => {
       const current = prev[key] || { value: '', color_index: 0, is_bold: false, text_align: 'left', number_format: 'text' };
-      const nextColorIndex = (current.color_index + 1) % activePalette.colors.length;
+      const nextColorIndex = explicitIndex !== undefined ? explicitIndex : (current.color_index + 1) % activePalette.colors.length;
       const next = { ...prev, [key]: { ...current, color_index: nextColorIndex } };
 
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -410,9 +424,10 @@ export default function HojaCalculo() {
 
       return next;
     });
-  }, [activePalette, saveCellToSupabase]);
+  }, [activePalette, saveCellToSupabase, canEdit]);
 
   const handleBoldChange = useCallback((bold: boolean) => {
+    if (!canEdit) return;
     if (!selectedCell) return;
     const [row, col] = selectedCell.split('-').map(Number);
     if (row === 0) return;
@@ -429,9 +444,10 @@ export default function HojaCalculo() {
 
       return next;
     });
-  }, [selectedCell, saveCellToSupabase]);
+  }, [selectedCell, saveCellToSupabase, canEdit]);
 
   const handleAlignChange = useCallback((align: string) => {
+    if (!canEdit) return;
     if (!selectedCell) return;
     const [row, col] = selectedCell.split('-').map(Number);
     const key = selectedCell;
@@ -447,9 +463,10 @@ export default function HojaCalculo() {
 
       return next;
     });
-  }, [selectedCell, saveCellToSupabase]);
+  }, [selectedCell, saveCellToSupabase, canEdit]);
 
   const handleFormatChange = useCallback((format: string) => {
+    if (!canEdit) return;
     if (!selectedCell) return;
     const [row, col] = selectedCell.split('-').map(Number);
     const key = selectedCell;
@@ -465,24 +482,63 @@ export default function HojaCalculo() {
 
       return next;
     });
-  }, [selectedCell, saveCellToSupabase]);
+  }, [selectedCell, saveCellToSupabase, canEdit]);
 
   const handleChangePalette = useCallback((index: number) => {
+    if (!canEdit) return;
     setActivePaletteIndex(index);
     const p = palettes[index];
-    if (p?.id && user?.id) {
+    if (p?.id && ownerId) {
       savePaletteSelection(p.id);
     }
-  }, [palettes, user?.id, savePaletteSelection]);
+  }, [palettes, ownerId, savePaletteSelection, canEdit]);
 
   // Formula bar edit
   const handleFormulaBarChange = useCallback((newValue: string) => {
+    if (!canEdit) return;
     if (!selectedCell || editingCell) return;
     const [row, col] = selectedCell.split('-').map(Number);
     if (row === 0) return;
 
     handleFinishEdit(row, col, newValue);
-  }, [selectedCell, editingCell, handleFinishEdit]);
+  }, [selectedCell, editingCell, handleFinishEdit, canEdit]);
+
+  // Guardar una copia de la hoja en Documentos → Mis documentos
+  const saveToDocuments = useCallback(async () => {
+    if (!user?.id) return;
+    setSavingToDocuments(true);
+    const rows: string[][] = [];
+    for (let r = 0; r < ROWS; r++) {
+      const rowData: string[] = [];
+      let hasData = false;
+      for (let c = 0; c < COLS; c++) {
+        const meta = getCellMeta(r, c);
+        if (meta.value) hasData = true;
+        rowData.push(`"${(meta.value || '').replace(/"/g, '""')}"`);
+      }
+      if (hasData) rows.push(rowData);
+    }
+    const headerRow = colLabels.map(l => `"${l}"`);
+    const csv = [headerRow.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const fileName = `Hoja de Cálculo - ${new Date().toLocaleDateString('es-ES')}.csv`;
+    const path = `${crypto.randomUUID()}.csv`;
+
+    const { error: upErr } = await supabase.storage.from('documentos').upload(path, blob, { contentType: 'text/csv' });
+    if (!upErr) {
+      const { data: pub } = supabase.storage.from('documentos').getPublicUrl(path);
+      await supabase.from('documents').insert({
+        space: 'mis',
+        name: fileName,
+        type: 'xlsx',
+        size_label: `${(blob.size / 1024).toFixed(0)} KB`,
+        file_url: pub.publicUrl,
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    }
+    setSavingToDocuments(false);
+  }, [getCellMeta, user?.id]);
 
   // Export CSV
   const exportCSV = useCallback(() => {
@@ -514,6 +570,7 @@ export default function HojaCalculo() {
 
   // Import CSV
   const handleImportCSV = useCallback((rows: string[][], startRow?: number, startCol?: number) => {
+    if (!canEdit) return;
     const baseRow = startRow ?? 1;
     const baseCol = startCol ?? 0;
 
@@ -540,13 +597,13 @@ export default function HojaCalculo() {
     setShowImporter(false);
 
     // Bulk save
-    if (!user?.id) return;
+    if (!ownerId) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
       const payload = Object.entries(updates).map(([key, meta]) => {
         const [r, c] = key.split('-').map(Number);
         return {
-          user_id: user.id,
+          user_id: ownerId,
           row_index: r,
           col_index: c,
           value: meta.value || null,
@@ -559,11 +616,11 @@ export default function HojaCalculo() {
       });
       await supabase.from('spreadsheet_cells').upsert(payload, { onConflict: 'user_id,row_index,col_index' });
     }, 1000);
-  }, [user?.id]);
+  }, [ownerId, canEdit]);
 
   // Save all
   const saveAllToSupabase = useCallback(async () => {
-    if (!user?.id) return;
+    if (!canEdit || !ownerId) return;
     setSaving(true);
 
     const cells = Object.entries(cellData).filter(([, meta]) => meta.value || meta.color_index > 0 || meta.is_bold);
@@ -575,7 +632,7 @@ export default function HojaCalculo() {
     const payload = cells.map(([key, meta]) => {
       const [r, c] = key.split('-').map(Number);
       return {
-        user_id: user.id,
+        user_id: ownerId,
         row_index: r,
         col_index: c,
         value: meta.value || null,
@@ -599,7 +656,7 @@ export default function HojaCalculo() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     }
-  }, [cellData, user?.id]);
+  }, [cellData, canEdit, ownerId]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -671,7 +728,11 @@ export default function HojaCalculo() {
   const formulaCells = useMemo(() => Object.values(cellData).filter(c => isFormula(c.value)).length, [cellData]);
 
   const selectedMeta = selectedCell ? cellData[selectedCell] || null : null;
-  const selectedColor = selectedCell ? getCellColor(...selectedCell.split('-').map(Number)) : '#ffffff';
+  const selectedColor = (() => {
+    if (!selectedCell) return '#ffffff';
+    const [selRow, selCol] = selectedCell.split('-').map(Number);
+    return getCellColor(selRow, selCol);
+  })();
 
   return (
     <PremiumGate>
@@ -699,8 +760,9 @@ export default function HojaCalculo() {
               onBlur={() => {
                 if (selectedCell) handleFormulaBarChange(formulaBar);
               }}
-              placeholder="=SUM(A1:A5) o valor..."
-              className="flex-1 px-2 sm:px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-400 dark:placeholder:text-slate-500"
+              readOnly={!canEdit}
+              placeholder={canEdit ? '=SUM(A1:A5) o valor...' : 'Solo lectura'}
+              className={`flex-1 px-2 sm:px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-gray-700 dark:text-slate-200 outline-none focus:border-orange-400 dark:placeholder:text-slate-500 ${!canEdit ? 'cursor-default' : ''}`}
             />
           </div>
           {/* Quick actions */}
@@ -728,32 +790,35 @@ export default function HojaCalculo() {
           </div>
           {/* Scrollable buttons */}
           <div className="flex items-center gap-1.5 px-3 py-2 overflow-x-auto flex-1 scrollbar-hide">
-            {/* Create chart */}
-            <button
-              onClick={() => {
-                if (selectedRange && selectedRange.endRow > selectedRange.startRow) {
-                  setShowChartConfig(true);
-                }
-              }}
-              className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                selectedRange && selectedRange.endRow > selectedRange.startRow
-                  ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
-                  : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-600 cursor-not-allowed'
-              }`}
-              title="Selecciona un rango para crear gráfico"
-            >
-              <i className="ri-bar-chart-grouped-line" />
-              <span className="hidden sm:inline">Gráfico</span>
-            </button>
+            {canEdit && (
+              <>
+                {/* Create chart */}
+                <button
+                  onClick={() => {
+                    if (selectedRange) {
+                      setShowChartConfig(true);
+                    } else {
+                      setChartHint(true);
+                      setTimeout(() => setChartHint(false), 3000);
+                    }
+                  }}
+                  className="flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/50"
+                  title="Selecciona una celda o rango y crea un gráfico"
+                >
+                  <i className="ri-bar-chart-grouped-line" />
+                  <span className="hidden sm:inline">Gráfico</span>
+                </button>
 
-            {/* Import CSV */}
-            <button
-              onClick={() => setShowImporter(true)}
-              className="flex-shrink-0 px-2.5 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-gray-200 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 whitespace-nowrap"
-            >
-              <i className="ri-file-upload-line" />
-              <span className="hidden sm:inline">Importar</span>
-            </button>
+                {/* Import CSV */}
+                <button
+                  onClick={() => setShowImporter(true)}
+                  className="flex-shrink-0 px-2.5 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-gray-200 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <i className="ri-file-upload-line" />
+                  <span className="hidden sm:inline">Importar</span>
+                </button>
+              </>
+            )}
 
             {/* Export CSV */}
             <button
@@ -764,8 +829,21 @@ export default function HojaCalculo() {
               <span>Exportar</span>
             </button>
 
-            {/* Save all */}
+            {/* Save to Documentos */}
             {user?.id && (
+              <button
+                onClick={saveToDocuments}
+                disabled={savingToDocuments}
+                className="flex-shrink-0 px-2.5 py-1.5 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-gray-200 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 whitespace-nowrap disabled:opacity-60"
+                title="Guarda una copia en Documentos → Mis documentos"
+              >
+                {savingToDocuments ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <i className="ri-folder-upload-line" />}
+                <span className="hidden sm:inline">A Documentos</span>
+              </button>
+            )}
+
+            {/* Save all */}
+            {canEdit && user?.id && (
               <button
                 onClick={saveAllToSupabase}
                 disabled={saving}
@@ -781,20 +859,24 @@ export default function HojaCalculo() {
               </button>
             )}
 
-            {/* Separator */}
-            <div className="flex-shrink-0 w-px h-5 bg-gray-200 dark:bg-slate-700 mx-1" />
+            {canEdit && (
+              <>
+                {/* Separator */}
+                <div className="flex-shrink-0 w-px h-5 bg-gray-200 dark:bg-slate-700 mx-1" />
 
-            {/* Palettes */}
-            {palettes.map((p, idx) => (
-              <button
-                key={p.name + idx}
-                onClick={() => handleChangePalette(idx)}
-                className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap
-                  ${activePaletteIndex === idx ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
-              >
-                {p.name}
-              </button>
-            ))}
+                {/* Palettes */}
+                {palettes.map((p, idx) => (
+                  <button
+                    key={p.name + idx}
+                    onClick={() => handleChangePalette(idx)}
+                    className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap
+                      ${activePaletteIndex === idx ? 'bg-orange-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         </div>
 
@@ -808,12 +890,14 @@ export default function HojaCalculo() {
                 </div>
                 Gráficos ({charts.length})
               </h2>
-              <button
-                onClick={() => setCharts([])}
-                className="text-xs text-red-500 hover:text-red-600 font-medium"
-              >
-                Limpiar todos
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => { setCharts([]); if (ownerId) supabase.from('spreadsheet_charts').delete().eq('user_id', ownerId); }}
+                  className="text-xs text-red-500 hover:text-red-600 font-medium"
+                >
+                  Limpiar todos
+                </button>
+              )}
             </div>
             <div className="space-y-3">
               {charts.map(chart => (
@@ -882,6 +966,7 @@ export default function HojaCalculo() {
                             onStartEdit={handleStartEdit}
                             onFinishEdit={handleFinishEdit}
                             onColorToggle={handleToggleColor}
+                            readOnly={!canEdit}
                           />
                         );
                       })}
@@ -895,13 +980,17 @@ export default function HojaCalculo() {
             <div className="flex items-center justify-between flex-wrap gap-2 px-3 sm:px-4 py-2 text-xs text-gray-500 dark:text-slate-400 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-700">
               <div className="hidden sm:flex items-center gap-2">
                 <div className="w-4 h-4 flex items-center justify-center">
-                  <i className="ri-information-line" />
+                  <i className={canEdit ? 'ri-information-line' : 'ri-lock-line'} />
                 </div>
-                <span>Doble clic para editar · Clic para seleccionar · Shift+clic para rango · Ctrl+B negrita · Flechas para navegar · Enter para editar · Espacio para color</span>
+                <span>
+                  {canEdit
+                    ? 'Doble clic para editar · Clic para seleccionar · Shift+clic para rango · Ctrl+B negrita · Flechas para navegar · Enter para editar · Espacio para color'
+                    : 'Solo lectura: esta hoja la gestiona la empresa. Clic para seleccionar · Shift+clic para rango'}
+                </span>
               </div>
               <div className="flex sm:hidden items-center gap-1.5 text-gray-400 dark:text-slate-500">
-                <i className="ri-information-line" />
-                <span>Toca para seleccionar · Doble toque para editar</span>
+                <i className={canEdit ? 'ri-information-line' : 'ri-lock-line'} />
+                <span>{canEdit ? 'Toca para seleccionar · Doble toque para editar' : 'Solo lectura: la gestiona la empresa'}</span>
               </div>
               {!user?.id && (
                 <span className="text-orange-600 font-medium">Datos guardados localmente. Inicia sesión para persistirlos.</span>
@@ -921,13 +1010,14 @@ export default function HojaCalculo() {
                 <CellPropertiesPanel
                   selectedCell={selectedCell}
                   cellMeta={selectedMeta}
+                  readOnly={!canEdit}
                   onBoldChange={handleBoldChange}
                   onAlignChange={handleAlignChange}
                   onFormatChange={handleFormatChange}
-                  onColorToggle={() => {
+                  onColorToggle={(index) => {
                     if (!selectedCell) return;
                     const [r, c] = selectedCell.split('-').map(Number);
-                    handleToggleColor(r, c);
+                    handleToggleColor(r, c, index);
                   }}
                   activePaletteColors={activePalette.colors}
                   cellColor={selectedColor}
@@ -964,6 +1054,14 @@ export default function HojaCalculo() {
               <i className="ri-checkbox-circle-line" />
             </div>
             Guardado correctamente
+          </div>
+        )}
+
+        {/* Chart hint toast */}
+        {chartHint && (
+          <div className="fixed top-4 right-4 z-50 bg-gray-800 dark:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg flex items-center gap-2">
+            <i className="ri-cursor-line" />
+            Selecciona primero una celda o un rango de datos
           </div>
         )}
       </div>

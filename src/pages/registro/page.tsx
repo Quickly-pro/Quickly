@@ -35,6 +35,7 @@ export default function Registro() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [registeredEmail, setRegisteredEmail] = useState('');
@@ -120,6 +121,21 @@ export default function Registro() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
+      }
+
+      // Si es empresa o empleado y puso un código de invitación, unirse a esa
+      // empresa en vez de quedar sin vincular (o, para empresa, como dueña de
+      // una empresa vacía nueva).
+      const code = inviteCode.trim();
+      if ((role === 'empresa' || role === 'empleado') && code) {
+        if (authData.session) {
+          // Ya hay sesión activa: podemos llamar al RPC ahora mismo
+          await supabase.rpc('join_company_by_code', { p_code: code });
+        } else {
+          // Requiere confirmar el email primero: guardamos el código
+          // y AuthContext lo aplicará automáticamente en el primer login.
+          localStorage.setItem('quickly_pending_invite_code', code);
+        }
       }
     }
 
@@ -292,6 +308,26 @@ export default function Registro() {
                 placeholder="Repite la contraseña"
               />
             </div>
+
+            {(role === 'empresa' || role === 'empleado') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                  Código de invitación <span className="text-gray-400 font-normal">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                  placeholder="Si tu empresa ya usa Quickly, pídeselo"
+                />
+                <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+                  {role === 'empresa'
+                    ? 'Con un código te unes a la empresa de tu compañero y heredas su plan Premium. Sin código, creas tu propia empresa.'
+                    : 'Con el código de tu empresa heredas su plan Premium automáticamente, sin pagar nada por separado. Puedes añadirlo después si ahora no lo tienes a mano.'}
+                </p>
+              </div>
+            )}
 
             {error && (
               <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm flex items-start gap-2">

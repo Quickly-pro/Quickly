@@ -14,10 +14,11 @@ interface CellPropertiesPanelProps {
   onBoldChange: (bold: boolean) => void;
   onAlignChange: (align: string) => void;
   onFormatChange: (format: string) => void;
-  onColorToggle: () => void;
+  onColorToggle: (colorIndex?: number) => void;
   activePaletteColors: string[];
   cellColor: string;
   onClose?: () => void;
+  readOnly?: boolean;
 }
 
 export default function CellPropertiesPanel({
@@ -30,6 +31,7 @@ export default function CellPropertiesPanel({
   activePaletteColors,
   cellColor,
   onClose,
+  readOnly = false,
 }: CellPropertiesPanelProps) {
   const [showPalette, setShowPalette] = useState(false);
   const paletteRef = useRef<HTMLDivElement>(null);
@@ -48,10 +50,11 @@ export default function CellPropertiesPanel({
   const align = cellMeta?.text_align || 'left';
   const format = cellMeta?.number_format || 'text';
 
-  const handleColorPick = useCallback(() => {
+  const handleColorPick = useCallback((index: number) => {
+    if (readOnly) return;
     setShowPalette(false);
-    onColorToggle();
-  }, [onColorToggle]);
+    onColorToggle(index);
+  }, [onColorToggle, readOnly]);
 
   if (!selectedCell) {
     return (
@@ -84,6 +87,15 @@ export default function CellPropertiesPanel({
         </div>
       )}
 
+      {readOnly && (
+        <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+          <p className="text-xs text-gray-500 flex items-center gap-1.5">
+            <i className="ri-lock-line" />
+            Solo lectura — la gestiona la empresa
+          </p>
+        </div>
+      )}
+
       <div className="flex-1 overflow-auto p-4 space-y-5">
         {/* Formula info */}
         {cellMeta?.value?.startsWith('=') && (
@@ -101,7 +113,8 @@ export default function CellPropertiesPanel({
           <div className="flex gap-1">
             <button
               onClick={() => onBoldChange(!isBold)}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all border
+              disabled={readOnly}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all border disabled:opacity-50 disabled:cursor-not-allowed
                 ${isBold ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
               title="Negrita"
             >
@@ -125,7 +138,8 @@ export default function CellPropertiesPanel({
               <button
                 key={opt.key}
                 onClick={() => onAlignChange(opt.key)}
-                className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-lg text-xs transition-all border
+                disabled={readOnly}
+                className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-lg text-xs transition-all border disabled:opacity-50 disabled:cursor-not-allowed
                   ${align === opt.key ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                 title={opt.label}
               >
@@ -150,7 +164,8 @@ export default function CellPropertiesPanel({
               <button
                 key={opt.key}
                 onClick={() => onFormatChange(opt.key)}
-                className={`px-2 py-2 rounded-lg text-xs transition-all border text-left
+                disabled={readOnly}
+                className={`px-2 py-2 rounded-lg text-xs transition-all border text-left disabled:opacity-50 disabled:cursor-not-allowed
                   ${format === opt.key ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
               >
                 <span className="font-medium">{opt.label}</span>
@@ -165,23 +180,24 @@ export default function CellPropertiesPanel({
           <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Color de fondo</label>
           <div className="flex items-center gap-2">
             <div
-              className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer flex-shrink-0"
+              className={`w-8 h-8 rounded-lg border border-gray-200 flex-shrink-0 ${readOnly ? 'cursor-default' : 'cursor-pointer'}`}
               style={{ backgroundColor: cellColor }}
-              onClick={() => setShowPalette(!showPalette)}
+              onClick={() => { if (!readOnly) setShowPalette(!showPalette); }}
             />
             <button
               onClick={() => setShowPalette(!showPalette)}
-              className="flex-1 text-left text-xs text-gray-600 hover:text-gray-800 py-2"
+              disabled={readOnly}
+              className="flex-1 text-left text-xs text-gray-600 hover:text-gray-800 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {showPalette ? 'Cerrar paleta' : 'Cambiar color...'}
+              {readOnly ? 'Solo lectura' : showPalette ? 'Cerrar paleta' : 'Cambiar color...'}
             </button>
           </div>
-          {showPalette && (
+          {showPalette && !readOnly && (
             <div ref={paletteRef} className="grid grid-cols-5 gap-1.5 mt-2 p-2 bg-gray-50 rounded-lg">
               {activePaletteColors.map((c, i) => (
                 <button
                   key={i}
-                  onClick={handleColorPick}
+                  onClick={() => handleColorPick(i)}
                   className="w-7 h-7 rounded-md border border-gray-200 hover:scale-110 transition-transform"
                   style={{ backgroundColor: c }}
                   title={`Color ${i + 1}`}

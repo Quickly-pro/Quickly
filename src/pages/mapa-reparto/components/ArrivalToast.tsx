@@ -10,6 +10,34 @@ interface Toast {
 
 let toastId = 0;
 
+// En apps instaladas (TWA/PWA) el navegador exige pasar por el Service
+// Worker en vez del constructor `new Notification(...)` directo — si no,
+// lanza "Illegal constructor" y rompe toda la pantalla si nadie lo atrapa.
+async function showArrivalNotification(vehicleName: string, destination: string, id: number) {
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(`🚛 ${vehicleName} ha llegado`, {
+        body: `Destino: ${destination}`,
+        icon: '/favicon.ico',
+        tag: `arrival-${id}`,
+      });
+      return;
+    }
+  } catch {
+    // seguir al método clásico de abajo
+  }
+  try {
+    new Notification(`🚛 ${vehicleName} ha llegado`, {
+      body: `Destino: ${destination}`,
+      icon: '/favicon.ico',
+      tag: `arrival-${id}`,
+    });
+  } catch {
+    // Una notificación fallida nunca debe romper la pantalla de Rutas.
+  }
+}
+
 export function useArrivalToasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -17,13 +45,9 @@ export function useArrivalToasts() {
     const id = ++toastId;
     setToasts(prev => [...prev, { id, vehicleName, destination, color }]);
     playNotificationSound('arrival');
-    // Browser notification (if permission granted)
+    // Notificación del navegador (si hay permiso concedido)
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification(`🚛 ${vehicleName} ha llegado`, {
-        body: `Destino: ${destination}`,
-        icon: '/favicon.ico',
-        tag: `arrival-${id}`,
-      });
+      showArrivalNotification(vehicleName, destination, id);
     }
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));

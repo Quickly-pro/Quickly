@@ -270,7 +270,7 @@ export default function EmpleadoDashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Link to="/rutas" className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700 hover:border-orange-300 dark:hover:border-orange-700 transition-all">
+        <Link to="/mapa-reparto" className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-100 dark:border-slate-700 hover:border-orange-300 dark:hover:border-orange-700 transition-all">
           <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 mb-2">
             <i className="ri-map-2-line text-lg" />
           </div>

@@ -47,7 +47,8 @@ const PRESET_LOGOS = [
 
 export default function Empresa() {
   const { data: company, update } = useCompany();
-  const { isCliente } = useRole();
+  const { isCliente, isEmpleado } = useRole();
+  const isReadOnly = isCliente || isEmpleado;
   const [showEdit, setShowEdit] = useState(false);
   const editModalRef = useRef<HTMLDivElement>(null);
   useClickOutside(editModalRef, () => setShowEdit(false), showEdit);
@@ -57,11 +58,13 @@ export default function Empresa() {
   const [isDraggingLogo, setIsDraggingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const openEdit = () => {
     setEditForm({ ...company });
     setLogoPreview(null);
     setLogoName('');
+    setSaveError('');
     setShowEdit(true);
   };
 
@@ -115,9 +118,10 @@ export default function Empresa() {
     if (logoInputRef.current) logoInputRef.current.value = '';
   };
 
-  const saveChanges = () => {
+  const saveChanges = async () => {
     setIsSaving(true);
-    update({
+    setSaveError('');
+    const result = await update({
       name: editForm.name,
       legalName: editForm.legalName,
       cif: editForm.cif,
@@ -134,10 +138,12 @@ export default function Empresa() {
       paymentPaypal: editForm.paymentPaypal,
       paymentStripe: editForm.paymentStripe,
     });
-    setTimeout(() => {
-      setIsSaving(false);
+    setIsSaving(false);
+    if (result.success) {
       setShowEdit(false);
-    }, 400);
+    } else {
+      setSaveError(result.error || 'No se pudieron guardar los cambios. Inténtalo de nuevo.');
+    }
   };
 
   return (
@@ -151,7 +157,7 @@ export default function Empresa() {
             {isCliente ? 'Datos de contacto de tu empresa proveedora' : 'Datos y configuración de la empresa'}
           </p>
         </div>
-        {!isCliente && (
+        {!isReadOnly && (
           <button
             onClick={openEdit}
             className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-all flex items-center gap-2 whitespace-nowrap"
@@ -163,6 +169,8 @@ export default function Empresa() {
           </button>
         )}
       </div>
+
+      {/* La gestión del código de invitación y el Premium compartido vive ahora en Mi Perfil */}
 
       {/* Company Card */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
@@ -178,7 +186,7 @@ export default function Empresa() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
             <div className="space-y-3">
-              {!isCliente && (
+              {!isReadOnly && (
               <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
                 <div className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-700 rounded-lg flex-shrink-0">
                   <i className="ri-building-line text-gray-500 dark:text-slate-400" />
@@ -243,8 +251,8 @@ export default function Empresa() {
         </div>
       </div>
 
-      {/* Stats — solo empresa */}
-      {!isCliente && <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Stats — solo empresa (no empleados ni clientes) */}
+      {!isReadOnly && <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-gray-100 dark:border-slate-700">
           <div className="w-10 h-10 rounded-lg bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center mb-3">
             <i className="ri-team-line text-orange-600 text-lg" />
@@ -505,6 +513,12 @@ export default function Empresa() {
               ))}
             </div>
           </div>
+          {saveError && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+              <i className="ri-error-warning-line flex-shrink-0" />
+              {saveError}
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-700">
             <button
               onClick={() => setShowEdit(false)}
@@ -515,8 +529,9 @@ export default function Empresa() {
             <button
               onClick={saveChanges}
               disabled={isSaving}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50"
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2"
             >
+              {isSaving && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               {isSaving ? 'Guardando...' : 'Guardar Cambios'}
             </button>
           </div>

@@ -66,6 +66,76 @@ INSTRUCCIONES:
     // Intentar con Anthropic Claude
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (anthropicKey) {
+      const tools = [
+        {
+          name: 'add_route_stop',
+          description: 'Añade una nueva parada de reparto a la ruta activa de la empresa',
+          input_schema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Nombre del cliente o destino' },
+              address: { type: 'string', description: 'Dirección completa de entrega' },
+              phone: { type: 'string', description: 'Teléfono de contacto, opcional' },
+              notes: { type: 'string', description: 'Notas o instrucciones de entrega, opcional' },
+            },
+            required: ['name', 'address'],
+          },
+        },
+        {
+          name: 'create_invoice',
+          description: 'Crea una factura para un cliente con un concepto, cantidad y precio unitario',
+          input_schema: {
+            type: 'object',
+            properties: {
+              client: { type: 'string', description: 'Nombre del cliente a facturar' },
+              product: { type: 'string', description: 'Concepto o producto facturado' },
+              qty: { type: 'number', description: 'Cantidad' },
+              unitPrice: { type: 'number', description: 'Precio unitario en euros, sin IVA' },
+              notes: { type: 'string', description: 'Notas de la factura, opcional' },
+            },
+            required: ['client', 'product', 'qty', 'unitPrice'],
+          },
+        },
+        {
+          name: 'create_vehicle_incident',
+          description: 'Registra una incidencia o avería de un vehículo de la flota',
+          input_schema: {
+            type: 'object',
+            properties: {
+              vehicle: { type: 'string', description: 'Nombre, modelo o matrícula del vehículo' },
+              description: { type: 'string', description: 'Descripción de la incidencia' },
+            },
+            required: ['vehicle', 'description'],
+          },
+        },
+        {
+          name: 'add_pedido',
+          description: 'Añade un nuevo pedido a la Hoja de Pedidos para un cliente, con dirección, turno y una lista de productos',
+          input_schema: {
+            type: 'object',
+            properties: {
+              employee: { type: 'string', description: 'Nombre del cliente o empleado para quien es el pedido' },
+              address: { type: 'string', description: 'Dirección de entrega del cliente, opcional' },
+              phone: { type: 'string', description: 'Teléfono móvil del cliente, opcional' },
+              turno: { type: 'number', description: 'Número de turno (1, 2, 3...), opcional, por defecto 1' },
+              items: {
+                type: 'array',
+                description: 'Lista de productos del pedido',
+                items: {
+                  type: 'object',
+                  properties: {
+                    product: { type: 'string', description: 'Nombre del producto' },
+                    quantity: { type: 'string', description: 'Cantidad' },
+                  },
+                  required: ['product', 'quantity'],
+                },
+              },
+            },
+            required: ['employee', 'items'],
+          },
+        },
+      ];
+
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -76,15 +146,40 @@ INSTRUCCIONES:
         body: JSON.stringify({
           model: 'claude-3-5-haiku-20241022',
           max_tokens: 1024,
-          system: systemPrompt,
+          system: systemPrompt + `\n\nSi el usuario te pide una ACCIÓN concreta (añadir una parada a la ruta, crear una factura, o registrar una incidencia de vehículo), usa la herramienta correspondiente en vez de responder solo con texto. No ejecutes la acción tú mismo — el sistema le pedirá confirmación al usuario antes de aplicarla.`,
           messages: [{ role: 'user', content: message }],
+          tools,
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
+        const textBlock = data.content.find((b: any) => b.type === 'text');
+        const toolBlock = data.content.find((b: any) => b.type === 'tool_use');
+
+        if (toolBlock) {
+          const summaries: Record<string, (p: any) => string> = {
+            add_route_stop: (p) => `Añadir parada: ${p.name} — ${p.address}${p.phone ? ` · ${p.phone}` : ''}`,
+            create_invoice: (p) => `Crear factura a ${p.client}: ${p.qty} × ${p.product} a €${p.unitPrice} c/u`,
+            create_vehicle_incident: (p) => `Registrar incidencia en ${p.vehicle}: ${p.description}`,
+            add_pedido: (p) => `Nuevo pedido para ${p.employee}: ${(p.items || []).map((it: any) => `${it.quantity} × ${it.product}`).join(', ')}`,
+          };
+          return new Response(
+            JSON.stringify({
+              text: textBlock?.text || 'Esto es lo que voy a hacer — confírmalo cuando quieras:',
+              source: 'claude',
+              pendingAction: {
+                type: toolBlock.name,
+                params: toolBlock.input,
+                summary: summaries[toolBlock.name]?.(toolBlock.input) || toolBlock.name,
+              },
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         return new Response(
-          JSON.stringify({ text: data.content[0].text, source: 'claude' }),
+          JSON.stringify({ text: textBlock?.text || '', source: 'claude' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { usePremium } from '@/hooks/usePremium';
+import { useCompany } from '@/hooks/useCompany';
 
 const premiumFeatures = [
   'Asistente IA con consultas ilimitadas',
@@ -21,7 +22,8 @@ export default function UpgradePremium() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { refetch } = usePremium();
+  const { refetch: refetchPremium } = usePremium();
+  const { data: company, isOwner } = useCompany();
   const verifiedRef = useRef(false);
 
   const price = annual ? 240 : 25;
@@ -37,7 +39,7 @@ export default function UpgradePremium() {
       const verify = async () => {
         try {
           const res = await fetch(
-            'https://irbilfifptefmpudwxee.supabase.co/functions/v1/verify-stripe-subscription',
+            'https://wtelnoiuqaqnzgobuuce.supabase.co/functions/v1/verify-stripe-subscription',
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -53,7 +55,7 @@ export default function UpgradePremium() {
             );
           } else {
             setSuccessMsg('¡Pago completado! Tu suscripción Premium está activa.');
-            refetch?.();
+            refetchPremium?.();
           }
         } catch (err: any) {
           setErrorMsg(err.message || 'Error verificando el pago. Intenta recargar la página.');
@@ -64,7 +66,7 @@ export default function UpgradePremium() {
     } else if (searchParams.get('canceled') === 'true') {
       setErrorMsg('El pago fue cancelado. Puedes intentarlo de nuevo cuando quieras.');
     }
-  }, [searchParams, refetch]);
+  }, [searchParams, refetchPremium]);
 
   const handleSubscribe = async () => {
     if (!user) {
@@ -78,7 +80,7 @@ export default function UpgradePremium() {
 
     try {
       const res = await fetch(
-        'https://irbilfifptefmpudwxee.supabase.co/functions/v1/create-stripe-checkout',
+        'https://wtelnoiuqaqnzgobuuce.supabase.co/functions/v1/create-stripe-checkout',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -104,6 +106,29 @@ export default function UpgradePremium() {
     }
   };
 
+  // El usuario se unió a la empresa de otro con un código: ya tiene
+  // Premium heredado y no debe iniciar una suscripción propia aparte.
+  if (user && !isOwner) {
+    return (
+      <div className="space-y-6 max-w-lg mx-auto text-center">
+        <div className="w-16 h-16 bg-amber-50 dark:bg-amber-900/20 rounded-2xl flex items-center justify-center mx-auto mb-2">
+          <i className="ri-vip-crown-line text-amber-500 text-2xl" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">
+          Ya tienes acceso Premium
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-slate-400 max-w-md mx-auto">
+          Formas parte de <strong>{company.name}</strong>, y tu Premium viene de la suscripción
+          de esa empresa. No necesitas pagar nada por separado — si algún día quieres tu propia
+          suscripción independiente, puedes salir de la empresa desde la página de{' '}
+          <button onClick={() => navigate('/empresa')} className="text-orange-600 hover:underline font-medium">
+            Empresa
+          </button>.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 max-w-lg mx-auto">
       {(successMsg || errorMsg) && (
@@ -128,6 +153,9 @@ export default function UpgradePremium() {
         </h1>
         <p className="text-sm text-gray-500 dark:text-slate-400 max-w-md mx-auto">
           El plan gratuito cubre lo básico. Premium te da las herramientas que necesitas para escalar tu empresa de transporte y logística.
+        </p>
+        <p className="text-xs text-gray-400 dark:text-slate-500 max-w-md mx-auto mt-2">
+          Al suscribirte, todo tu equipo puede unirse con un código de invitación y usar Premium sin pagar aparte — gestiónalo desde la página de Empresa.
         </p>
 
         {/* Toggle mensual / anual */}

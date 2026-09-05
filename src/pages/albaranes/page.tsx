@@ -1,10 +1,10 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Modal from '@/components/base/Modal';
 import SignaturePad from '@/components/base/SignaturePad';
 import { useRole } from '@/hooks/useRole';
 import { useNotificationsContext } from '@/context/NotificationsContext';
+import { supabase } from '@/lib/supabase';
 import {
-  albaranes as initialAlbaranes,
   STATUS_LABEL,
   STATUS_COLOR,
   STATUS_ICON,
@@ -49,11 +49,41 @@ const emptyItem = (): AlbaranItem => ({ product: '', qty: 1, unit: 'unidad', pri
 
 const calcItemTotal = (it: AlbaranItem) => +(it.qty * (it.price || 0)).toFixed(2);
 
+// ── Traducción fila de Supabase <-> objeto Albaran de la interfaz ──────────
+function rowToAlbaran(r: any): Albaran {
+  return {
+    id: r.id,
+    client: r.client,
+    clientAddress: r.client_address,
+    clientPhone: r.client_phone || undefined,
+    clientEmail: r.client_email || undefined,
+    date: r.date,
+    deliveryDate: r.delivery_date || undefined,
+    deliveredAt: r.delivered_at || undefined,
+    deliveredBy: r.delivered_by || undefined,
+    driver: r.driver || undefined,
+    vehicle: r.vehicle || undefined,
+    status: r.status,
+    items: r.items || [],
+    subtotal: Number(r.subtotal || 0),
+    tax: Number(r.tax || 0),
+    total: Number(r.total || 0),
+    notes: r.notes || undefined,
+    signature: r.signature || undefined,
+    signatureName: r.signature_name || undefined,
+    invoiceId: r.invoice_id || undefined,
+    rejectReason: r.reject_reason || undefined,
+    routeId: r.route_id || undefined,
+    orderId: r.order_id || undefined,
+  } as Albaran;
+}
+
 export default function Albaranes() {
   const { isEmpresa, isEmpleado } = useRole();
   const { addNotification } = useNotificationsContext();
 
-  const [list, setList] = useState<Albaran[]>(initialAlbaranes);
+  const [list, setList] = useState<Albaran[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | AlbaranStatus>('todos');
   const [dateFrom, setDateFrom] = useState('');
@@ -66,6 +96,22 @@ export default function Albaranes() {
   const [showDelete, setShowDelete] = useState<Albaran | null>(null);
 
   const printRef = useRef<HTMLDivElement>(null);
+
+  // ── Cargar desde Supabase ────────────────────────────────────────────
+  const fetchAlbaranes = useCallback(async () => {
+    const { data } = await supabase.from('albaranes').select('*').order('created_at', { ascending: false }).limit(200);
+    if (data) setList(data.map(rowToAlbaran));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchAlbaranes();
+    const sub = supabase
+      .channel(`albaranes_${Math.random()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'albaranes' }, fetchAlbaranes)
+      .subscribe();
+    return () => { sub.unsubscribe(); };
+  }, [fetchAlbaranes]);
 
   // Filtros
   const filtered = useMemo(() => {
@@ -94,68 +140,102 @@ export default function Albaranes() {
     return { pendientes, enReparto, entregados, total };
   }, [list]);
 
-  // CRUD ----------------------------------------------------------
-  const createAlbaran = (data: Omit<Albaran, 'id'>) => {
-    const newA: Albaran = { ...data, id: newAlbaranId(list) };
-    setList(prev => [newA, ...prev]);
-    addNotification('Albarán creado', `${newA.id} para ${newA.client}`, 'route');
-    setShowCreate(false);
+  // ── CRUD contra Supabase ─────────────────────────────────────────────
+  const createAlbaran = async (data: Omit<Albaran, 'id'>) => {
+    const id = newAlbaranId(list);
+    const { error } = await supabase.from('albaranes').insert({
+      id,
+      client: data.client,
+      client_address: data.clientAddress,
+      client_phone: data.clientPhone || null,
+      client_email: data.clientEmail || null,
+      date: data.date,
+      delivery_date: data.deliveryDate || null,
+      driver: data.driver || null,
+      vehicle: data.vehicle || null,
+      status: data.status,
+      items: data.items,
+      subtotal: data.subtotal,
+      tax: data.tax,
+      total: data.total,
+      notes: data.notes || null,
+    });
+    if (!error) {
+      addNotification('Albarán creado', `${id} para ${data.client}`, 'route');
+      setShowCreate(false);
+      fetchAlbaranes();
+    }
   };
 
-  const markDelivered = (a: Albaran, deliveredBy: string, signatureName: string, notes: string) => {
-    setList(prev => prev.map(x =>
-      x.id === a.id
-        ? {
-            ...x,
-            status: 'entregado',
-            deliveredAt: new Date().toISOString(),
-            deliveredBy: deliveredBy || x.driver || 'Conductor',
-            signature: signatureName || x.signature,
-            notes: notes ? (x.notes ? x.notes + ' · ' : '') + notes : x.notes,
-          }
-        : x
-    ));
-    addNotification('Albarán entregado', `${a.id} entregado a ${a.client}`, 'route');
-    setShowDeliver(null);
-    setSelected(null);
+  const markDelivered = async (a: Albaran, deliveredBy: string, signatureName: string, notes: string) => {
+    const mergedNotes = notes ? (a.notes ? a.notes + ' · ' : '') + notes : a.notes;
+    const { error } = await supabase.from('albaranes').update({
+      status: 'entregado',
+      delivered_at: new Date().toISOString(),
+      delivered_by: deliveredBy || a.driver || 'Conductor',
+      signature: signatureName || a.signature || null,
+      notes: mergedNotes || null,
+    }).eq('id', a.id);
+    if (!error) {
+      addNotification('Albarán entregado', `${a.id} entregado a ${a.client}`, 'route');
+      setShowDeliver(null);
+      setSelected(null);
+      fetchAlbaranes();
+    }
   };
 
-  const rejectAlbaran = (a: Albaran, reason: string) => {
-    setList(prev => prev.map(x =>
-      x.id === a.id ? { ...x, status: 'rechazado', rejectReason: reason, deliveredAt: new Date().toISOString() } : x
-    ));
-    addNotification('Albarán rechazado', `${a.id} rechazado por ${a.client}`, 'route');
-    setShowReject(null);
-    setSelected(null);
+  const rejectAlbaran = async (a: Albaran, reason: string) => {
+    const { error } = await supabase.from('albaranes').update({
+      status: 'rechazado', reject_reason: reason, delivered_at: new Date().toISOString(),
+    }).eq('id', a.id);
+    if (!error) {
+      addNotification('Albarán rechazado', `${a.id} rechazado por ${a.client}`, 'route');
+      setShowReject(null);
+      setSelected(null);
+      fetchAlbaranes();
+    }
   };
 
-  const updateStatus = (a: Albaran, status: AlbaranStatus) => {
-    setList(prev => prev.map(x => x.id === a.id ? { ...x, status } : x));
-    setSelected(prev => (prev && prev.id === a.id ? { ...prev, status } : prev));
-    addNotification('Estado actualizado', `${a.id} ahora está "${STATUS_LABEL[status]}"`, 'route');
+  const updateStatus = async (a: Albaran, status: AlbaranStatus) => {
+    const { error } = await supabase.from('albaranes').update({ status }).eq('id', a.id);
+    if (!error) {
+      setSelected(prev => (prev && prev.id === a.id ? { ...prev, status } : prev));
+      addNotification('Estado actualizado', `${a.id} ahora está "${STATUS_LABEL[status]}"`, 'route');
+      fetchAlbaranes();
+    }
   };
 
-  const convertToInvoice = (a: Albaran) => {
+  const convertToInvoice = async (a: Albaran) => {
     const invoiceId = `F-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
-    setList(prev => prev.map(x => x.id === a.id ? { ...x, status: 'facturado', invoiceId } : x));
-    setSelected(prev => (prev && prev.id === a.id ? { ...prev, status: 'facturado', invoiceId } : prev));
-    addNotification('Factura generada', `${a.id} → ${invoiceId}`, 'invoice');
+    const { error } = await supabase.from('albaranes').update({ status: 'facturado', invoice_id: invoiceId }).eq('id', a.id);
+    if (!error) {
+      setSelected(prev => (prev && prev.id === a.id ? { ...prev, status: 'facturado', invoiceId } : prev));
+      addNotification('Factura generada', `${a.id} → ${invoiceId}`, 'invoice');
+      fetchAlbaranes();
+    }
   };
 
-  const deleteAlbaran = (a: Albaran) => {
-    setList(prev => prev.filter(x => x.id !== a.id));
-    addNotification('Albarán eliminado', `${a.id} se ha eliminado`, 'route');
-    setShowDelete(null);
-    setSelected(null);
+  const deleteAlbaran = async (a: Albaran) => {
+    const { error } = await supabase.from('albaranes').delete().eq('id', a.id);
+    if (!error) {
+      addNotification('Albarán eliminado', `${a.id} se ha eliminado`, 'route');
+      setShowDelete(null);
+      setSelected(null);
+      fetchAlbaranes();
+    }
   };
 
-  const signAlbaran = (a: Albaran, name: string, sigData?: string) => {
+  const signAlbaran = async (a: Albaran, name: string, sigData?: string) => {
     const sigValue = sigData || name;
-    setList(prev => prev.map(x => x.id === a.id ? { ...x, signature: sigValue, signatureName: name } : x));
-    // Actualiza también el albarán abierto en el modal de detalle para que la firma se vea al instante.
-    setSelected(prev => (prev && prev.id === a.id ? { ...prev, signature: sigValue, signatureName: name } : prev));
-    addNotification('Albarán firmado', `${a.id} firmado por ${name}`, 'route');
-    setShowSign(null);
+    const { error } = await supabase.from('albaranes').update({
+      signature: sigValue, signature_name: name,
+    }).eq('id', a.id);
+    if (!error) {
+      setSelected(prev => (prev && prev.id === a.id ? { ...prev, signature: sigValue, signatureName: name } : prev));
+      addNotification('Albarán firmado', `${a.id} firmado por ${name}`, 'route');
+      setShowSign(null);
+      fetchAlbaranes();
+    }
   };
 
   const downloadAlbaran = (a: Albaran) => {
@@ -203,7 +283,7 @@ export default function Albaranes() {
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Albaranes</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400">
-            Gestión de notas de entrega · seguimiento de mercancía hasta el cliente
+            Gestión de notas de entrega · seguimiento de mercancía hasta el cliente{loading && ' (cargando...)'}
           </p>
         </div>
         {isEmpresa && (
@@ -297,7 +377,7 @@ export default function Albaranes() {
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-gray-400 dark:text-slate-500">
                     <i className="ri-file-list-3-line text-3xl mb-2 block" />
-                    No hay albaranes que coincidan con los filtros
+                    {loading ? 'Cargando albaranes...' : 'No hay albaranes que coincidan con los filtros'}
                   </td>
                 </tr>
               )}
@@ -332,7 +412,7 @@ export default function Albaranes() {
                       >
                         <i className="ri-eye-line text-sm" />
                       </button>
-                      {(a.status === 'pendiente' || a.status === 'en-reparto') && (
+                      {isEmpresa && (a.status === 'pendiente' || a.status === 'en-reparto') && (
                         <button
                           onClick={() => setShowDeliver(a)}
                           title="Marcar entregado"
@@ -479,7 +559,7 @@ export default function Albaranes() {
 
             {/* Acciones */}
             <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100 dark:border-slate-800 print:hidden">
-              {(selected.status === 'pendiente' || selected.status === 'en-reparto') && (
+              {isEmpresa && (selected.status === 'pendiente' || selected.status === 'en-reparto') && (
                 <>
                   <button
                     onClick={() => setShowDeliver(selected)}
@@ -511,12 +591,14 @@ export default function Albaranes() {
                   <i className="ri-bill-line" /> Convertir a factura
                 </button>
               )}
-              <button
-                onClick={() => setShowSign(selected)}
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium"
-              >
-                <i className="ri-pen-nib-line" /> Firmar
-              </button>
+              {isEmpresa && (
+                <button
+                  onClick={() => setShowSign(selected)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium"
+                >
+                  <i className="ri-pen-nib-line" /> Firmar
+                </button>
+              )}
               <button
                 onClick={() => downloadAlbaran(selected)}
                 className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium"
@@ -688,11 +770,15 @@ function DeliverForm({
       <div>
         <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Firma del receptor</label>
         {showPad ? (
-          <SignaturePad
-            label="Dibuja la firma del receptor:"
-            onSave={(data) => { setSignatureData(data); setShowPad(false); }}
-            onCancel={() => setShowPad(false)}
-          />
+          <div>
+            <SignaturePad onChange={(data) => setSignatureData(data || '')} />
+            <div className="flex justify-end gap-4 mt-2">
+              <button type="button" onClick={() => { setSignatureData(''); setShowPad(false); }}
+                className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
+              <button type="button" disabled={!signatureData} onClick={() => setShowPad(false)}
+                className="text-xs font-medium text-green-600 hover:text-green-700 disabled:opacity-40 disabled:cursor-not-allowed">Guardar firma</button>
+            </div>
+          </div>
         ) : signatureData ? (
           <div className="border border-green-200 dark:border-green-800/40 rounded-xl overflow-hidden bg-white dark:bg-slate-800 p-2">
             <img src={signatureData} alt="Firma" className="h-20 object-contain mx-auto" />
@@ -805,11 +891,15 @@ function SignForm({ onConfirm, onCancel }: { onConfirm: (name: string, sigData?:
       <div>
         <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Firma digital</label>
         {showPad ? (
-          <SignaturePad
-            label="Dibuja tu firma:"
-            onSave={(data) => { setSignatureData(data); setShowPad(false); }}
-            onCancel={() => setShowPad(false)}
-          />
+          <div>
+            <SignaturePad onChange={(data) => setSignatureData(data || '')} />
+            <div className="flex justify-end gap-4 mt-2">
+              <button type="button" onClick={() => { setSignatureData(''); setShowPad(false); }}
+                className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
+              <button type="button" disabled={!signatureData} onClick={() => setShowPad(false)}
+                className="text-xs font-medium text-orange-600 hover:text-orange-700 disabled:opacity-40 disabled:cursor-not-allowed">Guardar firma</button>
+            </div>
+          </div>
         ) : signatureData ? (
           <div className="border border-orange-200 dark:border-orange-800/40 rounded-xl overflow-hidden bg-white dark:bg-slate-800 p-2">
             <img src={signatureData} alt="Firma" className="h-20 object-contain mx-auto" />
@@ -865,6 +955,7 @@ function CreateAlbaranModal({
   const [vehicle, setVehicle] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<AlbaranItem[]>([emptyItem()]);
+  const [submitting, setSubmitting] = useState(false);
 
   const subtotal = items.reduce((s, it) => s + calcItemTotal(it), 0);
   const tax = +(subtotal * 0.21).toFixed(2);
@@ -874,9 +965,10 @@ function CreateAlbaranModal({
     setItems(prev => prev.map((it, idx) => idx === i ? { ...it, [field]: value, total: calcItemTotal({ ...it, [field]: value }) } : it));
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!client.trim() || !clientAddress.trim() || items.length === 0) return;
-    onCreate({
+    setSubmitting(true);
+    await onCreate({
       client: client.trim(),
       clientAddress: clientAddress.trim(),
       clientPhone: clientPhone.trim() || undefined,
@@ -892,6 +984,7 @@ function CreateAlbaranModal({
       total,
       notes: notes.trim() || undefined,
     });
+    setSubmitting(false);
   };
 
   return (
@@ -982,12 +1075,13 @@ function CreateAlbaranModal({
         </div>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-slate-800">
-          <button onClick={onClose} className="px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium">Cancelar</button>
+          <button onClick={onClose} disabled={submitting} className="px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium disabled:opacity-40">Cancelar</button>
           <button
             onClick={submit}
-            disabled={!client.trim() || !clientAddress.trim()}
-            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-40"
+            disabled={!client.trim() || !clientAddress.trim() || submitting}
+            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-40 flex items-center gap-2"
           >
+            {submitting && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
             Crear albarán
           </button>
         </div>

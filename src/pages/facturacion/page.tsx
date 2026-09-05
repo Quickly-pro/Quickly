@@ -228,17 +228,41 @@ export default function Facturacion() {
       if (sendEmail) {
         const clientEmail = clients.find(c => c.name === invoiceClient)?.email;
         if (clientEmail) {
-          await fetch('https://irbilfifptefmpudwxee.supabase.co/functions/v1/send-invoice-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              invoice: { ...invoicePayload, id: invoiceId },
-              items: itemsPayload,
-              toEmail: clientEmail,
-              companyName: 'Quickly',
-            }),
-          });
-          addNotification('Factura enviada por email', `Factura ${invNum} enviada a ${clientEmail}`, 'invoice');
+          let companyName = 'Quickly';
+          let paymentInfo: Record<string, string> = {};
+          try {
+            const stored = localStorage.getItem('quickly_company_data');
+            if (stored) {
+              const p = JSON.parse(stored);
+              if (p?.name) companyName = p.name;
+              if (p?.paymentBizum) paymentInfo.bizum = p.paymentBizum;
+              if (p?.paymentIban) paymentInfo.iban = p.paymentIban;
+              if (p?.paymentPaypal) paymentInfo.paypal = p.paymentPaypal;
+              if (p?.paymentStripe) paymentInfo.stripe = p.paymentStripe;
+            }
+          } catch { /* ignorar */ }
+
+          try {
+            const res = await fetch('https://wtelnoiuqaqnzgobuuce.supabase.co/functions/v1/send-invoice-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                invoice: { ...invoicePayload, id: invoiceId },
+                items: itemsPayload,
+                toEmail: clientEmail,
+                companyName,
+                paymentInfo,
+              }),
+            });
+            const resData = await res.json().catch(() => ({}));
+            if (!res.ok || resData?.error) {
+              addNotification('No se pudo enviar el email', `Factura ${invNum} creada, pero el email a ${clientEmail} falló: ${resData?.error || 'error desconocido'}`, 'invoice');
+            } else {
+              addNotification('Factura enviada por email', `Factura ${invNum} enviada a ${clientEmail}`, 'invoice');
+            }
+          } catch (err: any) {
+            addNotification('No se pudo enviar el email', `Factura ${invNum} creada, pero falló el envío: ${err?.message || 'error de conexión'}`, 'invoice');
+          }
         } else {
           addNotification('Factura creada', `${invNum} creada pero el cliente no tiene email registrado`, 'invoice');
         }
@@ -331,7 +355,7 @@ export default function Facturacion() {
         }
       } catch { /* ignorar */ }
 
-      const res = await fetch('https://irbilfifptefmpudwxee.supabase.co/functions/v1/send-invoice-email', {
+      const res = await fetch('https://wtelnoiuqaqnzgobuuce.supabase.co/functions/v1/send-invoice-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invoice, items, toEmail, companyName, paymentInfo }),
@@ -694,11 +718,15 @@ export default function Facturacion() {
             <div>
               <label className="text-sm text-gray-600 dark:text-slate-300 block mb-1">Firma digital</label>
               {showSignPad ? (
-                <SignaturePad
-                  label="Dibuja tu firma:"
-                  onSave={(data) => { setSignInvoiceData(data); setShowSignPad(false); }}
-                  onCancel={() => setShowSignPad(false)}
-                />
+                <div>
+                  <SignaturePad onChange={(data) => setSignInvoiceData(data || '')} />
+                  <div className="flex justify-end gap-4 mt-2">
+                    <button type="button" onClick={() => { setSignInvoiceData(''); setShowSignPad(false); }}
+                      className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
+                    <button type="button" disabled={!signInvoiceData} onClick={() => setShowSignPad(false)}
+                      className="text-xs font-medium text-orange-600 hover:text-orange-700 disabled:opacity-40 disabled:cursor-not-allowed">Guardar firma</button>
+                  </div>
+                </div>
               ) : signInvoiceData ? (
                 <div className="border border-orange-200 dark:border-orange-800/40 rounded-xl overflow-hidden bg-white dark:bg-slate-800 p-2">
                   <img src={signInvoiceData} alt="Firma" className="h-20 object-contain mx-auto" />
@@ -916,19 +944,49 @@ export default function Facturacion() {
                 <h3 className="text-sm font-semibold text-slate-200">Lineas de factura</h3>
                 <button onClick={addLine} className="px-3 py-1.5 text-xs font-medium text-slate-300 border border-slate-600 rounded-lg hover:bg-slate-800 flex items-center gap-1.5 whitespace-nowrap"><div className="w-3 h-3 flex items-center justify-center"><i className="ri-add-line" /></div>Anadir linea</button>
               </div>
-              <div className="space-y-2">
+              <div className="lg:space-y-2">
+              {/* Encabezados alineados con cada campo — solo visibles en pantallas medianas o más grandes */}
+              <div className="hidden sm:grid grid-cols-12 gap-2 px-1">
+                <span className="col-span-3 text-[10px] text-slate-500 uppercase tracking-wide">Producto</span>
+                <span className="col-span-3 text-[10px] text-slate-500 uppercase tracking-wide">Descripción</span>
+                <span className="col-span-1 text-[10px] text-slate-500 uppercase tracking-wide text-center">Cant.</span>
+                <span className="col-span-1 text-[10px] text-slate-500 uppercase tracking-wide">Precio €</span>
+                <span className="col-span-1 text-[10px] text-slate-500 uppercase tracking-wide">Desc. %</span>
+                <span className="col-span-2 text-[10px] text-slate-500 uppercase tracking-wide text-right">Total</span>
+                <span className="col-span-1"></span>
+              </div>
+              <div className="space-y-3 sm:space-y-2">
                 {lines.map((line) => (
-                  <div key={line.id} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-3"><input type="text" placeholder="Producto" value={line.product} onChange={(e) => updateLine(line.id, 'product', e.target.value)} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 outline-none placeholder-slate-500" /></div>
-                    <div className="col-span-3"><input type="text" placeholder="Descripcion" value={line.description} onChange={(e) => updateLine(line.id, 'description', e.target.value)} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 outline-none placeholder-slate-500" /></div>
-                    <div className="col-span-1"><input type="number" min={1} value={line.qty} onChange={(e) => updateLine(line.id, 'qty', Number(e.target.value))} className="w-full px-2 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 outline-none text-center" /></div>
-                    <div className="col-span-1"><input type="number" placeholder="0" value={line.unitPrice} onChange={(e) => updateLine(line.id, 'unitPrice', Number(e.target.value))} className="w-full px-2 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 outline-none" /></div>
-                    <div className="col-span-1"><input type="number" placeholder="0" value={line.discount} onChange={(e) => updateLine(line.id, 'discount', Number(e.target.value))} className="w-full px-2 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 outline-none" /></div>
-                    <div className="col-span-2 text-right"><span className="text-sm text-slate-300 font-medium">€{((line.qty * line.unitPrice) * (1 - line.discount / 100)).toFixed(2)}</span></div>
+                  <div key={line.id} className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-center">
+                    <div className="col-span-2 sm:col-span-3">
+                      <span className="sm:hidden text-[10px] text-slate-500 uppercase block mb-0.5">Producto</span>
+                      <input type="text" placeholder="Producto" value={line.product} onChange={(e) => updateLine(line.id, 'product', e.target.value)} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 outline-none placeholder-slate-500" />
+                    </div>
+                    <div className="col-span-2 sm:col-span-3">
+                      <span className="sm:hidden text-[10px] text-slate-500 uppercase block mb-0.5">Descripción</span>
+                      <input type="text" placeholder="Descripcion" value={line.description} onChange={(e) => updateLine(line.id, 'description', e.target.value)} className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 outline-none placeholder-slate-500" />
+                    </div>
+                    <div className="col-span-1">
+                      <span className="sm:hidden text-[10px] text-slate-500 uppercase block mb-0.5">Cant.</span>
+                      <input type="number" min={1} value={line.qty} onChange={(e) => updateLine(line.id, 'qty', Number(e.target.value))} className="w-full px-2 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 outline-none text-center" />
+                    </div>
+                    <div className="col-span-1">
+                      <span className="sm:hidden text-[10px] text-slate-500 uppercase block mb-0.5">Precio €</span>
+                      <input type="number" placeholder="0" value={line.unitPrice} onChange={(e) => updateLine(line.id, 'unitPrice', Number(e.target.value))} className="w-full px-2 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 outline-none" />
+                    </div>
+                    <div className="col-span-1">
+                      <span className="sm:hidden text-[10px] text-slate-500 uppercase block mb-0.5">Desc. %</span>
+                      <input type="number" placeholder="0" value={line.discount} onChange={(e) => updateLine(line.id, 'discount', Number(e.target.value))} className="w-full px-2 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 outline-none" />
+                    </div>
+                    <div className="col-span-1 sm:col-span-2 text-right">
+                      <span className="sm:hidden text-[10px] text-slate-500 uppercase block mb-0.5">Total</span>
+                      <span className="text-sm text-slate-300 font-medium">€{((line.qty * line.unitPrice) * (1 - line.discount / 100)).toFixed(2)}</span>
+                    </div>
                     <div className="col-span-1 flex justify-end"><button onClick={() => removeLine(line.id)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-800 text-slate-500 hover:text-red-400"><i className="ri-delete-bin-line" /></button></div>
                   </div>
                 ))}
               </div>
+            </div>
               <div className="flex justify-end gap-4 mt-4 pt-4 border-t border-slate-700">
                 <span className="text-sm text-slate-400">Subtotal: <span className="text-slate-200 font-medium">€{subtotalAfterDiscount.toFixed(2)}</span></span>
                 <span className="text-sm text-slate-400">IVA ({invoiceVatPercent}%): <span className="text-slate-200 font-medium">€{taxAmount.toFixed(2)}</span></span>

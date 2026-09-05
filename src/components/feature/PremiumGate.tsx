@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePremium } from '@/hooks/usePremium';
 import { useRole } from '@/hooks/useRole';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 interface PremiumGateProps {
   children: React.ReactNode;
@@ -8,9 +11,36 @@ interface PremiumGateProps {
 }
 
 export default function PremiumGate({ children, fallback }: PremiumGateProps) {
-  const { isPremium, loading, isTrial, trialDaysLeft } = usePremium();
+  const { isPremium, loading, isTrial, trialDaysLeft, isSharedFromCompany, subscription, refetch } = usePremium();
   const { isCliente, isEmpleado } = useRole();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [startingTrial, setStartingTrial] = useState(false);
+  const [trialError, setTrialError] = useState('');
+
+  // Solo la empresa puede activar la prueba (los empleados heredan el
+  // Premium de su empresa) — y solo si nunca ha tenido ya una suscripción
+  // o prueba antes, para que sea de verdad "un mes, una sola vez".
+  const canStartTrial = !isEmpleado && !isCliente && subscription === null;
+
+  const startFreeTrial = async () => {
+    if (!user) return;
+    setStartingTrial(true);
+    setTrialError('');
+    const trialEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('subscriptions').upsert({
+      user_id: user.id,
+      status: 'trial',
+      plan: 'premium',
+      trial_ends_at: trialEnd,
+      current_period_start: now,
+      current_period_end: trialEnd,
+    }, { onConflict: 'user_id' });
+    setStartingTrial(false);
+    if (error) { setTrialError(error.message || 'No se pudo activar la prueba'); return; }
+    await refetch();
+  };
 
   if (loading) {
     return (
@@ -20,8 +50,8 @@ export default function PremiumGate({ children, fallback }: PremiumGateProps) {
     );
   }
 
-  // Empleados y clientes: sin acceso a funciones premium
-  if (isCliente || isEmpleado) {
+  // Clientes: sin acceso a funciones premium (los empleados sí pueden, ver abajo)
+  if (isCliente) {
     if (fallback) return <>{fallback}</>;
     return (
       <div className="flex items-center justify-center min-h-[60vh] px-4">
@@ -38,14 +68,38 @@ export default function PremiumGate({ children, fallback }: PremiumGateProps) {
     );
   }
 
-  // Empresa con premium activo: acceso total
+  // Premium activo (propio o heredado de la empresa): acceso total
   if (isPremium) {
     return <>{children}</>;
   }
 
-  // Empresa sin premium: pantalla de upgrade
   if (fallback) {
     return <>{fallback}</>;
+  }
+
+  // Empleado sin premium: su empresa aún no tiene Premium (o no se ha unido a una)
+  if (isEmpleado) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] px-4">
+        <div className="max-w-sm w-full text-center">
+          <div className="w-16 h-16 bg-amber-50 dark:bg-amber-900/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <i className="ri-vip-crown-line text-amber-500 text-2xl" />
+          </div>
+          <h2 className="text-lg font-semibold text-gray-700 dark:text-slate-200 mb-2">Función Premium</h2>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
+            {isSharedFromCompany
+              ? 'Tu empresa todavía no tiene el plan Premium activo. Pídele a tu responsable que lo active para que puedas usar esta sección.'
+              : 'Únete a tu empresa con el código de invitación para heredar su plan Premium, si lo tiene activo.'}
+          </p>
+          <button
+            onClick={() => navigate('/empresa')}
+            className="w-full px-6 py-3 bg-amber-500 text-white rounded-xl text-sm font-semibold hover:bg-amber-600 transition-all"
+          >
+            Ir a Mi Empresa
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -116,6 +170,20 @@ export default function PremiumGate({ children, fallback }: PremiumGateProps) {
           </div>
         </div>
 
+        {canStartTrial && (
+          <button
+            onClick={startFreeTrial}
+            disabled={startingTrial}
+            className="w-full px-6 py-3 bg-orange-500 text-white rounded-xl text-sm font-semibold hover:bg-orange-600 transition-all flex items-center justify-center gap-2 mb-3 disabled:opacity-60"
+          >
+            {startingTrial
+              ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : <i className="ri-gift-line text-lg" />}
+            {startingTrial ? 'Activando...' : 'Probar gratis 1 mes'}
+          </button>
+        )}
+        {trialError && <p className="text-xs text-red-500 mb-3">{trialError}</p>}
+
         <button
           onClick={() => navigate('/upgrade-premium')}
           className="w-full px-6 py-3 bg-amber-500 text-white rounded-xl text-sm font-semibold hover:bg-amber-600 transition-all flex items-center justify-center gap-2"
@@ -126,7 +194,7 @@ export default function PremiumGate({ children, fallback }: PremiumGateProps) {
           Ver planes Premium
         </button>
         <p className="text-xs text-gray-400 dark:text-slate-500 mt-3">
-          Sin compromiso. Cancela cuando quieras.
+          {canStartTrial ? 'Prueba gratis sin tarjeta — se bloquea sola al pasar el mes.' : 'Sin compromiso. Cancela cuando quieras.'}
         </p>
       </div>
     </div>

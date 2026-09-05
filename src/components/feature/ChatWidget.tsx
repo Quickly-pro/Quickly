@@ -6,13 +6,28 @@ import EmojiPicker from '@/components/base/EmojiPicker';
 import ChatInputAddons from '@/components/base/ChatInputAddons';
 import MessageContent from '@/components/base/MessageContent';
 
-function fireChatNotif(senderName: string, text: string) {
+async function fireChatNotif(senderName: string, text: string) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   if (document.visibilityState === 'visible') return;
   const body = text.length > 80 ? text.slice(0, 80) + '…' : text;
-  const n = new Notification(`💬 ${senderName}`, { body, icon: '/favicon.svg' });
-  n.onclick = () => { window.focus(); n.close(); };
-  setTimeout(() => n.close(), 6000);
+
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(`💬 ${senderName}`, { body, icon: '/favicon.svg' });
+      return;
+    }
+  } catch {
+    // seguir al método clásico de abajo
+  }
+
+  try {
+    const n = new Notification(`💬 ${senderName}`, { body, icon: '/favicon.svg' });
+    n.onclick = () => { window.focus(); n.close(); };
+    setTimeout(() => n.close(), 6000);
+  } catch {
+    // Una notificación fallida nunca debe romper la app.
+  }
 }
 
 export default function ChatWidget() {

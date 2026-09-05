@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 export interface ChatMessage {
   id: number;
+  sender_id: string | null;
   sender_name: string;
   sender_type: string;
   channel: string;
@@ -10,6 +11,12 @@ export interface ChatMessage {
   text: string;
   avatar_url: string | null;
   created_at: string;
+  edited_at: string | null;
+  hidden_for: string[];
+  reply_to_id: number | null;
+  forwarded: boolean;
+  read_by: string[];
+  starred_by: string[];
 }
 
 export function useChatMessages(channel: string, targetId?: string | null) {
@@ -50,7 +57,7 @@ export function useChatMessages(channel: string, targetId?: string | null) {
 
     setTableError(null);
     if (data) {
-      setMessages(data);
+      setMessages(data as ChatMessage[]);
       if (data.length > 0) {
         lastIdRef.current = data[data.length - 1].id;
       }
@@ -60,17 +67,22 @@ export function useChatMessages(channel: string, targetId?: string | null) {
 
   // ── Send ──────────────────────────────────────────────────────────────
   const sendMessage = useCallback(
-    async (text: string, senderName: string, avatarUrl?: string): Promise<boolean> => {
+    async (text: string, senderName: string, avatarUrl?: string, extra?: { replyToId?: number | null; forwarded?: boolean }): Promise<boolean> => {
       if (channel === '__none__') return false;
       setSendError(null);
 
+      const { data: { user } } = await supabase.auth.getUser();
+
       const payload = {
+        sender_id: user?.id ?? null,
         sender_name: senderName || 'Usuario',
         text,
         channel,
         target_id: targetId ?? null,
         avatar_url: avatarUrl ?? null,
         sender_type: 'user',
+        reply_to_id: extra?.replyToId ?? null,
+        forwarded: extra?.forwarded ?? false,
       };
 
       const { data, error } = await supabase
@@ -90,7 +102,6 @@ export function useChatMessages(channel: string, targetId?: string | null) {
         return false;
       }
 
-      // Añadir el mensaje recién insertado directamente al estado (sin esperar realtime)
       if (data) {
         setMessages(prev => {
           if (prev.some(m => m.id === data.id)) return prev;
@@ -102,6 +113,50 @@ export function useChatMessages(channel: string, targetId?: string | null) {
     },
     [channel, targetId]
   );
+
+  // ── Editar mensaje propio ────────────────────────────────────────────
+  const editMessage = useCallback(async (messageId: number, newText: string): Promise<{ success: boolean; error?: string }> => {
+    const { data, error } = await supabase.rpc('edit_chat_message', { p_message_id: messageId, p_new_text: newText });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, text: newText, edited_at: new Date().toISOString() } : m));
+    return { success: true };
+  }, []);
+
+  // ── Eliminar para todos (solo mensajes propios) ──────────────────────
+  const deleteForEveryone = useCallback(async (messageId: number): Promise<{ success: boolean; error?: string }> => {
+    const { data, error } = await supabase.rpc('delete_chat_message_everyone', { p_message_id: messageId });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    return { success: true };
+  }, []);
+
+  // ── Ocultar solo para mí ──────────────────────────────────────────────
+  const hideForMe = useCallback(async (messageId: number): Promise<{ success: boolean; error?: string }> => {
+    const { data, error } = await supabase.rpc('hide_chat_message_for_me', { p_message_id: messageId });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    return { success: true };
+  }, []);
+
+  // ── Marcar mensajes de esta conversación como leídos ─────────────────
+  const markAsRead = useCallback(async () => {
+    if (channel === '__none__') return;
+    await supabase.rpc('mark_messages_read', { p_channel: channel, p_target_id: targetId ?? null });
+  }, [channel, targetId]);
+
+  // ── Destacar / quitar destacado ────────────────────────────────────────
+  const toggleStar = useCallback(async (messageId: number): Promise<{ success: boolean; starred?: boolean; error?: string }> => {
+    const { data, error } = await supabase.rpc('toggle_star_message', { p_message_id: messageId });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+    return { success: true, starred: data.starred };
+  }, []);
 
   // ── Realtime + polling fallback ────────────────────────────────────────
   useEffect(() => {
@@ -126,6 +181,24 @@ export function useChatMessages(channel: string, targetId?: string | null) {
           });
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'chat_messages', filter: `channel=eq.${channel}` },
+        (payload) => {
+          const updated = payload.new as ChatMessage;
+          if (!updated?.id) return;
+          setMessages(prev => prev.map(m => m.id === updated.id ? updated : m));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'chat_messages', filter: `channel=eq.${channel}` },
+        (payload) => {
+          const deletedId = (payload.old as { id?: number })?.id;
+          if (!deletedId) return;
+          setMessages(prev => prev.filter(m => m.id !== deletedId));
+        }
+      )
       .subscribe();
 
     // Polling cada 4 segundos como red de seguridad
@@ -137,5 +210,5 @@ export function useChatMessages(channel: string, targetId?: string | null) {
     };
   }, [channel, targetId, fetchMessages]);
 
-  return { messages, loading, sendError, tableError, sendMessage, refetch: fetchMessages };
+  return { messages, loading, sendError, tableError, sendMessage, editMessage, deleteForEveryone, hideForMe, markAsRead, toggleStar, refetch: fetchMessages };
 }
