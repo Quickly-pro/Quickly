@@ -168,6 +168,54 @@ BEGIN
 END $$;
 
 -- =========================================================
+-- G. Hoja de Cálculo (spreadsheet_cells / spreadsheet_palettes /
+--    spreadsheet_charts) — usan "user_id" como dueño (no "company_id"),
+--    así que van aparte del bucle de la Sección B. Encontramos una
+--    política suelta "allow all" (anon+authenticated) en estas tablas
+--    que no venía de ningún script que tengamos guardado (probablemente
+--    creada a mano desde el dashboard) y que anulaba a las políticas
+--    correctas de hoja-calculo-solo-empresa-edita.sql. Lectura: la
+--    empresa y sus empleados ven la misma hoja. Escritura: SOLO la
+--    propia empresa (nunca un empleado, aunque comparta company_id).
+-- =========================================================
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOR t IN SELECT unnest(ARRAY['spreadsheet_cells','spreadsheet_palettes','spreadsheet_charts'])
+  LOOP
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = t) THEN
+      CONTINUE;
+    END IF;
+
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+
+    -- Borra cualquier política abierta o antigua conocida por nombre
+    EXECUTE format('DROP POLICY IF EXISTS "allow all" ON public.%I', t);
+    EXECUTE format('DROP POLICY IF EXISTS "auth read" ON public.%I', t);
+    EXECUTE format('DROP POLICY IF EXISTS "auth insert" ON public.%I', t);
+    EXECUTE format('DROP POLICY IF EXISTS "auth update" ON public.%I', t);
+    EXECUTE format('DROP POLICY IF EXISTS "auth delete" ON public.%I', t);
+    EXECUTE format('DROP POLICY IF EXISTS "%s_all" ON public.%I', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS "%s_select" ON public.%I', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS "%s_insert" ON public.%I', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS "%s_update" ON public.%I', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS "%s_delete" ON public.%I', t, t);
+
+    -- Lectura: la empresa (user_id = ella misma) y sus empleados
+    EXECUTE format(
+      'CREATE POLICY "%s_select" ON public.%I FOR SELECT TO authenticated USING (user_id = public.get_effective_company_id())', t, t);
+    -- Escritura: solo la propia empresa, nunca un empleado
+    EXECUTE format(
+      'CREATE POLICY "%s_insert" ON public.%I FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid())', t, t);
+    EXECUTE format(
+      'CREATE POLICY "%s_update" ON public.%I FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid())', t, t);
+    EXECUTE format(
+      'CREATE POLICY "%s_delete" ON public.%I FOR DELETE TO authenticated USING (user_id = auth.uid())', t, t);
+  END LOOP;
+END $$;
+
+-- =========================================================
 -- F. VERIFICACIÓN — ejecuta esto después y comprueba que la lista sale VACÍA.
 --    Si aparece alguna fila, esa tabla todavía tiene una política abierta.
 -- =========================================================
