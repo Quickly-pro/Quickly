@@ -1,6 +1,7 @@
 import { useState, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import BottomNav from './BottomNav';
 import Navbar from './Navbar';
 import PageTransition from './PageTransition';
 import RoleGuard from './RoleGuard';
@@ -33,7 +34,7 @@ export default function Layout() {
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 relative z-10
         ${user ? (collapsed ? 'md:ml-16' : 'md:ml-64') : ''}`}>
         <Navbar />
-        <main className="relative flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 min-w-0">
+        <main className={`relative flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 min-w-0 ${user ? 'pb-24 md:pb-6' : ''}`}>
           <Suspense fallback={<PageSkeleton />}>
             <PageTransition>
               <RoleGuard>
@@ -45,6 +46,7 @@ export default function Layout() {
           </Suspense>
         </main>
       </div>
+      {user && <BottomNav />}
     </div>
   );
 }

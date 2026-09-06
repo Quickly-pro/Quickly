@@ -8,7 +8,7 @@ import { useLanguage } from '@/context/LanguageContext';
 
 
 // Mapa de path → clave de traducción
-const PATH_TRANSLATION_KEY: Record<string, string> = {
+export const PATH_TRANSLATION_KEY: Record<string, string> = {
   '/': 'dashboard', '/clientes': 'clients', '/rutas': 'routes', '/productos': 'products',
   '/pedidos': 'orders', '/facturacion': 'invoicing', '/albaranes': 'deliverynotes',
   '/incidencias': 'incidents', '/vehiculos': 'vehicles', '/mapa-reparto': 'routes',
@@ -28,7 +28,6 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
   const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const { unreadCount } = useNotificationsContext();
   const { data: company } = useCompany();
   const { sidebarSections, isCliente, isEmpleado } = useRole();
@@ -46,10 +45,6 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
       locked: isEmpresa && (item as any).premium && !isPremium,
     })),
   }));
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
 
   const renderItem = useCallback((item: { path: string; label: string; icon: string; premium?: boolean; locked?: boolean }) => {
     const isActive = location.pathname === item.path;
@@ -94,21 +89,11 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
 
   return (
     <>
-      {mobileOpen && (
-        <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setMobileOpen(false)} />
-      )}
-
-      <button
-        onClick={() => setMobileOpen(!mobileOpen)}
-        className="fixed top-3 left-3 z-50 md:hidden w-11 h-11 flex items-center justify-center bg-white dark:bg-[#040816] rounded-xl shadow-lg border border-gray-100 dark:border-orange-500/20 dark:shadow-orange-500/10"
-      >
-        <i className={`${mobileOpen ? 'ri-close-line' : 'ri-menu-line'} text-xl text-gray-700 dark:text-orange-400`} />
-      </button>
-
+      {/* Sidebar deslizante: solo escritorio. En móvil/tablet la navegación
+          vive en la barra inferior (BottomNav) con overflow en "Más". */}
       <aside
-        className={`fixed top-0 left-0 h-full bg-white dark:glass-sidebar z-40 transition-transform duration-300 flex flex-col
-          ${collapsed ? 'w-16' : 'w-64'}
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+        className={`hidden md:flex fixed top-0 left-0 h-full bg-white dark:glass-sidebar z-40 transition-all duration-300 flex-col
+          ${collapsed ? 'w-16' : 'w-64'}`}
       >
         {/* Logo area */}
         <div className={`flex items-center gap-3 px-4 py-4 border-b border-gray-100 dark:border-orange-500/10 min-h-[64px] ${collapsed ? 'justify-center' : ''}`}>
@@ -121,7 +106,7 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
               onError={(e) => { (e.target as HTMLImageElement).src = '/logo.png'; }}
             />
           </div>
-          {(!collapsed || mobileOpen) && (
+          {!collapsed && (
             <span className="font-bold text-lg whitespace-nowrap text-gray-800 dark:neon-gradient-text">{company.name.split(' ')[0]}</span>
           )}
         </div>
@@ -185,7 +170,6 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
           </a>
         </div>
 
-        <div className="h-4 md:hidden" />
       </aside>
     </>
   );

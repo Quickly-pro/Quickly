@@ -396,3 +396,163 @@ input.chat-input-field:focus {
   60%  { transform: scale(1.15); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
+/* ============================================================
+   REDISEÑO 2026 — Identidad de marca "Navy → Violeta"
+   Sustituye el acento "neón naranja" por un degradado de dos
+   colores enlazados (azul marino → violeta), aplicado de forma
+   centralizada reescribiendo las mismas clases de Tailwind que
+   ya se usan en todo el código (bg-orange-*, text-orange-*,
+   border-orange-*, from/via/to-orange-*), tanto en modo claro
+   como oscuro. Así no hace falta tocar cada página una por una.
+   ============================================================ */
+
+:root {
+  --brand-navy: #1e3a8a;
+  --brand-navy-deep: #0f1f57;
+  --brand-indigo: #4f46e5;
+  --brand-purple: #7c3aed;
+  --brand-purple-light: #a78bfa;
+  --brand-purple-deep: #5b21b6;
+  --brand-gradient: linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-purple) 100%);
+  --brand-gradient-soft: linear-gradient(135deg, rgba(30,58,138,0.12) 0%, rgba(124,58,237,0.12) 100%);
+}
+
+.brand-gradient-bg { background-image: var(--brand-gradient) !important; }
+.brand-gradient-text {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Tintes suaves (fondos, chips, tarjetas) ── */
+.bg-orange-50, .bg-orange-100 { background-color: #ede9fe !important; }
+.dark .bg-orange-50  { background-color: rgba(91, 33, 182, 0.18) !important; }
+.dark .bg-orange-100 { background-color: rgba(91, 33, 182, 0.28) !important; }
+.hover\:bg-orange-50:hover, .hover\:bg-orange-100:hover { background-color: #ddd6fe !important; }
+.dark .hover\:bg-orange-50:hover, .dark .hover\:bg-orange-100:hover { background-color: rgba(91, 33, 182, 0.35) !important; }
+
+/* ── Bordes ── */
+.border-orange-100, .border-orange-200, .border-orange-300 { border-color: #ddd6fe !important; }
+.dark .border-orange-100 { border-color: rgba(124, 58, 237, 0.12) !important; }
+.dark .border-orange-200 { border-color: rgba(124, 58, 237, 0.20) !important; }
+.dark .border-orange-800\/30, .dark .border-orange-800 { border-color: rgba(124, 58, 237, 0.30) !important; }
+.border-orange-500, .border-orange-600 { border-color: var(--brand-purple) !important; }
+
+/* ── Texto de acento ── */
+.text-orange-400 { color: var(--brand-purple-light) !important; }
+.text-orange-500, .text-orange-600, .text-orange-700 { color: var(--brand-indigo) !important; }
+.dark .text-orange-400, .dark .text-orange-500,
+.dark .text-orange-600, .dark .text-orange-700 { color: var(--brand-purple-light) !important; }
+.hover\:text-orange-600:hover { color: var(--brand-purple-deep) !important; }
+.dark .hover\:text-orange-600:hover { color: #c4b5fd !important; }
+
+/* ── Rellenos sólidos (botones, iconos, indicadores) ── */
+.bg-orange-400, .bg-orange-500 {
+  background-color: var(--brand-purple) !important;
+  background-image: var(--brand-gradient) !important;
+}
+.bg-orange-600 {
+  background-color: var(--brand-purple-deep) !important;
+  background-image: linear-gradient(135deg, var(--brand-navy-deep) 0%, var(--brand-purple-deep) 100%) !important;
+}
+.hover\:bg-orange-600:hover, .hover\:bg-orange-700:hover {
+  background-image: linear-gradient(135deg, var(--brand-navy-deep) 0%, var(--brand-purple-deep) 100%) !important;
+}
+.bg-orange-500\/10 { background-color: rgba(124, 58, 237, 0.10) !important; }
+
+/* ── Degradados (from/via/to) ── */
+.from-orange-400, .from-orange-500, .from-orange-600 { --tw-gradient-from: var(--brand-navy) !important; --tw-gradient-to: rgb(124 58 237 / 0) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+.via-orange-500 { --tw-gradient-to: rgb(124 58 237 / 0)  !important; --tw-gradient-stops: var(--tw-gradient-from), var(--brand-indigo), var(--tw-gradient-to) !important; }
+.to-orange-500, .to-orange-600, .to-orange-700,
+.to-amber-400, .to-amber-500 { --tw-gradient-to: var(--brand-purple) !important; }
+.hover\:from-orange-600:hover { --tw-gradient-from: var(--brand-navy-deep) !important; }
+.hover\:to-orange-700:hover { --tw-gradient-to: var(--brand-purple-deep) !important; }
+
+/* ── Anillos de foco / selección ── */
+.ring-orange-500, .focus\:ring-orange-500:focus { --tw-ring-color: var(--brand-purple) !important; }
+.dark input:focus, .dark textarea:focus, .dark select:focus {
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.35), 0 0 12px rgba(124, 58, 237, 0.18) !important;
+}
+
+/* ── Fondo futurista / resplandores neón → versión navy-violeta ── */
+.dark .futuristic-bg {
+  background-image:
+    linear-gradient(rgba(124, 58, 237, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 58, 237, 0.05) 1px, transparent 1px);
+}
+.dark .futuristic-bg::before {
+  background:
+    radial-gradient(ellipse 70% 50% at 5% 5%,  rgba(30, 58, 138, 0.16) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 70% at 95% 95%, rgba(124, 58, 237, 0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 50% 0%,  rgba(79, 70, 229, 0.06) 0%, transparent 50%);
+}
+.glass-sidebar { border-right: 1px solid rgba(124, 58, 237, 0.18) !important; }
+.glass-navbar { }
+.dark .sidebar-active-ping {
+  background: rgba(124, 58, 237, 0.16) !important;
+  border: 1px solid rgba(124, 58, 237, 0.35) !important;
+  box-shadow: 0 0 18px rgba(124, 58, 237, 0.22), inset 0 0 12px rgba(30, 58, 138, 0.10) !important;
+}
+.dark .sidebar-active-ping .neon-dot {
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.85), 0 0 16px rgba(30, 58, 138, 0.5);
+}
+.neon-orange-glow {
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.5), 0 0 28px rgba(30, 58, 138, 0.25) !important;
+}
+.neon-gradient-text {
+  background: var(--brand-gradient) !important;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.dark .neon-pro-badge {
+  box-shadow: 0 0 6px rgba(124,58,237,0.6) !important;
+}
+.dark ::-webkit-scrollbar-thumb  { background: rgba(124, 58, 237, 0.40) !important; }
+.dark ::-webkit-scrollbar-thumb:hover { background: rgba(124, 58, 237, 0.65) !important; }
+.dark .hover\:shadow-neon:hover {
+  box-shadow: 0 0 0 1px rgba(124,58,237,0.25), 0 8px 32px rgba(30,58,138,0.16) !important;
+}
+.dark .neon-separator {
+  background: linear-gradient(90deg, transparent, rgba(124,58,237,0.35), transparent) !important;
+}
+.dark table thead th { color: rgba(167, 139, 250, 0.75) !important; border-bottom-color: rgba(124, 58, 237, 0.15) !important; }
+.dark table tbody tr { border-bottom-color: rgba(124, 58, 237, 0.08) !important; }
+.dark table tbody tr:hover {
+  background: rgba(124, 58, 237, 0.05) !important;
+  box-shadow: inset 3px 0 0 rgba(124, 58, 237, 0.40) !important;
+}
+.dark input[type="text"], .dark input[type="search"], .dark input[type="email"],
+.dark input[type="number"], .dark input[type="date"], .dark input[type="time"],
+.dark input[type="password"], .dark textarea, .dark select {
+  border-color: rgba(124, 58, 237, 0.22) !important;
+}
+.dark .rounded-xl.border, .dark .rounded-2xl.border {
+  box-shadow: 0 1px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(124,58,237,0.08) inset !important;
+}
+.dark .rounded-xl.border:hover, .dark .rounded-2xl.border:hover {
+  box-shadow: 0 4px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,58,237,0.16) inset !important;
+}
+.dark .rounded-full.bg-orange-500 { box-shadow: 0 0 8px rgba(124,58,237,0.65) !important; }
+.dark .bg-orange-500 { box-shadow: 0 0 12px rgba(124,58,237,0.35) !important; }
+.dark .bg-orange-500:hover, .dark .hover\:bg-orange-600:hover {
+  box-shadow: 0 0 20px rgba(124,58,237,0.55) !important;
+}
+
+/* ── Barra de navegación inferior (móvil / tablet) ── */
+.bottom-nav {
+  background: rgba(10, 12, 28, 0.92);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(124, 58, 237, 0.18);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.35);
+}
+:root:not(.dark) .bottom-nav {
+  background: rgba(255, 255, 255, 0.92);
+  border-top: 1px solid rgba(124, 58, 237, 0.15);
+  box-shadow: 0 -4px 24px rgba(30,27,75,0.10);
+}
+.bottom-nav-item-active {
+  background: var(--brand-gradient);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.45);
+}
