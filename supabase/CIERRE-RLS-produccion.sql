@@ -168,6 +168,43 @@ BEGIN
 END $$;
 
 -- =========================================================
+-- G0. Hoja de Cálculo — alinear el ESQUEMA real con lo que el código
+--    de src/pages/hoja-calculo/page.tsx espera. Se descubrió que
+--    spreadsheet_cells y spreadsheet_palettes se recrearon en algún
+--    momento con columnas distintas (sheet_id/formula en vez de
+--    user_id, sin color_index/is_bold/text_align/number_format en
+--    cells; sin user_id/sort_order/is_active/is_default en palettes).
+--    Resultado: cada lectura/escritura fallaba con "column does not
+--    exist" (el error solo iba a console.error, nunca se veía) y la
+--    Hoja de Cálculo solo mostraba datos de ejemplo, nunca lo real.
+--    No se pierde nada al correr esto: ninguna fila existente tenía
+--    datos reales de usuario (no había user_id para empezar).
+-- =========================================================
+ALTER TABLE public.spreadsheet_cells
+  ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS color_index integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS is_bold boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS text_align text DEFAULT 'left',
+  ADD COLUMN IF NOT EXISTS number_format text DEFAULT 'text',
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'spreadsheet_cells_user_row_col_key'
+  ) THEN
+    ALTER TABLE public.spreadsheet_cells
+      ADD CONSTRAINT spreadsheet_cells_user_row_col_key UNIQUE (user_id, row_index, col_index);
+  END IF;
+END $$;
+
+ALTER TABLE public.spreadsheet_palettes
+  ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS sort_order integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS is_default boolean DEFAULT false;
+
+-- =========================================================
 -- G. Hoja de Cálculo (spreadsheet_cells / spreadsheet_palettes /
 --    spreadsheet_charts) — usan "user_id" como dueño (no "company_id"),
 --    así que van aparte del bucle de la Sección B. Encontramos una
