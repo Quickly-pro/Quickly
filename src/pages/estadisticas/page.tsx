@@ -89,12 +89,16 @@ export default function Estadisticas() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [{ data: inv }, { data: fuel }, { data: time }, { data: cl }] = await Promise.all([
+    const [{ data: inv, error: invErr }, { data: fuel, error: fuelErr }, { data: time, error: timeErr }, { data: cl, error: clErr }] = await Promise.all([
       supabase.from('invoices').select('id, amount, date, client, status'),
       supabase.from('fuel_tickets').select('id, liters, cost, date'),
       supabase.from('time_tracking').select('employee, total_hours, date'),
       supabase.from('clients').select('id, status'),
     ]);
+    if (invErr) console.error('Error al cargar las facturas', invErr);
+    if (fuelErr) console.error('Error al cargar los tickets de combustible', fuelErr);
+    if (timeErr) console.error('Error al cargar los fichajes', timeErr);
+    if (clErr) console.error('Error al cargar los clientes', clErr);
     setInvoices(inv || []);
     setFuelTickets(fuel || []);
     setTimeRecords(time || []);

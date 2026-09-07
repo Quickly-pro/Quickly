@@ -217,7 +217,8 @@ export default function Configuracion() {
   useEffect(() => {
     const check2FA = async () => {
       try {
-        const { data } = await supabase.auth.mfa.listFactors();
+        const { data, error } = await supabase.auth.mfa.listFactors();
+        if (error) console.error('Error al comprobar el estado de 2FA', error);
         const hasTotp = data?.totp?.some(f => f.status === 'verified');
         setMfaEnabled(!!hasTotp);
       } catch { /* ignore */ }
@@ -245,7 +246,8 @@ export default function Configuracion() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error('Error al cerrar sesión', error);
     localStorage.clear();
     sessionStorage.clear();
     navigate('/login');
@@ -258,23 +260,28 @@ export default function Configuracion() {
       let filename = type;
 
       if (type === 'clients') {
-        const { data } = await supabase.from('clients').select('*');
+        const { data, error } = await supabase.from('clients').select('*');
+        if (error) console.error('Error al exportar los clientes', error);
         rows = (data || []).map(c => ({ Nombre: c.name, Contacto: c.contact, Telefono: c.phone, Email: c.email, Direccion: c.address, Estado: c.status, Total_Gastado: c.total_spent }));
         filename = 'clientes';
       } else if (type === 'orders') {
-        const { data } = await supabase.from('order_headers').select('*');
+        const { data, error } = await supabase.from('order_headers').select('*');
+        if (error) console.error('Error al exportar los pedidos', error);
         rows = (data || []).map(o => ({ ID: o.id, Estado: o.status, Total: o.total, Pago: o.payment_provider, Fecha: o.created_at }));
         filename = 'pedidos';
       } else if (type === 'invoices') {
-        const { data } = await supabase.from('invoices').select('*');
+        const { data, error } = await supabase.from('invoices').select('*');
+        if (error) console.error('Error al exportar las facturas', error);
         rows = (data || []).map(i => ({ Numero: i.invoice_number, Cliente: i.client, Importe: i.amount, Estado: i.status, Fecha: i.date }));
         filename = 'facturas';
       } else if (type === 'routes') {
-        const { data } = await supabase.from('route_stops').select('*');
+        const { data, error } = await supabase.from('route_stops').select('*');
+        if (error) console.error('Error al exportar las rutas', error);
         rows = (data || []).map(r => ({ Cliente: r.client, Direccion: r.address, Estado: r.status, Conductor: r.driver, Entregado: r.delivered_at }));
         filename = 'rutas';
       } else if (type === 'employees') {
-        const { data } = await supabase.from('employees').select('*');
+        const { data, error } = await supabase.from('employees').select('*');
+        if (error) console.error('Error al exportar los empleados', error);
         rows = (data || []).map(e => ({ Nombre: e.name, Rol: e.role, Telefono: e.phone, Email: e.email }));
         filename = 'empleados';
       }
@@ -384,10 +391,12 @@ export default function Configuracion() {
   // ── 2FA: Desactivar ──
   const handle2FADisable = async () => {
     try {
-      const { data } = await supabase.auth.mfa.listFactors();
+      const { data, error } = await supabase.auth.mfa.listFactors();
+      if (error) console.error('Error al listar los factores de 2FA', error);
       for (const factor of data?.totp || []) {
         if (factor.status === 'verified') {
-          await supabase.auth.mfa.unenroll({ factorId: factor.id });
+          const { error: unenrollErr } = await supabase.auth.mfa.unenroll({ factorId: factor.id });
+          if (unenrollErr) console.error('Error al desactivar el factor de 2FA', unenrollErr);
         }
       }
       setMfaEnabled(false);
@@ -401,7 +410,8 @@ export default function Configuracion() {
   const loadSessions = async () => {
     setLoadingSessions(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) console.error('Error al obtener la sesión', sessionErr);
       const ua = navigator.userAgent;
       const getBrowser = () => {
         if (ua.includes('Edg/')) return 'Microsoft Edge';
@@ -871,7 +881,7 @@ export default function Configuracion() {
             </div>
           )}
           <div className="pt-2 border-t border-gray-100 dark:border-slate-700">
-            <button onClick={async () => { await supabase.auth.signOut({ scope: 'global' }); navigate('/login'); }}
+            <button onClick={async () => { const { error } = await supabase.auth.signOut({ scope: 'global' }); if (error) console.error('Error al cerrar sesión en todos los dispositivos', error); navigate('/login'); }}
               className="w-full py-2 text-sm text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/40 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center justify-center gap-2">
               <i className="ri-logout-circle-r-line" />
               Cerrar sesión en todos los dispositivos

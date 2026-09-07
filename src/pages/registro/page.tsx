@@ -102,7 +102,7 @@ export default function Registro() {
         cliente: 'Cliente',
       };
 
-      await supabase.from('profiles').insert({
+      const { error: profileError } = await supabase.from('profiles').insert({
         id: userId,
         full_name: fullName.trim(),
         email: email.trim(),
@@ -111,16 +111,18 @@ export default function Registro() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
+      if (profileError) console.error('Error al crear el perfil del usuario', profileError);
 
       // Si es cliente, también crear en clients
       if (role === 'cliente') {
-        await supabase.from('clients').insert({
+        const { error: clientError } = await supabase.from('clients').insert({
           name: fullName.trim(),
           email: email.trim(),
           status: 'activo',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
+        if (clientError) console.error('Error al crear el registro de cliente', clientError);
       }
 
       // Si es empresa o empleado y puso un código de invitación, unirse a esa
@@ -130,7 +132,8 @@ export default function Registro() {
       if ((role === 'empresa' || role === 'empleado') && code) {
         if (authData.session) {
           // Ya hay sesión activa: podemos llamar al RPC ahora mismo
-          await supabase.rpc('join_company_by_code', { p_code: code });
+          const { error: joinError } = await supabase.rpc('join_company_by_code', { p_code: code });
+          if (joinError) console.error('Error al unirse a la empresa con el código de invitación', joinError);
         } else {
           // Requiere confirmar el email primero: guardamos el código
           // y AuthContext lo aplicará automáticamente en el primer login.

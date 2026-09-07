@@ -21,7 +21,8 @@ export function useCompanyDriverLocations() {
   const [byName, setByName] = useState<Record<string, DriverLocation>>({});
 
   const fetchAll = useCallback(async () => {
-    const { data } = await supabase.from('driver_locations').select('*');
+    const { data, error } = await supabase.from('driver_locations').select('*');
+    if (error) console.error('Error cargando ubicaciones de repartidores:', error);
     if (data) {
       const map: Record<string, DriverLocation> = {};
       (data as DriverLocation[]).forEach(d => {

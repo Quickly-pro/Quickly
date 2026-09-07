@@ -33,7 +33,8 @@ async function processQueryFallback(query: string) {
   }
 
   if (q.includes('cliente') || q.includes('clientes') || q.includes('contacto') || q.includes('contactos')) {
-    const { data } = await supabase.from('clients').select('*').eq('status', 'activo').order('name');
+    const { data, error } = await supabase.from('clients').select('*').eq('status', 'activo').order('name');
+    if (error) console.error('Error consultando clientes:', error);
     const count = data?.length || 0;
     return {
       text: `Tienes ${count} cliente${count !== 1 ? 's' : ''} activo${count !== 1 ? 's' : ''} en este momento.`,
@@ -41,7 +42,8 @@ async function processQueryFallback(query: string) {
     };
   }
   if (q.includes('factura') || q.includes('facturas') || q.includes('cobro') || q.includes('cobros')) {
-    const { data } = await supabase.from('invoices').select('*').eq('status', 'pendiente').order('due_date');
+    const { data, error } = await supabase.from('invoices').select('*').eq('status', 'pendiente').order('due_date');
+    if (error) console.error('Error consultando facturas:', error);
     const count = data?.length || 0;
     const total = data?.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
     return {
@@ -50,7 +52,8 @@ async function processQueryFallback(query: string) {
     };
   }
   if (q.includes('stock') || q.includes('producto') || q.includes('productos') || q.includes('inventario')) {
-    const { data } = await supabase.from('product_items').select('*, product_categories(id, name)').eq('status', 'active');
+    const { data, error } = await supabase.from('product_items').select('*, product_categories(id, name)').eq('status', 'active');
+    if (error) console.error('Error consultando productos:', error);
     const lowStock = data?.filter(p => (p.stock || 0) < 10) || [];
     return {
       text: `Hay ${lowStock.length} producto${lowStock.length !== 1 ? 's' : ''} con stock bajo (menos de 10 unidades).`,
@@ -59,7 +62,8 @@ async function processQueryFallback(query: string) {
   }
   if (q.includes('ruta') || q.includes('rutas') || q.includes('reparto') || q.includes('entrega')) {
     const today = new Date().toISOString().split('T')[0];
-    const { data } = await supabase.from('routes').select('*').gte('date', today).order('date');
+    const { data, error } = await supabase.from('routes').select('*').gte('date', today).order('date');
+    if (error) console.error('Error consultando rutas:', error);
     const count = data?.length || 0;
     return {
       text: `Hay ${count} ruta${count !== 1 ? 's' : ''} programada${count !== 1 ? 's' : ''} para hoy.`,
@@ -67,7 +71,8 @@ async function processQueryFallback(query: string) {
     };
   }
   if (q.includes('empleado') || q.includes('empleados') || q.includes('horas')) {
-    const { data } = await supabase.from('employees').select('*').order('name');
+    const { data, error } = await supabase.from('employees').select('*').order('name');
+    if (error) console.error('Error consultando empleados:', error);
     const count = data?.length || 0;
     return {
       text: `La empresa tiene ${count} empleado${count !== 1 ? 's' : ''} registrado${count !== 1 ? 's' : ''}.`,
@@ -75,7 +80,8 @@ async function processQueryFallback(query: string) {
     };
   }
   if (q.includes('pedido') || q.includes('pedidos') || q.includes('orden')) {
-    const { data } = await supabase.from('order_headers').select('*').order('created_at', { ascending: false }).limit(5);
+    const { data, error } = await supabase.from('order_headers').select('*').order('created_at', { ascending: false }).limit(5);
+    if (error) console.error('Error consultando pedidos:', error);
     const count = data?.length || 0;
     return {
       text: `Hay ${count} pedidos recientes en el sistema.`,
@@ -83,7 +89,8 @@ async function processQueryFallback(query: string) {
     };
   }
   if (q.includes('incidencia') || q.includes('incidencias') || q.includes('problema') || q.includes('vehiculo')) {
-    const { data } = await supabase.from('vehicle_incidents').select('*').order('created_at', { ascending: false }).limit(5);
+    const { data, error } = await supabase.from('vehicle_incidents').select('*').order('created_at', { ascending: false }).limit(5);
+    if (error) console.error('Error consultando incidencias de vehículos:', error);
     const count = data?.length || 0;
     return {
       text: `Hay ${count} incidencia${count !== 1 ? 's' : ''} de vehículo${count !== 1 ? 's' : ''} registrada${count !== 1 ? 's' : ''}.`,
@@ -91,7 +98,8 @@ async function processQueryFallback(query: string) {
     };
   }
   if (q.includes('combustible') || q.includes('gasolina') || q.includes('diesel') || q.includes('repostar')) {
-    const { data } = await supabase.from('fuel_tickets').select('*').order('date', { ascending: false }).limit(5);
+    const { data, error } = await supabase.from('fuel_tickets').select('*').order('date', { ascending: false }).limit(5);
+    if (error) console.error('Error consultando tickets de combustible:', error);
     const totalLitros = data?.reduce((s, t) => s + Number(t.liters || 0), 0) || 0;
     return {
       text: `El consumo reciente de combustible suma ${totalLitros.toFixed(1)} litros en total.`,
@@ -145,7 +153,8 @@ export function useAssistantChat() {
         });
         if (error) throw error;
       } else if (type === 'create_invoice') {
-        const { count } = await supabase.from('invoices').select('*', { count: 'exact', head: true });
+        const { count, error: countErr } = await supabase.from('invoices').select('*', { count: 'exact', head: true });
+        if (countErr) console.error('Error contando facturas:', countErr);
         const year = new Date().getFullYear();
         const seq = String((count || 0) + 1).padStart(3, '0');
         const invoiceId = `F-${year}-${seq}`;
@@ -158,9 +167,10 @@ export function useAssistantChat() {
           notes: params.notes || null,
         });
         if (invErr) throw invErr;
-        await supabase.from('invoice_items').insert({
+        const { error: itemsErr } = await supabase.from('invoice_items').insert({
           invoice_id: invoiceId, product: params.product, qty: params.qty, price: params.unitPrice, total: subtotal,
         });
+        if (itemsErr) console.error('Error añadiendo artículo de factura:', itemsErr);
       } else if (type === 'create_client') {
         const { error } = await supabase.from('clients').insert({
           name: params.name, phone: params.phone || null, email: params.email || null,
@@ -191,7 +201,8 @@ export function useAssistantChat() {
         });
         if (error) throw error;
       } else if (type === 'create_reminder') {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error: userErr } = await supabase.auth.getUser();
+        if (userErr) console.error('Error obteniendo usuario:', userErr);
         if (!user) throw new Error('No se pudo identificar al usuario');
         const { error } = await supabase.from('notifications').insert({
           user_id: user.id, title: params.title, text: params.text, type: 'reminder', read: false,
@@ -266,7 +277,8 @@ export function useAssistantChat() {
       }
 
       const title = query.length > 40 ? query.slice(0, 37) + '...' : query;
-      const { data: savedConv } = await supabase.from('assistant_conversations').insert({ title, query, response: aiText }).select('id').single();
+      const { data: savedConv, error: saveConvErr } = await supabase.from('assistant_conversations').insert({ title, query, response: aiText }).select('id').single();
+      if (saveConvErr) console.error('Error guardando la conversación del asistente:', saveConvErr);
       if (savedConv && onSaved) onSaved({ id: savedConv.id, title });
     } catch {
       addMessage({

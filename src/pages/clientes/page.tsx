@@ -144,7 +144,8 @@ export default function Clientes() {
   };
 
   const deleteClient = async (id: number) => {
-    await supabase.from('clients').delete().eq('id', id);
+    const { error } = await supabase.from('clients').delete().eq('id', id);
+    if (error) console.error('Error al eliminar el cliente', error);
     fetchClients();
     setShowClientDetail(false);
   };
@@ -258,7 +259,8 @@ export default function Clientes() {
           avatar_url: null,
           total_spent: 0,
         }));
-        await supabase.from('clients').insert(data);
+        const { error } = await supabase.from('clients').insert(data);
+        if (error) console.error('Error al importar los clientes desde CSV', error);
         fetchClients();
       }
     };

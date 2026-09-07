@@ -91,11 +91,12 @@ export default function Facturacion() {
     // If cliente, resolve name for filtering
     let clientName = '';
     if (isCliente && user?.email) {
-      const { data: c } = await supabase
+      const { data: c, error: clientError } = await supabase
         .from('clients')
         .select('name')
         .eq('email', user.email)
         .maybeSingle();
+      if (clientError) console.error('Error al buscar el cliente', clientError);
       if (c?.name) clientName = c.name;
       setMyClientName(clientName);
     }
@@ -223,7 +224,8 @@ export default function Facturacion() {
         price: l.unitPrice,
         total: l.qty * l.unitPrice * (1 - l.discount / 100),
       }));
-      await supabase.from('invoice_items').insert(itemsPayload);
+      const { error: itemsError } = await supabase.from('invoice_items').insert(itemsPayload);
+      if (itemsError) console.error('Error al guardar las líneas de la factura', itemsError);
 
       // Send email if requested
       if (sendEmail) {

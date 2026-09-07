@@ -84,9 +84,10 @@ export default function HojaRuta() {
     setRows(prev => prev.map(r => r.id === rowId ? updated : r));
     setEditingCell(null);
 
-    await supabase.from('route_sheet_extras').upsert({
+    const { error } = await supabase.from('route_sheet_extras').upsert({
       item_id: row.itemId, price: updated.price, total: updated.total, status: updated.status, iva: updated.iva,
     }, { onConflict: 'item_id' });
+    if (error) console.error('Error al guardar los datos de la hoja de ruta', error);
   };
 
   const syncFromPedidos = () => {

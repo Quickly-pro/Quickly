@@ -50,7 +50,8 @@ export default function Sugerencias() {
   const [received, setReceived] = useState<any[]>([]);
 
   const fetchReceived = useCallback(async () => {
-    const { data } = await supabase.from('suggestions').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('suggestions').select('*').order('created_at', { ascending: false });
+    if (error) console.error('Error al cargar las sugerencias recibidas', error);
     setReceived(data || []);
   }, []);
 
@@ -82,7 +83,8 @@ export default function Sugerencias() {
   };
 
   const markStatus = async (id: number, newStatus: string) => {
-    await supabase.from('suggestions').update({ status: newStatus }).eq('id', id);
+    const { error } = await supabase.from('suggestions').update({ status: newStatus }).eq('id', id);
+    if (error) console.error('Error al actualizar el estado de la sugerencia', error);
     fetchReceived();
   };
 

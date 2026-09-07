@@ -237,7 +237,8 @@ export default function Vehiculos() {
     if (status === 'completado') {
       updates.completed_date = new Date().toISOString().split('T')[0];
     }
-    await supabase.from('vehicle_maintenance').update(updates).eq('id', id);
+    const { error: updateStatusError } = await supabase.from('vehicle_maintenance').update(updates).eq('id', id);
+    if (updateStatusError) console.error('Error al actualizar el estado del mantenimiento', updateStatusError);
 
     // Auto-recurrence: create next maintenance when completed
     if (status === 'completado') {
@@ -246,7 +247,7 @@ export default function Vehiculos() {
         const nextDate = completed.recurrence_months ? addMonths(completed.scheduled_date, completed.recurrence_months) : '';
         const nextKm = completed.recurrence_km ? (completed.current_km || 0) + completed.recurrence_km : null;
         if (nextDate || nextKm) {
-          await supabase.from('vehicle_maintenance').insert({
+          const { error: recurrenceError } = await supabase.from('vehicle_maintenance').insert({
             vehicle_name: completed.vehicle_name,
             maintenance_type: completed.maintenance_type,
             description: `Recurrente (generado automáticamente tras completar el anterior)`,
@@ -261,6 +262,7 @@ export default function Vehiculos() {
             alert_email: completed.alert_email,
             parent_maintenance_id: completed.id,
           });
+          if (recurrenceError) console.error('Error al crear el mantenimiento recurrente', recurrenceError);
           addNotification(
             'Mantenimiento recurrente creado',
             `${completed.vehicle_name}: siguiente ${maintenanceTypeConfig[completed.maintenance_type]?.label || completed.maintenance_type} programado para ${nextDate ? formatDate(nextDate) : (nextKm ? nextKm.toLocaleString() + ' km' : 'próxima fecha')}`,
@@ -277,7 +279,8 @@ export default function Vehiculos() {
   };
 
   const deleteMaintenance = async (id: number) => {
-    await supabase.from('vehicle_maintenance').delete().eq('id', id);
+    const { error } = await supabase.from('vehicle_maintenance').delete().eq('id', id);
+    if (error) console.error('Error al eliminar el mantenimiento', error);
     setShowDetail(null);
     fetchData();
   };

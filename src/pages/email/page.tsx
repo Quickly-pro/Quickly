@@ -35,10 +35,12 @@ export default function Email() {
   const [composeError, setComposeError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
-    const [{ data: inbox }, { data: sent }] = await Promise.all([
+    const [{ data: inbox, error: inboxError }, { data: sent, error: sentError }] = await Promise.all([
       supabase.from('received_emails').select('*').order('created_at', { ascending: false }),
       supabase.from('sent_emails').select('*').order('created_at', { ascending: false }),
     ]);
+    if (inboxError) console.error('Error al cargar la bandeja de entrada', inboxError);
+    if (sentError) console.error('Error al cargar los emails enviados', sentError);
     setInboxEmails((inbox || []).map((e: any) => ({
       id: String(e.id), from: e.from_email, subject: e.subject, preview: e.body || '',
       date: new Date(e.created_at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }),
@@ -84,7 +86,8 @@ export default function Email() {
         return;
       }
 
-      await supabase.from('sent_emails').insert({ to_email: composeTo, subject: composeSubject, body: composeBody });
+      const { error: sendErr } = await supabase.from('sent_emails').insert({ to_email: composeTo, subject: composeSubject, body: composeBody });
+      if (sendErr) console.error('Error al guardar el email enviado', sendErr);
 
       setComposeSent(true);
       setComposeSending(false);
@@ -113,7 +116,8 @@ export default function Email() {
     setSelectedEmail(email);
     setShowEmailDetail(true);
     if (email.folder === 'inbox' && !email.read) {
-      await supabase.from('received_emails').update({ read: true }).eq('id', email.id);
+      const { error } = await supabase.from('received_emails').update({ read: true }).eq('id', email.id);
+      if (error) console.error('Error al marcar el email como leído', error);
     }
   };
 

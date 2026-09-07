@@ -32,7 +32,8 @@ function CompanyAccessSection() {
 
   const handleRegenerate = async () => {
     setRegenerating(true);
-    const { data } = await supabase.rpc('regenerate_invite_code');
+    const { data, error } = await supabase.rpc('regenerate_invite_code');
+    if (error) console.error('Error al regenerar el código de invitación:', error);
     if (data?.success) await refetch();
     setRegenerating(false);
   };
@@ -55,7 +56,8 @@ function CompanyAccessSection() {
 
   const handleLeave = async () => {
     setLeaving(true);
-    await supabase.rpc('leave_company');
+    const { error } = await supabase.rpc('leave_company');
+    if (error) console.error('Error al salir de la empresa:', error);
     setLeaving(false);
     await refreshUser();
     await refetch();

@@ -33,6 +33,8 @@ export default function ControlHorario() {
       supabase.from('time_tracking').select('*').order('date', { ascending: false }).limit(50),
       supabase.from('employees').select('id, name').order('name'),
     ]);
+    if (eRes.error) console.error('Error al cargar los fichajes', eRes.error);
+    if (empRes.error) console.error('Error al cargar los empleados', empRes.error);
     setEntries(eRes.data || []);
     setEmployees(empRes.data || []);
     setLoading(false);
@@ -62,13 +64,14 @@ export default function ControlHorario() {
       ? (new Date(`${form.date}T${form.check_out}`).getTime() - checkIn.getTime()) / 3600000
       : null;
 
-    await supabase.from('time_tracking').insert({
+    const { error } = await supabase.from('time_tracking').insert({
       employee: form.employee,
       date: form.date,
       check_in: form.check_in,
       check_out: form.check_out || null,
       total_hours: total,
     });
+    if (error) console.error('Error al registrar el fichaje', error);
     setSubmitting(false);
     setModalOpen(false);
     setForm({ employee: '', date: '', check_in: '', check_out: '' });

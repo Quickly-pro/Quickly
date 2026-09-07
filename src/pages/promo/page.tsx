@@ -15,17 +15,19 @@ export default function PromoPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) console.error('Error al obtener el usuario', userError);
       if (!user) { setState('not_logged'); return; }
 
       // Check existing subscription
-      const { data: sub } = await supabase
+      const { data: sub, error: subError } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
+      if (subError) console.error('Error al comprobar la suscripción existente', subError);
 
       if (sub && ['active'].includes(sub.status)) {
         setState('already'); return;

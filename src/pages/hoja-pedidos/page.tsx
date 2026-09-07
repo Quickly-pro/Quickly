@@ -125,7 +125,8 @@ export default function HojaPedidos() {
     const value: any = field === 'turno' ? (parseInt(editValue) || 1) : editValue;
     setRows(prev => prev.map(r => r.id === rowId ? { ...r, [field]: value } : r));
     setEditingField(null);
-    await supabase.from('order_sheet_rows').update({ [field]: value }).eq('id', rowId);
+    const { error } = await supabase.from('order_sheet_rows').update({ [field]: value }).eq('id', rowId);
+    if (error) console.error('Error al guardar el campo del pedido', error);
   };
 
   // ── Edición de líneas de producto ──────────────────────────────────────
@@ -140,7 +141,8 @@ export default function HojaPedidos() {
     const { itemId, field } = editingItem;
     setRows(prev => prev.map(r => ({ ...r, items: r.items.map(it => it.id === itemId ? { ...it, [field]: editValue } : it) })));
     setEditingItem(null);
-    await supabase.from('order_sheet_items').update({ [field]: editValue }).eq('id', itemId);
+    const { error } = await supabase.from('order_sheet_items').update({ [field]: editValue }).eq('id', itemId);
+    if (error) console.error('Error al guardar la línea de producto', error);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, save: () => void, cancel: () => void) => {
@@ -150,7 +152,8 @@ export default function HojaPedidos() {
 
   const addItemLine = async (row: OrderRow) => {
     const nextPos = row.items.length > 0 ? Math.max(...row.items.map(i => i.position)) + 1 : 1;
-    const { data } = await supabase.from('order_sheet_items').insert({ row_id: row.id, product: '', quantity: '', position: nextPos }).select('*').single();
+    const { data, error } = await supabase.from('order_sheet_items').insert({ row_id: row.id, product: '', quantity: '', position: nextPos }).select('*').single();
+    if (error) console.error('Error al añadir la línea de producto', error);
     if (data) {
       setRows(prev => prev.map(r => r.id === row.id ? { ...r, items: [...r.items, { id: data.id, product: '', quantity: '', position: data.position }] } : r));
     }
@@ -158,7 +161,8 @@ export default function HojaPedidos() {
 
   const removeItemLine = async (rowId: number, itemId: number) => {
     setRows(prev => prev.map(r => r.id === rowId ? { ...r, items: r.items.filter(it => it.id !== itemId) } : r));
-    await supabase.from('order_sheet_items').delete().eq('id', itemId);
+    const { error } = await supabase.from('order_sheet_items').delete().eq('id', itemId);
+    if (error) console.error('Error al eliminar la línea de producto', error);
   };
 
   // ── Notas ───────────────────────────────────────────────────────────
@@ -194,7 +198,8 @@ export default function HojaPedidos() {
   const handleNoteDelete = async () => {
     if (notePopover === null || !isEmpresa) return;
     const row = rows.find(r => r.id === notePopover);
-    await supabase.rpc('save_order_note', { p_row_id: notePopover, p_employee_name: row?.employee || '', p_note: '' });
+    const { error } = await supabase.rpc('save_order_note', { p_row_id: notePopover, p_employee_name: row?.employee || '', p_note: '' });
+    if (error) console.error('Error al borrar la nota del pedido', error);
     setRows(prev => prev.map(r => r.id === notePopover ? { ...r, clientNote: '' } : r));
     setNotePopover(null);
   };
@@ -210,12 +215,14 @@ export default function HojaPedidos() {
     const next: Record<string, 'complete' | 'missing' | null> = { 'null': 'complete', 'complete': 'missing', 'missing': null };
     const newVal = next[String(row.verification)] ?? 'complete';
     setRows(prev => prev.map(r => r.id === row.id ? { ...r, verification: newVal } : r));
-    await supabase.from('order_sheet_rows').update({ verification: newVal }).eq('id', row.id);
+    const { error } = await supabase.from('order_sheet_rows').update({ verification: newVal }).eq('id', row.id);
+    if (error) console.error('Error al actualizar la verificación del pedido', error);
   };
 
   // ── Añadir cliente (fila en blanco) / Nuevo pedido guiado ─────────────
   const addBlankClient = async (turno = 1) => {
-    const { data } = await supabase.from('order_sheet_rows').insert({ employee: '', address: '', phone: '', date: '', turno }).select('*').single();
+    const { data, error } = await supabase.from('order_sheet_rows').insert({ employee: '', address: '', phone: '', date: '', turno }).select('*').single();
+    if (error) console.error('Error al añadir cliente', error);
     if (data) setRows(prev => [...prev, { id: data.id, employee: '', address: '', phone: '', date: '', turno, verification: null, items: [] }]);
   };
 

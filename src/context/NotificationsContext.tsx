@@ -126,17 +126,24 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const markAllRead = useCallback(async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    if (user) await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
+    if (user) {
+      const { error } = await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
+      if (error) console.error('Error marcando todas las notificaciones como leídas:', error);
+    }
   }, [user]);
 
   const markRead = useCallback(async (id: number) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    await supabase.from('notifications').update({ read: true }).eq('id', id);
+    const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
+    if (error) console.error('Error marcando notificación como leída:', error);
   }, []);
 
   const clearAll = useCallback(async () => {
     setNotifications([]);
-    if (user) await supabase.from('notifications').delete().eq('user_id', user.id);
+    if (user) {
+      const { error } = await supabase.from('notifications').delete().eq('user_id', user.id);
+      if (error) console.error('Error eliminando notificaciones:', error);
+    }
   }, [user]);
 
   const unreadCount = notifications.filter(n => !n.read).length;

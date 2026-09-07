@@ -17,10 +17,11 @@ export function useMessageReactions(messageIds: number[], myUserId?: string | nu
 
   const fetchReactions = useCallback(async () => {
     if (messageIds.length === 0) { setRaw([]); return; }
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('chat_message_reactions')
       .select('message_id, user_id, emoji')
       .in('message_id', messageIds);
+    if (error) console.error('Error cargando reacciones:', error);
     if (data) setRaw(data);
   }, [messageIds.join(',')]);
 
@@ -50,7 +51,8 @@ export function useMessageReactions(messageIds: number[], myUserId?: string | nu
   }, [raw, myUserId]);
 
   const react = useCallback(async (messageId: number, emoji: string) => {
-    await supabase.rpc('react_to_message', { p_message_id: messageId, p_emoji: emoji });
+    const { error } = await supabase.rpc('react_to_message', { p_message_id: messageId, p_emoji: emoji });
+    if (error) console.error('Error al reaccionar al mensaje:', error);
     fetchReactions();
   }, [fetchReactions]);
 

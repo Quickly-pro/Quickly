@@ -39,7 +39,8 @@ export default function Combustible() {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data } = await supabase.from('fuel_tickets').select('*').order('date', { ascending: false }).limit(50);
+    const { data, error } = await supabase.from('fuel_tickets').select('*').order('date', { ascending: false }).limit(50);
+    if (error) console.error('Error al cargar los tickets de combustible', error);
     setTickets(data || []);
     setLoading(false);
   };
@@ -95,7 +96,7 @@ export default function Combustible() {
   const handleCreate = async () => {
     if (!form.date || !form.liters) return;
     setSubmitting(true);
-    await supabase.from('fuel_tickets').insert({
+    const { error } = await supabase.from('fuel_tickets').insert({
       vehicle: form.vehicle || null,
       employee: form.employee || null,
       date: form.date,
@@ -105,6 +106,7 @@ export default function Combustible() {
       station: form.station || null,
       invoice_photo: fuelPhoto || null,
     });
+    if (error) console.error('Error al guardar el ticket de combustible', error);
     setSubmitting(false);
     setModalOpen(false);
     setForm({ vehicle: '', employee: '', date: '', time: '', liters: '', cost: '', station: '' });

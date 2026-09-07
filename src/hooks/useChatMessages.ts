@@ -71,7 +71,8 @@ export function useChatMessages(channel: string, targetId?: string | null) {
       if (channel === '__none__') return false;
       setSendError(null);
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) console.error('Error obteniendo usuario:', userError);
 
       const payload = {
         sender_id: user?.id ?? null,
@@ -147,7 +148,8 @@ export function useChatMessages(channel: string, targetId?: string | null) {
   // ── Marcar mensajes de esta conversación como leídos ─────────────────
   const markAsRead = useCallback(async () => {
     if (channel === '__none__') return;
-    await supabase.rpc('mark_messages_read', { p_channel: channel, p_target_id: targetId ?? null });
+    const { error } = await supabase.rpc('mark_messages_read', { p_channel: channel, p_target_id: targetId ?? null });
+    if (error) console.error('Error marcando mensajes como leídos:', error);
   }, [channel, targetId]);
 
   // ── Destacar / quitar destacado ────────────────────────────────────────

@@ -32,7 +32,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadUser = useCallback(async () => {
     setLoading(true); // siempre bloquear antes de verificar para que RoleGuard no redirija
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) console.error('Error obteniendo la sesión:', sessionError);
 
       if (session?.user) {
         // Intentar obtener perfil de la tabla profiles
@@ -78,7 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // hay sesión confirmada.
           const pendingCode = localStorage.getItem('quickly_pending_invite_code');
           if (pendingCode && !profile.company_id) {
-            const { data: joinResult } = await supabase.rpc('join_company_by_code', { p_code: pendingCode });
+            const { data: joinResult, error: joinError } = await supabase.rpc('join_company_by_code', { p_code: pendingCode });
+            if (joinError) console.error('Error uniéndose a la empresa por código de invitación:', joinError);
             localStorage.removeItem('quickly_pending_invite_code');
             if (joinResult?.success) {
               // Recargar el perfil para reflejar el company_id recién asignado
@@ -145,7 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error('Error cerrando sesión:', error);
     setUser(null);
   }, []);
 

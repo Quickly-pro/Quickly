@@ -36,7 +36,8 @@ export function useProfile() {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) console.error('Error obteniendo usuario:', userError);
       if (!user) {
         setLoading(false);
         return;
@@ -85,7 +86,8 @@ export function useProfile() {
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) console.error('Error obteniendo usuario:', userError);
       if (!user) {
         setSaving(false);
         return false;
@@ -118,7 +120,8 @@ export function useProfile() {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) console.error(`Error obteniendo usuario (intento ${attempt}):`, userError);
         if (!user) return { success: false, error: 'No hay sesión activa' };
 
         const updates: Record<string, unknown> = { avatar_url: avatarUrl };

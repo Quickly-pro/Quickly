@@ -99,7 +99,8 @@ export default function Albaranes() {
 
   // ── Cargar desde Supabase ────────────────────────────────────────────
   const fetchAlbaranes = useCallback(async () => {
-    const { data } = await supabase.from('albaranes').select('*').order('created_at', { ascending: false }).limit(200);
+    const { data, error } = await supabase.from('albaranes').select('*').order('created_at', { ascending: false }).limit(200);
+    if (error) console.error('Error al cargar los albaranes', error);
     if (data) setList(data.map(rowToAlbaran));
     setLoading(false);
   }, []);

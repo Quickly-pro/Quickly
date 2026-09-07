@@ -162,7 +162,8 @@ export default function Comunicacion() {
     if (isEmpleado) {
       setMyDirectId(user.id);
     } else if (isCliente) {
-      const { data } = await supabase.from('clients').select('id').ilike('email', user.email).maybeSingle();
+      const { data, error } = await supabase.from('clients').select('id').ilike('email', user.email).maybeSingle();
+      if (error) console.error('Error al buscar el registro del cliente', error);
       setMyDirectId(data ? `client_${data.id}` : `auth_${user.id}`);
     }
   }, [user, isEmpleado, isCliente]);
@@ -172,7 +173,8 @@ export default function Comunicacion() {
 
   const deleteConversation = useCallback(async (targetId: string, channel: string) => {
     setDeletingChat(true);
-    await supabase.from('chat_messages').delete().eq('target_id', targetId).eq('channel', channel);
+    const { error } = await supabase.from('chat_messages').delete().eq('target_id', targetId).eq('channel', channel);
+    if (error) console.error('Error al eliminar la conversación', error);
     setDeletingChat(false);
     setConfirmDeleteChat(false);
     setLastMessages(prev => { const n = { ...prev }; delete n[targetId]; return n; });
@@ -318,8 +320,9 @@ export default function Comunicacion() {
 
   const forwardTo = async (destChannel: string, destTargetId: string | null, label: string) => {
     if (!forwardingText) return;
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    await supabase.from('chat_messages').insert({
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    if (authError) console.error('Error al obtener el usuario autenticado', authError);
+    const { error } = await supabase.from('chat_messages').insert({
       sender_id: authUser?.id ?? null,
       sender_name: user?.full_name || 'Tú',
       text: forwardingText,
@@ -329,6 +332,7 @@ export default function Comunicacion() {
       sender_type: 'user',
       forwarded: true,
     });
+    if (error) console.error('Error al reenviar el mensaje', error);
     setForwardSentTo(label);
     setTimeout(() => { setShowForwardModal(false); setForwardingText(null); setForwardSentTo(null); }, 1200);
   };
@@ -336,12 +340,13 @@ export default function Comunicacion() {
   const openStarred = async () => {
     setShowStarredModal(true);
     setLoadingStarred(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
       .contains('starred_by', [user?.id])
       .order('created_at', { ascending: false })
       .limit(100);
+    if (error) console.error('Error al cargar los mensajes destacados', error);
     setStarredMessages(data || []);
     setLoadingStarred(false);
   };

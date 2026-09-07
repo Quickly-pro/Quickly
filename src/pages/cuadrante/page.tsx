@@ -212,18 +212,21 @@ export default function Cuadrante() {
     try {
       if (existing) {
         if (nextType === '') {
-          await supabase.from('shift_schedules').delete().eq('id', existing.id);
+          const { error } = await supabase.from('shift_schedules').delete().eq('id', existing.id);
+          if (error) console.error('Error al eliminar el turno', error);
         } else {
-          await supabase.from('shift_schedules').update({ shift_type: nextType, hours }).eq('id', existing.id);
+          const { error } = await supabase.from('shift_schedules').update({ shift_type: nextType, hours }).eq('id', existing.id);
+          if (error) console.error('Error al actualizar el turno', error);
         }
       } else if (nextType !== '') {
-        await supabase.from('shift_schedules').insert({
+        const { error } = await supabase.from('shift_schedules').insert({
           employee_id: employeeId,
           week_start_date: weekStartStr,
           day_index: dayIndex,
           shift_type: nextType,
           hours,
         });
+        if (error) console.error('Error al crear el turno', error);
       }
       loadData();
     } catch (err) {
@@ -250,7 +253,7 @@ export default function Cuadrante() {
       const targetShift = getShift(Number(swapToEmployeeId), swapToDayIndex);
       const targetShiftType = targetShift?.shift_type || '';
 
-      await supabase.from('shift_swaps').insert({
+      const { error } = await supabase.from('shift_swaps').insert({
         requester_employee_id: swapFromEmployee.id,
         requester_day_index: swapFromDayIndex,
         requester_shift_type: swapFromShiftType,
@@ -260,6 +263,7 @@ export default function Cuadrante() {
         week_start_date: weekStartStr,
         status: 'pending',
       });
+      if (error) console.error('Error al crear la solicitud de intercambio', error);
 
       setShowSwapModal(false);
       loadData();
@@ -286,47 +290,54 @@ export default function Cuadrante() {
         if (reqShift) {
           const tgtHours = swap.target_shift_type === 'free' || swap.target_shift_type === '' ? 0 : 8;
           if (swap.target_shift_type === '') {
-            await supabase.from('shift_schedules').delete().eq('id', reqShift.id);
+            const { error } = await supabase.from('shift_schedules').delete().eq('id', reqShift.id);
+            if (error) console.error('Error al eliminar el turno del solicitante', error);
           } else {
-            await supabase.from('shift_schedules').update({
+            const { error } = await supabase.from('shift_schedules').update({
               shift_type: swap.target_shift_type,
               hours: tgtHours,
             }).eq('id', reqShift.id);
+            if (error) console.error('Error al actualizar el turno del solicitante', error);
           }
         } else if (swap.target_shift_type !== '') {
-          await supabase.from('shift_schedules').insert({
+          const { error } = await supabase.from('shift_schedules').insert({
             employee_id: swap.requester_employee_id,
             week_start_date: weekStartStr,
             day_index: swap.requester_day_index,
             shift_type: swap.target_shift_type,
             hours: swap.target_shift_type === 'free' ? 0 : 8,
           });
+          if (error) console.error('Error al crear el turno del solicitante', error);
         }
 
         if (tgtShift) {
           const reqHours = swap.requester_shift_type === 'free' || swap.requester_shift_type === '' ? 0 : 8;
           if (swap.requester_shift_type === '') {
-            await supabase.from('shift_schedules').delete().eq('id', tgtShift.id);
+            const { error } = await supabase.from('shift_schedules').delete().eq('id', tgtShift.id);
+            if (error) console.error('Error al eliminar el turno del compañero', error);
           } else {
-            await supabase.from('shift_schedules').update({
+            const { error } = await supabase.from('shift_schedules').update({
               shift_type: swap.requester_shift_type,
               hours: reqHours,
             }).eq('id', tgtShift.id);
+            if (error) console.error('Error al actualizar el turno del compañero', error);
           }
         } else if (swap.requester_shift_type !== '') {
-          await supabase.from('shift_schedules').insert({
+          const { error } = await supabase.from('shift_schedules').insert({
             employee_id: swap.target_employee_id,
             week_start_date: weekStartStr,
             day_index: swap.target_day_index,
             shift_type: swap.requester_shift_type,
             hours: swap.requester_shift_type === 'free' ? 0 : 8,
           });
+          if (error) console.error('Error al crear el turno del compañero', error);
         }
       }
 
-      await supabase.from('shift_swaps').update({
+      const { error: statusError } = await supabase.from('shift_swaps').update({
         status: accept ? 'accepted' : 'rejected',
       }).eq('id', swapId);
+      if (statusError) console.error('Error al actualizar el estado del intercambio', statusError);
 
       loadData();
     } catch (err) {
@@ -352,12 +363,13 @@ export default function Cuadrante() {
       totalHours: weeklyHours(emp.id),
     }));
     const sentAtLabel = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    await supabase.from('sent_schedules').insert({
+    const { error } = await supabase.from('sent_schedules').insert({
       week_label: weekLabel,
       week_start_date: weekStartStr,
       sent_at: sentAtLabel,
       employees: scheduleData,
     });
+    if (error) console.error('Error al enviar el cuadrante', error);
     setSendOk(true);
     setTimeout(() => setSendOk(false), 3500);
   };
@@ -365,10 +377,11 @@ export default function Cuadrante() {
   const addEmployee = async () => {
     if (!newEmployeeName.trim()) return;
     try {
-      await supabase.from('employees').insert({
+      const { error } = await supabase.from('employees').insert({
         name: newEmployeeName,
         role: newEmployeeRole || 'Empleado',
       });
+      if (error) console.error('Error al añadir el empleado', error);
       setNewEmployeeName('');
       setNewEmployeeRole('');
       setShowAddEmployee(false);
@@ -380,7 +393,8 @@ export default function Cuadrante() {
 
   const removeEmployee = async (id: number) => {
     try {
-      await supabase.from('employees').delete().eq('id', id);
+      const { error } = await supabase.from('employees').delete().eq('id', id);
+      if (error) console.error('Error al eliminar el empleado', error);
       loadData();
     } catch (err) {
       console.error('Error removing employee:', err);

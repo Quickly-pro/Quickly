@@ -263,7 +263,8 @@ export default function Calendario() {
 
   const deleteEvent = async (evt: any) => {
     if (String(evt.id).startsWith('maint-')) return;
-    await supabase.from('calendar_events').delete().eq('id', evt.id);
+    const { error } = await supabase.from('calendar_events').delete().eq('id', evt.id);
+    if (error) console.error('Error al eliminar el evento del calendario', error);
     setDetailEvent(null);
     fetchEvents();
   };

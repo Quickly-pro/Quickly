@@ -93,10 +93,12 @@ export default function Empleados() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [{ data: empData }, { data: timeData }] = await Promise.all([
+    const [{ data: empData, error: empError }, { data: timeData, error: timeError }] = await Promise.all([
       supabase.from('employees').select('*').order('name'),
       supabase.from('time_tracking').select('*').order('date', { ascending: false }),
     ]);
+    if (empError) console.error('Error al cargar los empleados', empError);
+    if (timeError) console.error('Error al cargar los fichajes', timeError);
     if (empData) setEmployees(empData as Employee[]);
     if (timeData) setTimeRecords(timeData as TimeEntry[]);
     setLoading(false);
@@ -109,7 +111,8 @@ export default function Empleados() {
   const [confirmDeleteEmpId, setConfirmDeleteEmpId] = useState<number | null>(null);
 
   const deleteEmployee = async (id: number) => {
-    await supabase.from('employees').delete().eq('id', id);
+    const { error } = await supabase.from('employees').delete().eq('id', id);
+    if (error) console.error('Error al eliminar el empleado', error);
     setConfirmDeleteEmpId(null);
     fetchData();
   };
@@ -140,13 +143,14 @@ export default function Empleados() {
       ? (new Date(`${checkInForm.date}T${checkInForm.check_out}`).getTime() - checkInDate.getTime()) / 3600000
       : null;
 
-    await supabase.from('time_tracking').insert({
+    const { error } = await supabase.from('time_tracking').insert({
       employee: empName,
       date: checkInForm.date,
       check_in: checkInForm.check_in,
       check_out: checkInForm.check_out || null,
       total_hours: total,
     });
+    if (error) console.error('Error al registrar el fichaje', error);
     setSubmitting(false);
     setShowNewCheckIn(false);
     setCheckInForm({ employee: '', employeeInput: '', date: '', check_in: '', check_out: '' });
@@ -161,10 +165,11 @@ export default function Empleados() {
     const checkInDate = new Date(`${record.date}T${record.check_in}`);
     const checkOutDate = new Date();
     const total = (checkOutDate.getTime() - checkInDate.getTime()) / 3600000;
-    await supabase
+    const { error } = await supabase
       .from('time_tracking')
       .update({ check_out: nowTime, total_hours: total })
       .eq('id', record.id);
+    if (error) console.error('Error al registrar la salida', error);
     fetchData();
   };
 
@@ -183,7 +188,8 @@ export default function Empleados() {
   const updateEmployeePhoto = async () => {
     if (!editPhotoFor || !photoPreview) return;
     setUploadingPhoto(true);
-    await supabase.from('employees').update({ avatar_url: photoPreview }).eq('id', editPhotoFor.id);
+    const { error } = await supabase.from('employees').update({ avatar_url: photoPreview }).eq('id', editPhotoFor.id);
+    if (error) console.error('Error al actualizar la foto del empleado', error);
     setUploadingPhoto(false);
     setEditPhotoFor(null);
     setPhotoPreview('');
@@ -579,7 +585,8 @@ export default function Empleados() {
             onClick={async () => {
               const empName = useDropdown ? checkInForm.employee : checkInForm.employeeInput;
               if (!empName) return;
-              await supabase.from('time_tracking').insert({ employee: empName, date: today, check_in: nowTime, check_out: null, total_hours: null });
+              const { error } = await supabase.from('time_tracking').insert({ employee: empName, date: today, check_in: nowTime, check_out: null, total_hours: null });
+              if (error) console.error('Error al registrar la entrada', error);
               setCheckInForm({ employee: '', employeeInput: '', date: '', check_in: '', check_out: '' });
               fetchData();
             }}

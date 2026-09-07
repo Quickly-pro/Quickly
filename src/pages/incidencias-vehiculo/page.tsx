@@ -223,11 +223,12 @@ export default function IncidenciasVehiculo() {
     setDetailIncident(incident);
     setShowDetail(true);
     setDetailLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('vehicle_repairs')
       .select('*')
       .eq('incident_id', incident.id)
       .order('date', { ascending: false });
+    if (error) console.error('Error al cargar las reparaciones de la incidencia', error);
     setDetailRepairs(data || []);
     setDetailLoading(false);
   };
@@ -260,12 +261,14 @@ export default function IncidenciasVehiculo() {
   };
 
   const deleteRepair = async (repairId: number) => {
-    await supabase.from('vehicle_repairs').delete().eq('id', repairId);
+    const { error } = await supabase.from('vehicle_repairs').delete().eq('id', repairId);
+    if (error) console.error('Error al eliminar la reparación', error);
     if (detailIncident) openDetail(detailIncident);
   };
 
   const updateIncidentStatus = async (id: number, status: string) => {
-    await supabase.from('vehicle_incidents').update({ status }).eq('id', id);
+    const { error } = await supabase.from('vehicle_incidents').update({ status }).eq('id', id);
+    if (error) console.error('Error al actualizar el estado de la incidencia', error);
     fetchData();
     if (detailIncident && detailIncident.id === id) {
       setDetailIncident({ ...detailIncident, status });
@@ -311,7 +314,7 @@ export default function IncidenciasVehiculo() {
   const handleCreate = async () => {
     if (!form.vehicle || !form.type) return;
     setSubmitting(true);
-    await supabase.from('vehicle_incidents').insert({
+    const { error } = await supabase.from('vehicle_incidents').insert({
       vehicle: form.vehicle,
       driver: form.driver || null,
       date: form.date || null,
@@ -321,6 +324,7 @@ export default function IncidenciasVehiculo() {
       cost: form.cost ? Number(form.cost) : null,
       photo: incidentPhoto || null,
     });
+    if (error) console.error('Error al crear la incidencia de vehículo', error);
     setSubmitting(false);
     setModalOpen(false);
     setForm({ vehicle: '', driver: '', date: '', type: '', description: '', status: 'abierta', cost: '' });

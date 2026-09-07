@@ -258,8 +258,10 @@ export default function HojaCalculo() {
 
   const savePaletteSelection = useCallback(async (paletteId: number) => {
     if (!canEdit || !ownerId) return;
-    await supabase.from('spreadsheet_palettes').update({ is_active: false }).eq('user_id', ownerId);
-    await supabase.from('spreadsheet_palettes').update({ is_active: true }).eq('id', paletteId).eq('user_id', ownerId);
+    const { error: deactivateError } = await supabase.from('spreadsheet_palettes').update({ is_active: false }).eq('user_id', ownerId);
+    if (deactivateError) console.error('Error al desactivar la paleta anterior', deactivateError);
+    const { error: activateError } = await supabase.from('spreadsheet_palettes').update({ is_active: true }).eq('id', paletteId).eq('user_id', ownerId);
+    if (activateError) console.error('Error al activar la paleta seleccionada', activateError);
   }, [canEdit, ownerId]);
 
   const getCellMeta = useCallback((row: number, col: number): CellMeta => {
@@ -508,13 +510,14 @@ export default function HojaCalculo() {
     const { error: upErr } = await supabase.storage.from('documentos').upload(path, blob, { contentType: 'text/csv' });
     if (!upErr) {
       const { data: pub } = supabase.storage.from('documentos').getPublicUrl(path);
-      await supabase.from('documents').insert({
+      const { error: docError } = await supabase.from('documents').insert({
         space: 'mis',
         name: fileName,
         type: 'xlsx',
         size_label: `${(blob.size / 1024).toFixed(0)} KB`,
         file_url: pub.publicUrl,
       });
+      if (docError) console.error('Error al registrar el documento guardado', docError);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     }
@@ -595,7 +598,8 @@ export default function HojaCalculo() {
           updated_at: new Date().toISOString(),
         };
       });
-      await supabase.from('spreadsheet_cells').upsert(payload, { onConflict: 'user_id,row_index,col_index' });
+      const { error } = await supabase.from('spreadsheet_cells').upsert(payload, { onConflict: 'user_id,row_index,col_index' });
+      if (error) console.error('Error al guardar las celdas importadas', error);
     }, 1000);
   }, [ownerId, canEdit]);
 

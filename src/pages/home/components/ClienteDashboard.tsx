@@ -27,37 +27,41 @@ export default function ClienteDashboard() {
     setLoading(true);
 
     // Fetch featured products
-    const { data: products } = await supabase
+    const { data: products, error: productsError } = await supabase
       .from('product_items')
       .select('id, name, price, discount_enabled, discount_price, media, product_categories(name)')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(4);
+    if (productsError) console.error('Error al cargar los productos destacados', productsError);
 
     // Find client name for invoices
-    const { data: clientData } = await supabase
+    const { data: clientData, error: clientError } = await supabase
       .from('clients')
       .select('name')
       .eq('email', user?.email)
       .maybeSingle();
+    if (clientError) console.error('Error al cargar los datos del cliente', clientError);
 
     const clientName = clientData?.name;
 
-    const { data: invoices } = clientName
+    const { data: invoices, error: invoicesError } = clientName
       ? await supabase
           .from('invoices')
           .select('id, amount, status, invoice_number, created_at')
           .eq('client', clientName)
           .order('created_at', { ascending: false })
           .limit(3)
-      : { data: [] };
+      : { data: [], error: null };
+    if (invoicesError) console.error('Error al cargar las facturas del cliente', invoicesError);
 
     // Unread notifications
-    const { count } = await supabase
+    const { count, error: notifsError } = await supabase
       .from('notifications')
       .select('*', { head: true, count: 'exact' })
       .eq('user_id', user?.id)
       .eq('read', false);
+    if (notifsError) console.error('Error al cargar las notificaciones no leídas', notifsError);
 
     // Supabase puede devolver la relación product_categories como objeto
     // único o como array de un elemento según cómo detecte la FK — se

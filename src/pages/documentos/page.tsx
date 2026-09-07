@@ -68,10 +68,12 @@ export default function Documentos() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [{ data: docRows }, { data: schedules }] = await Promise.all([
+    const [{ data: docRows, error: docsError }, { data: schedules, error: schedulesError }] = await Promise.all([
       supabase.from('documents').select('*').order('created_at', { ascending: false }),
       supabase.from('sent_schedules').select('*').order('created_at', { ascending: false }),
     ]);
+    if (docsError) console.error('Error al cargar los documentos', docsError);
+    if (schedulesError) console.error('Error al cargar los cuadrantes enviados', schedulesError);
 
     const bySpace: Record<string, DocEntry[]> = { mis: [], publicos: [], internos: [] };
     (docRows || []).forEach((d: any) => {
@@ -142,10 +144,12 @@ export default function Documentos() {
 
   const handleDeleteDoc = async (doc: DocEntry) => {
     if (doc.isSchedule && doc.scheduleData) {
-      await supabase.from('sent_schedules').delete().eq('id', doc.scheduleData.id);
+      const { error } = await supabase.from('sent_schedules').delete().eq('id', doc.scheduleData.id);
+      if (error) console.error('Error al eliminar el cuadrante', error);
     } else {
       const id = doc.id.replace('doc-', '');
-      await supabase.from('documents').delete().eq('id', id);
+      const { error } = await supabase.from('documents').delete().eq('id', id);
+      if (error) console.error('Error al eliminar el documento', error);
     }
     setConfirmDelete(null);
     fetchAll();
