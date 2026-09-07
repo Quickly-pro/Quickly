@@ -11,7 +11,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { message, userId, language = 'es' } = await req.json();
+    const { message, userId, language = 'es', history = [] } = await req.json();
+
+    // Historial reciente de la conversación (para que la IA tenga memoria
+    // real entre mensajes, en vez de responder cada uno como si fuera el
+    // primero). Se limita a los últimos 16 turnos por coste/latencia.
+    const recentHistory = Array.isArray(history)
+      ? history
+          .filter((h: any) => h && typeof h.content === 'string' && (h.role === 'user' || h.role === 'assistant'))
+          .slice(-16)
+      : [];
 
     // Supabase client con service role para leer datos de la empresa
     const supabase = createClient(
@@ -58,7 +67,7 @@ INSTRUCCIONES:
 - Responde siempre en el idioma del usuario (detecta el idioma del mensaje)
 - Sé conciso pero completo — máximo 3 párrafos
 - Cuando des datos numéricos, sé preciso con los datos proporcionados
-- Puedes ayudar con: análisis de datos, gestión de clientes/pedidos/facturas/rutas/empleados, recomendaciones operativas, cálculos, resolución de dudas sobre gestión empresarial
+- Puedes ayudar con: análisis de datos, y EJECUTAR acciones reales de gestión de clientes, empleados, productos, pedidos, facturas, rutas, calendario, combustible, incidencias y recordatorios; también recomendaciones operativas, cálculos y dudas de gestión empresarial
 - Si preguntan algo fuera del contexto empresarial de reparto, igual ayuda con respuestas profesionales
 - Usa formato limpio, sin markdown excesivo
 - Si el idioma del mensaje es inglés, responde en inglés. Si es francés, responde en francés, etc.`;
@@ -109,6 +118,93 @@ INSTRUCCIONES:
           },
         },
         {
+          name: 'create_client',
+          description: 'Crea un nuevo cliente en la lista de clientes de la empresa',
+          input_schema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Nombre del cliente o negocio' },
+              phone: { type: 'string', description: 'Teléfono de contacto, opcional' },
+              email: { type: 'string', description: 'Correo electrónico, opcional' },
+              address: { type: 'string', description: 'Dirección, opcional' },
+              notes: { type: 'string', description: 'Notas sobre el cliente, opcional' },
+            },
+            required: ['name'],
+          },
+        },
+        {
+          name: 'create_employee',
+          description: 'Da de alta un nuevo empleado en el equipo',
+          input_schema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Nombre completo del empleado' },
+              role: { type: 'string', description: 'Puesto o rol (ej. Repartidor, Conductor), opcional' },
+              phone: { type: 'string', description: 'Teléfono, opcional' },
+              email: { type: 'string', description: 'Correo electrónico, opcional' },
+            },
+            required: ['name'],
+          },
+        },
+        {
+          name: 'create_product',
+          description: 'Añade un nuevo producto al catálogo con su precio y stock inicial',
+          input_schema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Nombre del producto' },
+              price: { type: 'number', description: 'Precio de venta en euros' },
+              stock: { type: 'number', description: 'Unidades iniciales en stock, opcional' },
+              description: { type: 'string', description: 'Descripción breve, opcional' },
+            },
+            required: ['name', 'price'],
+          },
+        },
+        {
+          name: 'create_calendar_event',
+          description: 'Añade un evento al calendario de la empresa: entrega, reunión, mantenimiento, etc.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Título del evento' },
+              date: { type: 'string', description: 'Fecha en formato AAAA-MM-DD' },
+              time: { type: 'string', description: 'Hora en formato HH:MM, opcional' },
+              type: { type: 'string', description: 'Tipo: reparto, reunion, mantenimiento u otro. Opcional' },
+              description: { type: 'string', description: 'Descripción del evento, opcional' },
+              location: { type: 'string', description: 'Lugar, opcional' },
+              priority: { type: 'string', description: 'Prioridad: baja, media o alta. Opcional, por defecto media' },
+            },
+            required: ['title', 'date'],
+          },
+        },
+        {
+          name: 'register_fuel_ticket',
+          description: 'Registra un ticket de repostaje de combustible de un vehículo',
+          input_schema: {
+            type: 'object',
+            properties: {
+              vehicle: { type: 'string', description: 'Nombre, modelo o matrícula del vehículo' },
+              liters: { type: 'number', description: 'Litros repostados' },
+              cost: { type: 'number', description: 'Coste total en euros, opcional' },
+              station: { type: 'string', description: 'Gasolinera, opcional' },
+              employee: { type: 'string', description: 'Empleado que repostó, opcional' },
+            },
+            required: ['vehicle', 'liters'],
+          },
+        },
+        {
+          name: 'create_reminder',
+          description: 'Crea un recordatorio o aviso que aparecerá en las notificaciones del usuario dentro de la app',
+          input_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Título corto del recordatorio' },
+              text: { type: 'string', description: 'Detalle del recordatorio' },
+            },
+            required: ['title', 'text'],
+          },
+        },
+        {
           name: 'add_pedido',
           description: 'Añade un nuevo pedido a la Hoja de Pedidos para un cliente, con dirección, turno y una lista de productos',
           input_schema: {
@@ -144,10 +240,10 @@ INSTRUCCIONES:
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-3-5-haiku-20241022',
-          max_tokens: 1024,
-          system: systemPrompt + `\n\nSi el usuario te pide una ACCIÓN concreta (añadir una parada a la ruta, crear una factura, o registrar una incidencia de vehículo), usa la herramienta correspondiente en vez de responder solo con texto. No ejecutes la acción tú mismo — el sistema le pedirá confirmación al usuario antes de aplicarla.`,
-          messages: [{ role: 'user', content: message }],
+          model: 'claude-sonnet-4-5-20250929',
+          max_tokens: 2048,
+          system: systemPrompt + `\n\nSi el usuario te pide una ACCIÓN concreta (crear un cliente, un empleado, un producto, un evento de calendario, un ticket de combustible, un recordatorio, añadir una parada a la ruta, crear una factura, un pedido, o registrar una incidencia de vehículo), usa la herramienta correspondiente en vez de responder solo con texto. No ejecutes la acción tú mismo — el sistema le pedirá confirmación al usuario antes de aplicarla. Ten en cuenta el historial de la conversación para entender referencias a mensajes anteriores.`,
+          messages: [...recentHistory, { role: 'user', content: message }],
           tools,
         }),
       });
@@ -163,6 +259,12 @@ INSTRUCCIONES:
             create_invoice: (p) => `Crear factura a ${p.client}: ${p.qty} × ${p.product} a €${p.unitPrice} c/u`,
             create_vehicle_incident: (p) => `Registrar incidencia en ${p.vehicle}: ${p.description}`,
             add_pedido: (p) => `Nuevo pedido para ${p.employee}: ${(p.items || []).map((it: any) => `${it.quantity} × ${it.product}`).join(', ')}`,
+            create_client: (p) => `Crear cliente: ${p.name}${p.phone ? ` · ${p.phone}` : ''}`,
+            create_employee: (p) => `Dar de alta empleado: ${p.name}${p.role ? ` · ${p.role}` : ''}`,
+            create_product: (p) => `Añadir producto: ${p.name} — €${p.price}${p.stock ? ` · ${p.stock} uds` : ''}`,
+            create_calendar_event: (p) => `Evento: ${p.title} — ${p.date}${p.time ? ` ${p.time}` : ''}`,
+            register_fuel_ticket: (p) => `Repostaje: ${p.vehicle} · ${p.liters}L${p.cost ? ` · €${p.cost}` : ''}`,
+            create_reminder: (p) => `Recordatorio: ${p.title}`,
           };
           return new Response(
             JSON.stringify({
@@ -182,6 +284,12 @@ INSTRUCCIONES:
           JSON.stringify({ text: textBlock?.text || '', source: 'claude' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      } else {
+        // La llamada a Anthropic falló — dejamos rastro en los logs de la
+        // función para poder diagnosticar (clave inválida, modelo, cuota...)
+        // en vez de caer en silencio al modo local sin dejar huella.
+        const errBody = await response.text().catch(() => '');
+        console.error('Anthropic API error', response.status, errBody);
       }
     }
 
@@ -209,9 +317,22 @@ INSTRUCCIONES:
   }
 });
 
+const ACTION_VERBS = ['crea ', 'crear ', 'crea un', 'crea una', 'añade ', 'anade ', 'agrega ', 'agregar ', 'da de alta', 'dar de alta', 'alta de', 'registra ', 'registrar ', 'apunta ', 'apuntar ', 'create ', 'add '];
+
+function looksLikeActionRequest(q: string): boolean {
+  return ACTION_VERBS.some((v) => q.includes(v));
+}
+
 function buildFallbackResponse(query: string, data: any): string {
   const q = query.toLowerCase();
   const { clients, invoices, products, orders, routes, employees } = data;
+
+  // Esto suena a una orden de crear/registrar algo, no a una pregunta. Sin
+  // conexión con la IA no podemos ejecutar acciones — decirlo claramente en
+  // vez de devolver un dato suelto que no responde a lo que se pidió.
+  if (looksLikeActionRequest(q)) {
+    return 'No he podido conectar con la IA para ejecutar esta acción ahora mismo. Comprueba tu conexión e inténtalo de nuevo en unos segundos.\n\nI could not reach the AI to perform this action right now. Please check your connection and try again shortly.';
+  }
 
   const pendingInvoices = invoices.filter((i: any) => i.status === 'pendiente');
   const activeClients = clients.filter((c: any) => c.status === 'activo');
@@ -222,7 +343,7 @@ function buildFallbackResponse(query: string, data: any): string {
     return `Tienes ${pendingInvoices.length} facturas pendientes de cobro por un total de €${total.toFixed(2)}. ${pendingInvoices.slice(0, 3).map((i: any) => `${i.client} (€${Number(i.amount).toFixed(2)})`).join(', ')}${pendingInvoices.length > 3 ? ' y más...' : ''}.`;
   }
 
-  if (q.includes('cliente') || q.includes('client')) {
+  if (q.includes('cliente') || q.includes('client') || q.includes('contacto')) {
     return `Tienes ${activeClients.length} clientes activos de un total de ${clients.length}. ${activeClients.length > 0 ? 'Los más recientes: ' + activeClients.slice(0, 4).map((c: any) => c.name).join(', ') + '.' : ''}`;
   }
 

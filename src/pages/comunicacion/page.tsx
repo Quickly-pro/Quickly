@@ -619,7 +619,7 @@ export default function Comunicacion() {
   };
 
   return (
-    <div className="flex flex-col gap-4 h-[calc(100svh-5.5rem)] sm:h-[calc(100svh-6rem)] md:h-[calc(100svh-7rem)]">
+    <div className="flex flex-col gap-4 h-[calc(100svh-5.5rem-92px)] sm:h-[calc(100svh-6rem-92px)] md:h-[calc(100svh-7rem)]">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
@@ -882,7 +882,7 @@ export default function Comunicacion() {
 
               {renderBubbles(messages, messagesEndRef, 'general', reactionsGeneral)}
 
-              <div className="px-4 py-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-700/50 flex-shrink-0 space-y-2">
+              <div className="px-4 pt-3 pb-[calc(0.75rem+92px)] md:pb-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-700/50 flex-shrink-0 space-y-2">
                 {sendError && (
                   <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl">
                     <i className="ri-error-warning-line text-red-500 flex-shrink-0 text-sm" />
@@ -1021,7 +1021,7 @@ export default function Comunicacion() {
                 <>
                   {renderBubbles(dmMessages, dmEndRef, 'dm', reactionsDM)}
 
-                  <div className="px-4 py-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-700/50 flex-shrink-0 space-y-2">
+                  <div className="px-4 pt-3 pb-[calc(0.75rem+92px)] md:pb-3 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-700/50 flex-shrink-0 space-y-2">
                     {dmSendError && (
                       <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl">
                         <i className="ri-error-warning-line text-red-500 flex-shrink-0 text-sm" />

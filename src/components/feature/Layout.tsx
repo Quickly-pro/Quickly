@@ -2,6 +2,7 @@ import { useState, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
+import AssistantWidget from './AssistantWidget';
 import Navbar from './Navbar';
 import PageTransition from './PageTransition';
 import RoleGuard from './RoleGuard';
@@ -47,6 +48,7 @@ export default function Layout() {
         </main>
       </div>
       {user && <BottomNav />}
+      {user && <AssistantWidget />}
     </div>
   );
 }

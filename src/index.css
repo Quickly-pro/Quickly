@@ -539,20 +539,78 @@ input.chat-input-field:focus {
   box-shadow: 0 0 20px rgba(124,58,237,0.55) !important;
 }
 
-/* ── Barra de navegación inferior (móvil / tablet) ── */
-.bottom-nav {
-  background: rgba(10, 12, 28, 0.92);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-top: 1px solid rgba(124, 58, 237, 0.18);
-  box-shadow: 0 -4px 24px rgba(0,0,0,0.35);
+/* ── Barra de navegación inferior — forma con muesca + botón central ── */
+.bottom-nav-shape path {
+  fill: rgba(10, 12, 28, 0.97);
 }
-:root:not(.dark) .bottom-nav {
-  background: rgba(255, 255, 255, 0.92);
-  border-top: 1px solid rgba(124, 58, 237, 0.15);
-  box-shadow: 0 -4px 24px rgba(30,27,75,0.10);
+:root:not(.dark) .bottom-nav-shape path {
+  fill: rgba(255, 255, 255, 0.98);
+}
+.bottom-nav-shape {
+  filter: drop-shadow(0 -6px 20px rgba(0,0,0,0.35));
+}
+:root:not(.dark) .bottom-nav-shape {
+  filter: drop-shadow(0 -6px 20px rgba(30,27,75,0.12));
 }
 .bottom-nav-item-active {
   background: var(--brand-gradient);
   box-shadow: 0 4px 14px rgba(124, 58, 237, 0.45);
 }
+.bottom-nav-fab {
+  background: var(--brand-gradient);
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.55), 0 0 0 5px var(--fab-ring, #ffffff);
+}
+.dark .bottom-nav-fab { --fab-ring: rgba(10, 12, 28, 0.97); }
+:root:not(.dark) .bottom-nav-fab { --fab-ring: rgba(255, 255, 255, 0.98); }
+
+.wheel-track {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.wheel-track::-webkit-scrollbar { display: none; }
+.wheel-item { scroll-snap-align: center; }
+
+/* ── Animación de entrada de la rueda "Más" — fluida y en abanico ── */
+@keyframes wheel-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.wheel-backdrop-in {
+  animation: wheel-backdrop-in 0.22s ease-out both;
+}
+
+@keyframes wheel-panel-in {
+  0% { opacity: 0; transform: translateY(36px) scale(0.9); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.wheel-panel-in {
+  animation: wheel-panel-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Burbuja flotante del Asistente IA — mismo patrón que el chat, con
+   animación fluida (con rebote) al abrir el panel ── */
+.assistant-fab {
+  background: var(--brand-gradient);
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.45);
+}
+.assistant-widget-header {
+  background: var(--brand-gradient);
+}
+.assistant-bubble-user {
+  background: var(--brand-gradient);
+}
+
+@keyframes assistant-panel-in {
+  0% { opacity: 0; transform: translateY(28px) scale(0.92); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.assistant-panel-in {
+  animation: assistant-panel-in 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: bottom right;
+}
+
+
+

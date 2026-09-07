@@ -87,7 +87,7 @@ export default function Sugerencias() {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] overflow-y-auto">
+    <div className="h-[calc(100vh-4rem-92px)] md:h-[calc(100vh-4rem)] overflow-y-auto">
       <div className="max-w-3xl mx-auto p-6">
         {/* Header */}
         <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">

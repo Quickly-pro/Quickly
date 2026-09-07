@@ -1,7 +1,8 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
 import PremiumGate from '@/components/feature/PremiumGate';
+import { useAssistantChat } from '@/hooks/useAssistantChat';
 
 interface Conversation {
   id: number;
@@ -22,27 +23,17 @@ const quickActions: QuickAction[] = [
   { icon: 'ri-bar-chart-box-line', label: 'Dame un resumen general', color: 'bg-green-50 text-green-600' },
   { icon: 'ri-map-2-line', label: 'Rutas y entregas de hoy', color: 'bg-purple-50 text-purple-600' },
   { icon: 'ri-team-line', label: 'Estado del equipo', color: 'bg-cyan-50 text-cyan-600' },
+  { icon: 'ri-user-add-line', label: 'Crea un nuevo cliente', color: 'bg-indigo-50 text-indigo-600' },
+  { icon: 'ri-calendar-event-line', label: 'Añade un evento al calendario', color: 'bg-pink-50 text-pink-600' },
 ];
-
-interface ChatMessage {
-  id: number;
-  text: string;
-  isUser: boolean;
-  time: string;
-  dataCards?: { title: string; value: string; icon: string }[];
-  listItems?: { label: string; detail: string }[];
-  pendingAction?: { type: string; params: any; summary: string };
-  actionStatus?: 'pending' | 'done' | 'cancelled' | 'error';
-  actionError?: string;
-}
 
 export default function Asistente() {
   const { profile } = useProfile();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { messages, setMessages, isLoading, executeAction, cancelAction, sendMessage } = useAssistantChat();
 
   useEffect(() => {
     supabase.from('assistant_conversations').select('id, title, created_at').order('created_at', { ascending: false }).limit(30)
@@ -54,306 +45,22 @@ export default function Asistente() {
       });
   }, []);
 
-  const addMessage = useCallback((msg: ChatMessage) => {
-    setMessages(prev => [...prev, msg]);
+  useEffect(() => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-  }, []);
+  }, [messages]);
 
-  // ── Ejecutar una acción que el asistente propuso, tras confirmación ──────
-  const executeAction = async (msgId: number, type: string, params: any) => {
-    try {
-      if (type === 'add_route_stop') {
-        const { error } = await supabase.from('route_stops').insert({
-          client: params.name,
-          address: params.address,
-          phone: params.phone || null,
-          notes: params.notes || null,
-          order_num: 9999,
-          status: 'pending',
-        });
-        if (error) throw error;
-      } else if (type === 'create_vehicle_incident') {
-        const { error } = await supabase.from('vehicle_incidents').insert({
-          vehicle: params.vehicle,
-          description: params.description,
-          type: 'general',
-          status: 'abierto',
-          date: new Date().toISOString().split('T')[0],
-        });
-        if (error) throw error;
-      } else if (type === 'create_invoice') {
-        const { count } = await supabase.from('invoices').select('*', { count: 'exact', head: true });
-        const year = new Date().getFullYear();
-        const seq = String((count || 0) + 1).padStart(3, '0');
-        const invoiceId = `F-${year}-${seq}`;
-        const subtotal = Number(params.qty) * Number(params.unitPrice);
-        const tax = subtotal * 0.21;
-        const total = subtotal + tax;
-
-        const { error: invErr } = await supabase.from('invoices').insert({
-          id: invoiceId,
-          invoice_number: invoiceId,
-          client: params.client,
-          amount: total,
-          subtotal,
-          tax,
-          status: 'pendiente',
-          date: new Date().toISOString().split('T')[0],
-          notes: params.notes || null,
-        });
-        if (invErr) throw invErr;
-
-        await supabase.from('invoice_items').insert({
-          invoice_id: invoiceId,
-          product: params.product,
-          qty: params.qty,
-          price: params.unitPrice,
-          total: subtotal,
-        });
-      } else if (type === 'add_pedido') {
-        const items = Array.isArray(params.items) ? params.items.slice(0, 20) : [];
-        const { data, error } = await supabase.rpc('create_order_row', {
-          p_employee: params.employee,
-          p_date: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-          p_address: params.address || '',
-          p_items: items,
-          p_turno: params.turno || 1,
-          p_phone: params.phone || '',
-        });
-        if (error || !data?.success) throw new Error(data?.error || error?.message || 'No se pudo crear el pedido');
-      }
-
-      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, actionStatus: 'done' } : m));
-    } catch (err: any) {
-      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, actionStatus: 'error', actionError: err?.message || 'No se pudo completar la acción' } : m));
-    }
-  };
-
-  const cancelAction = (msgId: number) => {
-    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, actionStatus: 'cancelled' } : m));
-  };
-
-  const processQuery = async (query: string) => {
-    const q = query.toLowerCase();
-
-    // CLIENTES ACTIVOS
-    if (q.includes('cliente') || q.includes('clientes')) {
-      const { data } = await supabase.from('clients').select('*').eq('status', 'activo').order('name');
-      const count = data?.length || 0;
-      return {
-        text: `Tienes ${count} cliente${count !== 1 ? 's' : ''} activo${count !== 1 ? 's' : ''} en este momento.`,
-        dataCards: data?.slice(0, 4).map(c => ({
-          title: c.name,
-          value: `€${(c.total_spent || 0).toLocaleString()}`,
-          icon: 'ri-store-2-line',
-        })),
-      };
-    }
-
-    // FACTURAS PENDIENTES
-    if (q.includes('factura') || q.includes('facturas') || q.includes('cobro') || q.includes('cobros')) {
-      const { data } = await supabase.from('invoices').select('*').eq('status', 'pendiente').order('due_date');
-      const count = data?.length || 0;
-      const total = data?.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
-      return {
-        text: `Hay ${count} factura${count !== 1 ? 's' : ''} pendiente${count !== 1 ? 's' : ''} de cobro, por un total de €${total.toFixed(2)}.`,
-        dataCards: data?.slice(0, 4).map(inv => ({
-          title: inv.client,
-          value: `€${Number(inv.amount).toFixed(2)}`,
-          icon: 'ri-bill-line',
-        })),
-      };
-    }
-
-    // STOCK BAJO
-    if (q.includes('stock') || q.includes('producto') || q.includes('productos') || q.includes('inventario')) {
-      const { data } = await supabase.from('product_items').select('*, product_categories(id, name)').eq('status', 'active');
-      const lowStock = data?.filter(p => (p.stock || 0) < 10) || [];
-      return {
-        text: `Hay ${lowStock.length} producto${lowStock.length !== 1 ? 's' : ''} con stock bajo (menos de 10 unidades).`,
-        dataCards: lowStock.slice(0, 4).map(p => ({
-          title: p.name,
-          value: `${p.stock} unid.`,
-          icon: 'ri-box-3-line',
-        })),
-      };
-    }
-
-    // RUTAS DE HOY
-    if (q.includes('ruta') || q.includes('rutas') || q.includes('reparto') || q.includes('entrega')) {
-      const today = new Date().toISOString().split('T')[0];
-      const { data } = await supabase.from('routes').select('*').gte('date', today).order('date');
-      const count = data?.length || 0;
-      return {
-        text: `Hay ${count} ruta${count !== 1 ? 's' : ''} programada${count !== 1 ? 's' : ''} para hoy.`,
-        dataCards: data?.slice(0, 4).map(r => ({
-          title: `Ruta ${r.id}`,
-          value: r.status || 'Programada',
-          icon: 'ri-truck-line',
-        })),
-      };
-    }
-
-    // EMPLEADOS / HORAS
-    if (q.includes('empleado') || q.includes('empleados') || q.includes('horas')) {
-      const { data } = await supabase.from('employees').select('*').order('name');
-      const count = data?.length || 0;
-      return {
-        text: `La empresa tiene ${count} empleado${count !== 1 ? 's' : ''} registrado${count !== 1 ? 's' : ''}.`,
-        dataCards: data?.slice(0, 4).map(e => ({
-          title: e.name,
-          value: `${e.hours_this_month || 0}h este mes`,
-          icon: 'ri-user-line',
-        })),
-      };
-    }
-
-    // PEDIDOS
-    if (q.includes('pedido') || q.includes('pedidos') || q.includes('orden')) {
-      const { data } = await supabase.from('order_headers').select('*').order('created_at', { ascending: false }).limit(5);
-      const count = data?.length || 0;
-      return {
-        text: `Hay ${count} pedidos recientes en el sistema.`,
-        dataCards: data?.map(o => ({
-          title: `PED-${o.id}`,
-          value: o.status || 'Pendiente',
-          icon: 'ri-shopping-cart-2-line',
-        })),
-      };
-    }
-
-    // INCIDENCIAS
-    if (q.includes('incidencia') || q.includes('incidencias') || q.includes('problema') || q.includes('vehiculo')) {
-      const { data } = await supabase.from('vehicle_incidents').select('*').order('created_at', { ascending: false }).limit(5);
-      const count = data?.length || 0;
-      return {
-        text: `Hay ${count} incidencia${count !== 1 ? 's' : ''} de vehículo${count !== 1 ? 's' : ''} registrada${count !== 1 ? 's' : ''}.`,
-        dataCards: data?.map(i => ({
-          title: i.type || 'Incidencia',
-          value: i.status || 'Abierta',
-          icon: 'ri-error-warning-line',
-        })),
-      };
-    }
-
-    // COMBUSTIBLE
-    if (q.includes('combustible') || q.includes('gasolina') || q.includes('diesel') || q.includes('repostar')) {
-      const { data } = await supabase.from('fuel_tickets').select('*').order('date', { ascending: false }).limit(5);
-      const totalLitros = data?.reduce((s, t) => s + Number(t.liters || 0), 0) || 0;
-      return {
-        text: `El consumo reciente de combustible suma ${totalLitros.toFixed(1)} litros en total.`,
-        dataCards: data?.slice(0, 4).map(t => ({
-          title: t.station || 'Estación',
-          value: `${t.liters || 0}L (€${Number(t.cost || 0).toFixed(2)})`,
-          icon: 'ri-gas-station-line',
-        })),
-      };
-    }
-
-    // ESTADÍSTICAS / RESUMEN
-    if (q.includes('estadistica') || q.includes('resumen') || q.includes('dashboard') || q.includes('general')) {
-      const [{ data: clients }, { data: invoices }, { data: orders }] = await Promise.all([
-        supabase.from('clients').select('*', { count: 'exact', head: true }),
-        supabase.from('invoices').select('*').eq('status', 'pendiente'),
-        supabase.from('order_headers').select('*', { count: 'exact', head: true }),
-      ]);
-      const pendingTotal = invoices?.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
-      return {
-        text: 'Aquí tienes el resumen general de la empresa:',
-        dataCards: [
-          { title: 'Clientes', value: `${(clients as any)?.length || 0}`, icon: 'ri-group-line' },
-          { title: 'Facturas Pendientes', value: `€${pendingTotal.toFixed(2)}`, icon: 'ri-bill-line' },
-          { title: 'Pedidos', value: `${(orders as any)?.length || 0}`, icon: 'ri-shopping-cart-2-line' },
-          { title: 'Ingresos Hoy', value: '€0.00', icon: 'ri-money-euro-circle-line' },
-        ],
-      };
-    }
-
-    // DEFAULT
-    return {
-      text: 'Puedo ayudarte con información de clientes, facturas, stock, rutas, empleados, pedidos e incidencias. ¿Qué necesitas consultar?',
-    };
-  };
-
-  const sendMessage = async () => {
+  const handleSend = () => {
     if (!inputValue.trim() || isLoading) return;
-
-    const userMsg: ChatMessage = {
-      id: Date.now(),
-      text: inputValue,
-      isUser: true,
-      time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-    };
-    addMessage(userMsg);
     const query = inputValue;
     setInputValue('');
-    setIsLoading(true);
-
-    try {
-      // Intentar con la edge function de IA (Claude API)
-      let aiText = '';
-      let dataCards: ChatMessage['dataCards'];
-      let pendingAction: ChatMessage['pendingAction'];
-
-      try {
-        const res = await fetch(
-          'https://wtelnoiuqaqnzgobuuce.supabase.co/functions/v1/ai-assistant',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: query }),
-          }
-        );
-        if (res.ok) {
-          const json = await res.json();
-          aiText = json.text;
-          pendingAction = json.pendingAction;
-        }
-      } catch { /* fall through to local */ }
-
-      // Si la edge function no respondió, usar procesamiento local
-      if (!aiText) {
-        const result = await processQuery(query);
-        aiText = result.text;
-        dataCards = result.dataCards;
-      }
-
-      const aiMsg: ChatMessage = {
-        id: Date.now() + 1,
-        text: aiText,
-        isUser: false,
-        time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-        dataCards,
-        pendingAction,
-        actionStatus: pendingAction ? 'pending' : undefined,
-      };
-      addMessage(aiMsg);
-
-      // Guardar conversación en historial (real, en Supabase)
-      const title = query.length > 40 ? query.slice(0, 37) + '...' : query;
-      const { data: savedConv } = await supabase.from('assistant_conversations').insert({
-        title, query, response: aiText,
-      }).select('id').single();
-      if (savedConv) {
-        setConversations(prev => [{ id: savedConv.id, title, date: 'Hoy' }, ...prev.slice(0, 29)]);
-      }
-
-    } catch {
-      const fallbackMsg: ChatMessage = {
-        id: Date.now() + 1,
-        text: 'Lo siento, hubo un error consultando los datos. Inténtalo de nuevo.\nSorry, there was an error. Please try again.',
-        isUser: false,
-        time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-      };
-      addMessage(fallbackMsg);
-    } finally {
-      setIsLoading(false);
-    }
+    sendMessage(query, (conv) => {
+      setConversations(prev => [{ id: conv.id, title: conv.title, date: 'Hoy' }, ...prev.slice(0, 29)]);
+    });
   };
 
   return (
     <PremiumGate>
-      <div className="h-[calc(100vh-4rem)] flex -mx-6 -mt-6 flex-col md:flex-row">
+      <div className="h-[calc(100vh-4rem-92px)] md:h-[calc(100vh-4rem)] flex -mx-6 -mt-6 flex-col md:flex-row">
         {/* Left sidebar */}
         <div className="w-full md:w-64 bg-gray-50 dark:bg-slate-800/50 border-b md:border-b-0 md:border-r border-gray-100 dark:border-slate-700 flex flex-col flex-shrink-0">
           <div className="p-4 border-b border-gray-100 dark:border-slate-700">
@@ -549,21 +256,21 @@ export default function Asistente() {
           </div>
 
           {/* Input */}
-          <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700">
+          <div className="px-6 pt-4 pb-[calc(1rem+92px)] md:pb-4 border-t border-gray-100 dark:border-slate-700 flex-shrink-0">
             <div className="max-w-3xl mx-auto flex items-center gap-3">
               <div className="flex-1 relative">
                 <input
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
+                  onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSend()}
                   placeholder="Escribe tu pregunta o tarea..."
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl text-sm text-gray-800 dark:text-slate-200 outline-none focus:bg-gray-100 dark:focus:bg-slate-700 pr-10"
                   disabled={isLoading}
                 />
               </div>
               <button
-                onClick={sendMessage}
+                onClick={handleSend}
                 disabled={isLoading}
                 className="w-10 h-10 flex items-center justify-center bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-all disabled:opacity-50"
               >
