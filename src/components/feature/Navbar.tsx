@@ -72,7 +72,7 @@ export default function Navbar() {
           onError={(e) => { (e.target as HTMLImageElement).src = '/logo.png'; }}
         />
         <div className="min-w-0">
-          <h2 className="text-sm md:text-base font-semibold text-gray-800 dark:text-slate-100 truncate">{company.name.split(' ')[0]}</h2>
+          <h2 className="text-sm md:text-base font-semibold text-gray-800 dark:text-slate-100 truncate">{(company.name || 'Mi Empresa').split(' ')[0]}</h2>
           <p className="text-[10px] md:text-xs text-gray-400 dark:text-slate-500 hidden sm:block">{t('managementPanel')}</p>
         </div>
       </div>

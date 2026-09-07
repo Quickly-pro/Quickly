@@ -107,7 +107,7 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
             />
           </div>
           {!collapsed && (
-            <span className="font-bold text-lg whitespace-nowrap text-gray-800 dark:neon-gradient-text">{company.name.split(' ')[0]}</span>
+            <span className="font-bold text-lg whitespace-nowrap text-gray-800 dark:neon-gradient-text">{(company.name || 'Mi Empresa').split(' ')[0]}</span>
           )}
         </div>
 

@@ -48,28 +48,15 @@ const DEFAULT_PALETTES: Palette[] = [
   { name: 'Vivo', colors: ['#ffffff', '#ff5722', '#4caf50', '#2196f3', '#ff9800', '#9c27b0', '#00bcd4', '#e91e63', '#8bc34a', '#673ab7', '#f44336', '#ffeb3b', '#3f51b5', '#009688', '#cddc39', '#ff4081', '#651fff', '#00e676', '#ff1744', '#00b8d4'] },
 ];
 
-const SAMPLE_DATA: Record<string, string> = {
-  '0-0': 'Envío', '0-1': 'Cliente', '0-2': 'Tipo', '0-3': 'Peso (kg)', '0-4': 'Precio (€)', '0-5': 'Fecha',
-  '1-0': 'EXP-10234', '1-1': 'Ferretería El Martillo', '1-2': 'Paquete 5kg', '1-3': '4.2', '1-4': '4.50', '1-5': '04/05/26',
-  '2-0': 'EXP-10235', '2-1': 'Muebles Casa Nova', '2-2': 'Sofá 3 plazas', '2-3': '85.0', '2-4': '85.00', '2-5': '04/05/26',
-  '3-0': 'EXP-10236', '3-1': 'ElectroMart S.A.', '3-2': 'Nevera americana', '3-3': '120.0', '3-4': '120.00', '3-5': '03/05/26',
-  '4-0': 'EXP-10237', '4-1': 'AutoTaller Ruiz', '4-2': 'Transporte coche', '4-3': '1,200', '4-4': '350.00', '4-5': '03/05/26',
-  '5-0': 'EXP-10238', '5-1': 'Construcciones López', '5-2': 'Palets cemento', '5-3': '1,000', '5-4': '180.00', '5-5': '02/05/26',
-};
-
 function getCellKey(row: number, col: number) {
   return `${row}-${col}`;
 }
 
 function buildInitialData(): Record<string, CellMeta> {
-  const data: Record<string, CellMeta> = {};
-  Object.entries(SAMPLE_DATA).forEach(([key, value]) => {
-    const [row, col] = key.split('-').map(Number);
-    data[key] = {
-      value, color_index: 0, is_bold: false, text_align: 'left', number_format: 'text',
-    };
-  });
-  return data;
+  // Hoja realmente vacía hasta que la empresa escriba en ella — antes se
+  // rellenaba con envíos y clientes de ejemplo ("EXP-10234", "Ferretería
+  // El Martillo"...) que se quedaban visibles como si fueran datos reales.
+  return {};
 }
 
 export default function HojaCalculo() {
@@ -180,12 +167,6 @@ export default function HojaCalculo() {
     }
 
     const loaded: Record<string, CellMeta> = {};
-    Object.entries(SAMPLE_DATA).forEach(([key, value]) => {
-      const [row, col] = key.split('-').map(Number);
-      loaded[key] = {
-        value, color_index: 0, is_bold: false, text_align: 'left', number_format: 'text',
-      };
-    });
 
     (data || []).forEach((cell: any) => {
       const key = getCellKey(cell.row_index, cell.col_index);

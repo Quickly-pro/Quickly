@@ -70,7 +70,7 @@ function CompanyAccessSection() {
           <i className="ri-vip-crown-line text-amber-500" /> Empresa y Premium
         </h2>
         <p className="text-sm text-gray-600 dark:text-slate-300">
-          Formas parte de <strong>{company.name}</strong>. Tienes acceso Premium a través de esta empresa —
+          Formas parte de <strong>{company.name || 'esta empresa'}</strong>. Tienes acceso Premium a través de esta empresa —
           no necesitas pagar una suscripción aparte.
         </p>
         <button

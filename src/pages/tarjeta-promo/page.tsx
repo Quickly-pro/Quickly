@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
-const PROMO_URL = 'https://app.tenden-c.com/promo';
+const PROMO_URL = typeof window !== 'undefined' ? `${window.location.origin}/promo` : '/promo';
+const PROMO_URL_DISPLAY = PROMO_URL.replace(/^https?:\/\//, '');
 const QR_API = (size: number) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(PROMO_URL)}&bgcolor=0d1017&color=f97316&qzone=1&format=png`;
 
@@ -198,7 +199,7 @@ function CardPreview() {
             <p className="text-white text-sm font-semibold leading-snug mb-1">Escanea y activa ahora</p>
             <p className="text-slate-500 text-[10px] leading-relaxed">Sin tarjeta · Sin compromiso · Se bloquea automáticamente</p>
             <div className="mt-3 pt-3 border-t border-white/5">
-              <p className="text-orange-500/60 text-[9px] font-mono break-all">app.tenden-c.com/promo</p>
+              <p className="text-orange-500/60 text-[9px] font-mono break-all">{PROMO_URL_DISPLAY}</p>
             </div>
           </div>
         </div>
@@ -263,7 +264,7 @@ function FlyerPreview() {
           Sin tarjeta de crédito · Sin compromiso<br />
           La prueba se bloquea automáticamente al finalizar el mes
         </p>
-        <p className="text-orange-500/40 text-[9px] font-mono mt-2">app.tenden-c.com/promo</p>
+        <p className="text-orange-500/40 text-[9px] font-mono mt-2">{PROMO_URL_DISPLAY}</p>
       </div>
     </div>
   );
@@ -291,7 +292,7 @@ function PrintCard() {
           </div>
           <div style={{ fontSize: '2.8mm', color: '#e2e8f0', fontWeight: 600, marginBottom: '0.5mm' }}>Escanea y activa ahora</div>
           <div style={{ fontSize: '2.2mm', color: '#64748b' }}>Sin tarjeta · Sin compromiso</div>
-          <div style={{ fontSize: '2mm', color: 'rgba(249,115,22,0.5)', fontFamily: 'monospace', marginTop: '1mm' }}>app.tenden-c.com/promo</div>
+          <div style={{ fontSize: '2mm', color: 'rgba(249,115,22,0.5)', fontFamily: 'monospace', marginTop: '1mm' }}>{PROMO_URL_DISPLAY}</div>
         </div>
       </div>
     </div>
@@ -340,7 +341,7 @@ function PrintFlyer() {
           Sin tarjeta de crédito · La prueba se desactiva automáticamente al finalizar el mes
         </div>
         <div style={{ fontSize: '2.2mm', color: 'rgba(249,115,22,0.4)', fontFamily: 'monospace', marginTop: '2mm' }}>
-          app.tenden-c.com/promo
+          {PROMO_URL_DISPLAY}
         </div>
       </div>
     </div>

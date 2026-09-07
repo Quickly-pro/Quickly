@@ -207,6 +207,7 @@ export default function Facturacion() {
       amount: total,
       subtotal: subtotal,
       tax: taxAmount,
+      vat_percent: invoiceVatPercent,
       status: 'pendiente',
       payment_method: invoicePaymentMethod,
       notes: invoiceNotes || null,
@@ -647,7 +648,7 @@ export default function Facturacion() {
 
             <div className="border-t border-gray-100 dark:border-slate-700 pt-4 space-y-2">
               <div className="flex justify-between text-sm"><span className="text-gray-500 dark:text-slate-400">Subtotal</span><span className="font-medium text-gray-800 dark:text-slate-100">€{Number(selectedInvoice.subtotal).toFixed(2)}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-gray-500 dark:text-slate-400">IVA (21%)</span><span className="font-medium text-gray-800 dark:text-slate-100">€{Number(selectedInvoice.tax).toFixed(2)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500 dark:text-slate-400">IVA ({selectedInvoice.vat_percent ?? 21}%)</span><span className="font-medium text-gray-800 dark:text-slate-100">€{Number(selectedInvoice.tax).toFixed(2)}</span></div>
               <div className="flex justify-between text-lg font-bold"><span className="text-gray-800 dark:text-slate-100">TOTAL</span><span className="text-orange-600">€{Number(selectedInvoice.amount).toFixed(2)}</span></div>
             </div>
 

@@ -25,13 +25,21 @@ export default function GuestDashboard() {
     ]);
 
     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const now = new Date();
+    const trailingMonths = Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+      return { key: `${d.getFullYear()}-${d.getMonth()}`, label: months[d.getMonth()] };
+    });
     const monthlyMap = new Map<string, number>();
-    months.forEach(m => monthlyMap.set(m, 0));
+    trailingMonths.forEach(m => monthlyMap.set(m.key, 0));
     (invoices || []).forEach((inv: any) => {
       const d = new Date(inv.created_at || Date.now());
-      monthlyMap.set(months[d.getMonth()], (monthlyMap.get(months[d.getMonth()]) || 0) + Number(inv.amount || 0));
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (monthlyMap.has(key)) {
+        monthlyMap.set(key, (monthlyMap.get(key) || 0) + Number(inv.amount || 0));
+      }
     });
-    const revenueData = months.map(m => ({ name: m, importe: Math.round(monthlyMap.get(m) || 0) }));
+    const revenueData = trailingMonths.map(m => ({ name: m.label, importe: Math.round(monthlyMap.get(m.key) || 0) }));
 
     setStats({
       totalClients: clients?.length || 0,

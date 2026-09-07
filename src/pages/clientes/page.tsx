@@ -57,6 +57,8 @@ export default function Clientes() {
   const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  const [orderCounts, setOrderCounts] = useState<{ total: number; byClient: Record<string, number> }>({ total: 0, byClient: {} });
+
   const fetchClients = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase.from('clients').select('*').order('name');
@@ -64,9 +66,21 @@ export default function Clientes() {
     setLoading(false);
   }, []);
 
+  const fetchOrderCounts = useCallback(async () => {
+    const { data, error } = await supabase.from('order_headers').select('client_id');
+    if (!error && data) {
+      const byClient: Record<string, number> = {};
+      data.forEach((o: any) => {
+        if (o.client_id) byClient[o.client_id] = (byClient[o.client_id] || 0) + 1;
+      });
+      setOrderCounts({ total: data.length, byClient });
+    }
+  }, []);
+
   useEffect(() => {
     fetchClients();
-  }, [fetchClients]);
+    fetchOrderCounts();
+  }, [fetchClients, fetchOrderCounts]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -193,6 +207,13 @@ export default function Clientes() {
   const totalClients = clients.length;
   const activeClients = clients.filter(c => c.status === 'activo').length;
   const totalRevenue = clients.reduce((s, c) => s + Number(c.total_spent || 0), 0);
+  const newClientsInPeriod = (() => {
+    const daysMap: Record<string, number> = { '1m': 30, '3m': 90, '6m': 180, '1a': 365 };
+    const days = daysMap[timeFilter] ?? 365;
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    return clients.filter(c => c.created_at && new Date(c.created_at).getTime() >= cutoff).length;
+  })();
+  const ordersPerClient = totalClients > 0 ? (orderCounts.total / totalClients).toFixed(1) : '0.0';
 
   // Download CSV template
   const downloadTemplate = () => {
@@ -234,7 +255,7 @@ export default function Clientes() {
           address: r.address || '',
           status: r.status || 'activo',
           notes: r.notes || '',
-          avatar: 'https://readdy.ai/api/search-image?query=modern%20business%20storefront%20professional%20signage%20clean%20urban%20background%20minimalist&width=200&height=200&seq=99&orientation=squarish',
+          avatar_url: null,
           total_spent: 0,
         }));
         await supabase.from('clients').insert(data);
@@ -407,11 +428,11 @@ export default function Clientes() {
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-4">
               <p className="text-xs text-gray-400 dark:text-slate-500 uppercase tracking-wide">Nuevos {timeFilter}</p>
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">{Math.max(1, Math.floor(totalClients * 0.15))}</p>
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">{newClientsInPeriod}</p>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-4">
               <p className="text-xs text-gray-400 dark:text-slate-500 uppercase tracking-wide">Pedidos / Cliente</p>
-              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">{(totalClients > 0 ? (totalClients * 2.3 / totalClients).toFixed(1) : '0.0')}</p>
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">{ordersPerClient}</p>
             </div>
           </>
         )}
@@ -464,9 +485,9 @@ export default function Clientes() {
             >
               <div className="flex items-start gap-3">
                 <div className="w-14 h-14 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  {client.avatar ? (
+                  {client.avatar_url ? (
                     <img
-                      src={client.avatar}
+                      src={client.avatar_url}
                       alt={client.name}
                       className="w-full h-full object-cover"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
@@ -619,8 +640,8 @@ export default function Clientes() {
               <div className="space-y-5">
                 <div className="flex items-center gap-4 mb-2">
                   <div className="w-20 h-20 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {selectedClient.avatar ? (
-                      <img src={selectedClient.avatar} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    {selectedClient.avatar_url ? (
+                      <img src={selectedClient.avatar_url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                     ) : (
                       <span className="text-orange-600 dark:text-orange-400 font-bold text-2xl">
                         {selectedClient.name?.charAt(0).toUpperCase() || '?'}
@@ -672,8 +693,8 @@ export default function Clientes() {
                 {/* Header */}
                 <div className="flex items-center gap-3 pb-3 border-b border-gray-100 dark:border-slate-700 mb-3 flex-shrink-0">
                   <div className="w-9 h-9 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {selectedClient.avatar ? (
-                      <img src={selectedClient.avatar} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    {selectedClient.avatar_url ? (
+                      <img src={selectedClient.avatar_url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                     ) : (
                       <span className="text-xs font-bold text-orange-600 dark:text-orange-400">{selectedClient.name?.charAt(0).toUpperCase()}</span>
                     )}
@@ -698,8 +719,8 @@ export default function Clientes() {
                       <div key={msg.id} className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : 'flex-row'}`}>
                         {!mine && (
                           <div className="w-7 h-7 rounded-full flex-shrink-0 self-end overflow-hidden">
-                            {selectedClient.avatar ? (
-                              <img src={selectedClient.avatar} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            {selectedClient.avatar_url ? (
+                              <img src={selectedClient.avatar_url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                             ) : (
                               <div className="w-full h-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
                                 <span className="text-xs font-bold text-orange-600 dark:text-orange-400">{selectedClient.name?.charAt(0).toUpperCase()}</span>
@@ -756,8 +777,8 @@ export default function Clientes() {
           <div className="flex flex-col h-[calc(80vh-100px)]">
             <div className="flex items-center gap-3 pb-3 border-b border-gray-100 dark:border-slate-700 mb-3">
               <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                {selectedClient.avatar ? (
-                  <img src={selectedClient.avatar} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                {selectedClient.avatar_url ? (
+                  <img src={selectedClient.avatar_url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                 ) : (
                   <span className="text-orange-600 dark:text-orange-400 font-bold text-base">
                     {selectedClient.name?.charAt(0).toUpperCase() || '?'}
@@ -787,9 +808,9 @@ export default function Clientes() {
                     {/* Avatar del cliente en mensajes recibidos */}
                     {!mine && (
                       <div className="w-7 h-7 rounded-full flex-shrink-0 self-end overflow-hidden">
-                        {selectedClient?.avatar ? (
+                        {selectedClient?.avatar_url ? (
                           <img
-                            src={selectedClient.avatar}
+                            src={selectedClient.avatar_url}
                             alt=""
                             className="w-full h-full object-cover"
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

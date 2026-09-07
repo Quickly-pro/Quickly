@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import SubscriptionBanner from '@/components/feature/SubscriptionBanner';
+import ImageWithFallback from '@/components/base/ImageWithFallback';
 
 interface Product {
   id: number;
@@ -83,7 +84,7 @@ export default function ClienteDashboard() {
     if (product.media && product.media.length > 0 && product.media[0]?.url) {
       return product.media[0].url;
     }
-    return 'https://readdy.ai/api/search-image?query=A%20simple%20flat%20illustration%20of%20a%20brown%20cardboard%20box%20on%20a%20clean%20cream%20background%2C%20minimal%20style%2C%20soft%20shadows%2C%20product%20placeholder%20icon%2C%20warm%20earth%20tones%2C%20no%20text&width=400&height=400&seq=prodph&orientation=squarish';
+    return null;
   };
 
   const finalPrice = (p: Product) => {
@@ -186,10 +187,11 @@ export default function ClienteDashboard() {
                 className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden hover:shadow-md transition-all"
               >
                 <div className="relative aspect-square bg-gray-50 dark:bg-slate-800 overflow-hidden">
-                  <img
+                  <ImageWithFallback
                     src={productImage(product)}
                     alt={product.name}
                     className="w-full h-full object-cover"
+                    fallbackClassName="w-full h-full"
                   />
                   {hasDiscount(product) && (
                     <div className="absolute top-2 right-2 px-2 py-0.5 bg-green-500 text-white rounded-full text-xs font-medium">

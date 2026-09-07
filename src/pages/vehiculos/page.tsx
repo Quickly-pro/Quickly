@@ -13,9 +13,6 @@ interface Vehicle {
   maintenanceCount: number;
   overdueMaintenance: number;
   color: string;
-  driver: string;
-  plate?: string;
-  year?: number;
 }
 
 interface MaintenanceRecord {
@@ -56,7 +53,6 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 const vehicleColors = ['#f97316', '#10b981', '#6366f1', '#ef4444', '#8b5cf6', '#14b8a6'];
-const vehicleDrivers = ['Carlos Ruiz', 'María López', 'Antonio García', 'Laura Sánchez', 'Pedro Martínez', 'Ana Fernández'];
 
 function daysUntil(dateStr: string): number {
   const target = new Date(dateStr + 'T00:00:00');
@@ -186,9 +182,6 @@ export default function Vehiculos() {
       maintenanceCount: vMaint.length,
       overdueMaintenance: overdue,
       color: vehicleColors[idx % vehicleColors.length],
-      driver: vehicleDrivers[idx % vehicleDrivers.length],
-      plate: `-${String.fromCharCode(66 + idx)}-${String(1000 + idx * 234).slice(1)}`,
-      year: 2021 + (idx % 5),
     };
   });
 
@@ -407,7 +400,6 @@ export default function Vehiculos() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">{v.name}</p>
-                  <p className="text-xs text-gray-400 dark:text-slate-500">{v.plate} · {v.year}</p>
                 </div>
                 {v.overdueMaintenance > 0 && (
                   <span className="px-2 py-0.5 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-full text-[10px] font-bold">
@@ -431,10 +423,7 @@ export default function Vehiculos() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-400 dark:text-slate-500 flex items-center gap-1">
-                  <i className="ri-user-line" /> {v.driver}
-                </span>
+              <div className="flex items-center justify-end text-xs">
                 <span className="text-gray-400 dark:text-slate-500">
                   Coste: €{v.totalRepairCost.toFixed(0)}
                 </span>

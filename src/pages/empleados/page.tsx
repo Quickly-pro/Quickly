@@ -122,7 +122,7 @@ export default function Empleados() {
       phone: newEmployee.phone,
       email: newEmployee.email,
       supervisor_id: newEmployee.supervisor_id,
-      avatar_url: 'https://readdy.ai/api/search-image?query=professional%20corporate%20employee%20headshot%20portrait%20neutral%20background%20warm%20lighting&width=200&height=200&seq=98&orientation=squarish',
+      avatar_url: null,
     }]);
     if (!error) {
       setShowNewEmployee(false);

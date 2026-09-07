@@ -118,7 +118,7 @@ export default function UpgradePremium() {
           Ya tienes acceso Premium
         </h1>
         <p className="text-sm text-gray-500 dark:text-slate-400 max-w-md mx-auto">
-          Formas parte de <strong>{company.name}</strong>, y tu Premium viene de la suscripción
+          Formas parte de <strong>{company.name || 'esta empresa'}</strong>, y tu Premium viene de la suscripción
           de esa empresa. No necesitas pagar nada por separado — si algún día quieres tu propia
           suscripción independiente, puedes salir de la empresa desde la página de{' '}
           <button onClick={() => navigate('/empresa')} className="text-orange-600 hover:underline font-medium">

@@ -80,11 +80,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const fetchNotifications = useCallback(async () => {
     if (!user) { setNotifications([]); return; }
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('notifications')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50);
+    if (error) console.error('Error cargando notificaciones:', error);
     if (data) {
       setNotifications(data.map((n: any) => ({
         id: n.id,

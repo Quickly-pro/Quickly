@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useRole } from '@/hooks/useRole';
+import { useAuth } from '@/context/AuthContext';
 import ChatWidget from '@/components/feature/ChatWidget';
 import { useNotificationsContext } from '@/context/NotificationsContext';
 import Modal from '@/components/base/Modal';
@@ -13,7 +14,7 @@ interface CartItem {
   name: string;
   price: number;
   qty: number;
-  image: string;
+  image: string | null;
 }
 
 const SUGGESTED_CATEGORIES = [
@@ -34,8 +35,16 @@ const SUGGESTED_CATEGORIES = [
 
 export default function Productos() {
   const { isCliente } = useRole();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { addNotification } = useNotificationsContext();
+  const [myClientId, setMyClientId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isCliente || !user?.email) return;
+    supabase.from('clients').select('id').ilike('email', user.email).maybeSingle()
+      .then(({ data }) => setMyClientId(data?.id ?? null));
+  }, [isCliente, user?.email]);
 
   // Datos reales de Supabase via hook
   const { products, categories, loading, error: productsError, refetch: fetchAll } = useProducts();
@@ -126,7 +135,7 @@ export default function Productos() {
     if (product.media && product.media.length > 0 && product.media[0]?.url) {
       return product.media[0].url;
     }
-    return 'https://readdy.ai/api/search-image?query=A%20simple%20flat%20illustration%20of%20a%20brown%20cardboard%20box%20on%20a%20clean%20cream%20background%2C%20minimal%20style%2C%20soft%20shadows%2C%20product%20placeholder%20icon%2C%20warm%20earth%20tones%2C%20no%20text&width=400&height=400&seq=prodph&orientation=squarish';
+    return null;
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1006,11 +1015,23 @@ export default function Productos() {
                     if (cartSubmitting || cart.length === 0) return;
                     setCartSubmitting(true);
                     const notes = cart.map(i => `${i.qty}x ${i.name} (€${i.price.toFixed(2)})`).join(', ');
-                    const { error } = await supabase.from('order_headers').insert({
+                    const { data: headerData, error } = await supabase.from('order_headers').insert({
                       status: 'pending_payment',
                       notes,
                       total: cartTotal,
-                    });
+                      subtotal_items: cartTotal,
+                      client_id: myClientId,
+                    }).select('id').single();
+                    if (!error && headerData) {
+                      const itemsPayload = cart.map(i => ({
+                        order_id: headerData.id,
+                        product_id: i.product_id,
+                        quantity: i.qty,
+                        price: i.price,
+                      }));
+                      const { error: itemsError } = await supabase.from('order_items').insert(itemsPayload);
+                      if (itemsError) console.error('Error guardando artículos del pedido:', itemsError);
+                    }
                     setCartSubmitting(false);
                     if (!error) {
                       addNotification('Pedido realizado', `Tu pedido de €${cartTotal.toFixed(2)} ha sido enviado`, 'route');

@@ -10,8 +10,19 @@ import EmojiPicker from '@/components/base/EmojiPicker';
 import ChatInputAddons from '@/components/base/ChatInputAddons';
 import MessageContent from '@/components/base/MessageContent';
 
-const FORM_URL = 'https://readdy.ai/api/form/d7q164vhqnrhtnv4fovg';
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+const CARGO_ISSUE_LABELS: Record<string, string> = {
+  rotura: 'Rotura / Deterioro',
+  perdida: 'Pérdida de mercancía',
+  dano_transporte: 'Daño durante transporte',
+  entrega_incorrecta: 'Entrega incorrecta',
+  retraso: 'Retraso en entrega',
+  documentacion: 'Problema de documentación',
+  temperatura: 'Incidencia de temperatura (cadena frío)',
+  defecto_fabrica: 'Defecto de fábrica / embalaje',
+  otro: 'Otro',
+};
 
 interface DirectContact {
   id: string;
@@ -432,20 +443,25 @@ export default function Comunicacion() {
     e.preventDefault();
     if (!reportForm.product || !reportForm.reason) return;
     setSubmitStatus('sending');
-    const fd = new FormData();
-    fd.append('product', reportForm.product);
-    fd.append('reason', reportForm.reason);
-    fd.append('notes', reportForm.notes || '');
-    if (uploadedFileName) fd.append('attachment_name', uploadedFileName);
-    try {
-      const res = await fetch(FORM_URL, { method: 'POST', body: fd });
-      if (res.ok) {
-        setSubmitStatus('success');
-        setReportForm({ product: '', reason: '', notes: '' });
-        setUploadedFile(null); setUploadedFileName('');
-        setTimeout(() => { setShowReportModal(false); setSubmitStatus('idle'); }, 2000);
-      } else setSubmitStatus('error');
-    } catch { setSubmitStatus('error'); }
+    // Se guarda como una incidencia de producto real (misma tabla que usa
+    // Incidencias) — antes este formulario se enviaba a un endpoint de
+    // Readdy.ai (la herramienta de prototipado), así que ningún reporte
+    // llegaba de verdad a la empresa.
+    const { error } = await supabase.from('product_incidents').insert([{
+      product_name: reportForm.product,
+      type: CARGO_ISSUE_LABELS[reportForm.reason] || reportForm.reason,
+      description: reportForm.notes || '(sin notas adicionales)',
+      status: 'abierta',
+      date: new Date().toISOString().split('T')[0],
+      photo: uploadedFile || null,
+      reported_by: user?.full_name || user?.email || '',
+    }]);
+    if (!error) {
+      setSubmitStatus('success');
+      setReportForm({ product: '', reason: '', notes: '' });
+      setUploadedFile(null); setUploadedFileName('');
+      setTimeout(() => { setShowReportModal(false); setSubmitStatus('idle'); }, 2000);
+    } else setSubmitStatus('error');
   };
 
   // ── Render de burbujas (reutilizable) ──────────────────────────────────
@@ -1170,7 +1186,7 @@ export default function Comunicacion() {
       </Modal>
 
       <Modal isOpen={showReportModal} onClose={() => setShowReportModal(false)} title="Reportar Incidencia de Carga" size="md">
-        <form ref={formRef} id="reportar-producto-danado" data-readdy-form onSubmit={handleSubmit} className="space-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm text-gray-600 dark:text-slate-400 block mb-1">Descripción de la carga / mercancía</label>
             <input type="text" name="product" placeholder="Ej: Palet de cajas, Electrodoméstico, Documentación..." required

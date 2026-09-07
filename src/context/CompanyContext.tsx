@@ -1,7 +1,31 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
-import { companyInfo } from '@/mocks/company';
+
+// Valores por defecto reales (vacíos) para una empresa que todavía no ha
+// rellenado su ficha en Configuración → Empresa. Antes aquí se usaba una
+// empresa de ejemplo ("Quickly Distribuciones S.L.") como relleno, que se
+// colaba como si fuera un dato real (en la cabecera, el menú, la ficha de
+// empresa e incluso en los emails enviados a clientes) hasta que el dueño
+// completaba cada campo — y sustituía en silencio cualquier campo que el
+// dueño dejara vacío a propósito.
+const emptyCompany = {
+  name: '',
+  legalName: '',
+  cif: '',
+  address: '',
+  city: '',
+  postalCode: '',
+  phone: '',
+  email: '',
+  website: '',
+  logo: '/logo.png',
+  brandColor: '#f97316',
+  founded: '',
+  employees: 0,
+  clients: 0,
+  monthlyRevenue: 0,
+};
 
 export interface CompanyData {
   name: string;
@@ -30,21 +54,21 @@ const STORAGE_KEY = 'quickly_company_data';
 
 function fromDb(row: any): CompanyData {
   return {
-    name:           row.name           || companyInfo.name,
-    legalName:      row.legal_name     || companyInfo.legalName,
-    cif:            row.cif            || companyInfo.cif,
-    address:        row.address        || companyInfo.address,
-    city:           row.city           || companyInfo.city,
-    postalCode:     row.postal_code    || companyInfo.postalCode,
-    phone:          row.phone          || companyInfo.phone,
-    email:          row.email          || companyInfo.email,
-    website:        row.website        || companyInfo.website,
-    logo:           row.logo           || companyInfo.logo,
-    brandColor:     row.brand_color    || companyInfo.brandColor,
-    founded:        row.founded        || companyInfo.founded,
-    employees:      row.employees      ?? companyInfo.employees,
-    clients:        row.clients        ?? companyInfo.clients,
-    monthlyRevenue: row.monthly_revenue ?? companyInfo.monthlyRevenue,
+    name:           row.name           || emptyCompany.name,
+    legalName:      row.legal_name     || emptyCompany.legalName,
+    cif:            row.cif            || emptyCompany.cif,
+    address:        row.address        || emptyCompany.address,
+    city:           row.city           || emptyCompany.city,
+    postalCode:     row.postal_code    || emptyCompany.postalCode,
+    phone:          row.phone          || emptyCompany.phone,
+    email:          row.email          || emptyCompany.email,
+    website:        row.website        || emptyCompany.website,
+    logo:           row.logo           || emptyCompany.logo,
+    brandColor:     row.brand_color    || emptyCompany.brandColor,
+    founded:        row.founded        || emptyCompany.founded,
+    employees:      row.employees      ?? emptyCompany.employees,
+    clients:        row.clients        ?? emptyCompany.clients,
+    monthlyRevenue: row.monthly_revenue ?? emptyCompany.monthlyRevenue,
     paymentBizum:   row.payment_bizum  || '',
     paymentIban:    row.payment_iban   || '',
     paymentPaypal:  row.payment_paypal || '',
@@ -80,9 +104,9 @@ function toDb(data: Partial<CompanyData>): Record<string, any> {
 function loadCache(): CompanyData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...companyInfo, ...JSON.parse(raw) };
+    if (raw) return { ...emptyCompany, ...JSON.parse(raw) };
   } catch { /* ignore */ }
-  return { ...companyInfo };
+  return { ...emptyCompany };
 }
 
 interface CompanyContextValue {

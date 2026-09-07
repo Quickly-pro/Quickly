@@ -197,7 +197,7 @@ export default function PromoPage() {
 
         {/* Footer */}
         <p className="text-center text-slate-600 text-xs mt-6">
-          app.tenden-c.com · Quickly © 2025
+          {typeof window !== 'undefined' ? window.location.hostname : ''} · Quickly © {new Date().getFullYear()}
         </p>
       </div>
     </div>

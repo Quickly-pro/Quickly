@@ -54,11 +54,17 @@ export default function HojaPedidos() {
   const [newOrderError, setNewOrderError] = useState('');
 
   const fetchAll = useCallback(async () => {
-    const [{ data: rowsData }, { data: itemsData }, { data: notesData }] = await Promise.all([
+    const [{ data: rowsData, error: rowsError }, { data: itemsData }, { data: notesData }] = await Promise.all([
       supabase.from('order_sheet_rows').select('*').order('turno').order('id'),
       supabase.from('order_sheet_items').select('*').order('position'),
       supabase.from('order_sheet_notes').select('row_id, note'),
     ]);
+
+    if (rowsError) {
+      console.error('Error cargando la hoja de pedidos:', rowsError);
+      setLoading(false);
+      return;
+    }
 
     let mapped: OrderRow[] = (rowsData || []).map((r: any) => ({
       id: r.id, employee: r.employee || '', address: r.address || '', phone: r.phone || '', date: r.date || '',
@@ -68,9 +74,10 @@ export default function HojaPedidos() {
     }));
 
     if (mapped.length === 0) {
-      const { data: inserted } = await supabase.from('order_sheet_rows').insert(
+      const { data: inserted, error: seedError } = await supabase.from('order_sheet_rows').insert(
         Array.from({ length: 5 }).map(() => ({ employee: '', address: '', phone: '', date: '', turno: 1 }))
       ).select('*');
+      if (seedError) console.error('Error creando filas iniciales:', seedError);
       mapped = (inserted || []).map((r: any) => ({ id: r.id, employee: '', address: '', phone: '', date: '', turno: 1, verification: null, items: [] }));
     }
 

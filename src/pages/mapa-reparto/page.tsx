@@ -9,7 +9,7 @@ import SignaturePad from '@/components/base/SignaturePad';
 import CameraCapture from '@/components/base/CameraCapture';
 import LiveRouteMap, { type MapStop, type MapDriver } from '@/components/base/LiveRouteMap';
 import { geocodeAddresses } from '@/lib/geocoding';
-import { optimizeRoute } from '@/lib/routeOptimizer';
+import { optimizeRoute, haversineKm } from '@/lib/routeOptimizer';
 import { useLiveLocationBroadcast } from '@/hooks/useLiveLocationBroadcast';
 import { useCompanyDriverLocations } from '@/hooks/useCompanyDriverLocations';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
@@ -35,197 +35,57 @@ interface Destination {
   trackingToken?: string;
 }
 
-interface Vehicle {
-  id: string;
-  name: string;
-  driver: string;
-  color: string;
-  progress: number;
-  currentStopIndex: number;
-  speed: number;
-  status: 'driving' | 'stopped' | 'idle';
-  startIndex: number;
-  endIndex: number;
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 function getNavigationUrl(address: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
-function generateEstimatedMinutes(destinations: Destination[]): Destination[] {
-  if (destinations.length <= 1) return destinations;
-  return destinations.map((d, i) => ({ ...d, estimated_minutes: i === 0 ? 0 : Math.floor(Math.random() * 22) + 8 }));
+// Distancia/tiempo real entre dos paradas geocodificadas (fórmula de
+// Haversine, la misma que usa el optimizador de rutas) — antes esto se
+// generaba con Math.random(), lo que además de ser un dato falso alimentaba
+// una "flota" simulada que llegó a marcar entregas como completadas en la
+// base de datos sin que hubieran ocurrido de verdad.
+function computeLegKm(a?: Destination, b?: Destination): number {
+  if (!a?.lat || !a?.lng || !b?.lat || !b?.lng) return 0;
+  return haversineKm({ id: a.id, lat: a.lat, lng: a.lng }, { id: b.id, lat: b.lat, lng: b.lng });
 }
 
-function getLegDistanceMinutes(): number { return Math.floor(Math.random() * 22) + 8; }
+const AVG_DELIVERY_SPEED_KMH = 30;
+function minutesForKm(km: number): number {
+  return km > 0 ? (km / AVG_DELIVERY_SPEED_KMH) * 60 : 0;
+}
 
-function createDemoVehicles(destinations: Destination[]): Vehicle[] {
-  if (destinations.length === 0) return [];
-  const count = Math.min(3, Math.max(1, Math.ceil(destinations.length / 4)));
-  const vehicleNames = ['Furgoneta A1', 'Camión B2', 'Furgón C3'];
-  const drivers = ['Carlos Ruiz', 'María López', 'Antonio García'];
-  const colors = ['#f97316', '#10b981', '#6366f1'];
-  const chunkSize = Math.ceil(destinations.length / count);
-  return Array.from({ length: count }, (_, i) => ({
-    id: `vehicle-${i}`,
-    name: vehicleNames[i],
-    driver: drivers[i],
-    color: colors[i],
-    progress: Math.random() * 0.7,
-    currentStopIndex: i * chunkSize,
-    speed: 35 + Math.floor(Math.random() * 25),
-    status: 'driving' as const,
-    startIndex: i * chunkSize,
-    endIndex: Math.min((i + 1) * chunkSize - 1, destinations.length - 1),
+function withEstimatedMinutes(destinations: Destination[]): Destination[] {
+  return destinations.map((d, i) => ({
+    ...d,
+    estimated_minutes: i === 0 ? 0 : minutesForKm(computeLegKm(destinations[i - 1], d)),
   }));
 }
 
 function formatETA(minutes: number): string {
-  if (minutes <= 0) return 'Llegando...';
+  if (minutes <= 0) return '—';
   if (minutes < 60) return `${Math.ceil(minutes)} min`;
   return `${Math.floor(minutes / 60)}h ${Math.ceil(minutes % 60)}m`;
 }
 
-function getVehicleForStop(vehicles: Vehicle[], stopIndex: number): Vehicle | undefined {
-  return vehicles.find(v => stopIndex >= v.startIndex && stopIndex <= v.endIndex);
-}
-
-// ── Animated vehicle on route strip ────────────────────────────────────────
-function VehicleRouteMarker({ vehicle, destinations }: { vehicle: Vehicle; destinations: Destination[] }) {
-  if (!destinations.length) return null;
-  const basePercent = (vehicle.currentStopIndex / Math.max(1, destinations.length - 1)) * 100;
-  const legPercent = (1 / Math.max(1, destinations.length - 1)) * vehicle.progress * 100;
-  const leftPercent = Math.min(97, Math.max(2, basePercent + legPercent));
-  return (
-    <div className="absolute top-1/2 -translate-y-1/2 z-10 transition-all duration-1000 ease-linear pointer-events-none" style={{ left: `${leftPercent}%` }}>
-      <div className="relative flex flex-col items-center">
-        <div className="absolute w-8 h-8 rounded-full animate-ping opacity-30" style={{ backgroundColor: vehicle.color }} />
-        <div className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center shadow-lg relative" style={{ backgroundColor: vehicle.color }}>
-          <i className="ri-truck-line text-white text-xs" />
-        </div>
-        <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-gray-900 dark:bg-slate-700 text-white rounded text-[10px] font-bold whitespace-nowrap shadow">
-          {vehicle.name}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MovingDashes({ color }: { color: string }) {
-  return (
-    <div className="absolute inset-0 overflow-hidden rounded-full">
-      <div className="absolute inset-0 animate-[slide_1.5s_linear_infinite]" style={{ background: `repeating-linear-gradient(90deg, transparent, transparent 6px, ${color}80 6px, ${color}80 12px)` }} />
-    </div>
-  );
-}
-
-// ── Trajectory path component ──────────────────────────────────────────────
-function TrajectoryStrip({ destinations, vehicles }: { destinations: Destination[]; vehicles: Vehicle[] }) {
-  if (destinations.length < 2) return null;
-  const visitedCount = destinations.filter(d => d.visited).length;
-  const visitedPercent = (visitedCount / (destinations.length - 1)) * 100;
-
-  return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-100 flex items-center gap-2">
-            <i className="ri-route-line text-orange-500" />
-            Trayecto en tiempo real
-          </h3>
-          <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
-            {vehicles.filter(v => v.status === 'driving').length} en movimiento &middot; {vehicles.filter(v => v.status === 'stopped').length} entregando &middot; {visitedCount}/{destinations.length} paradas
-          </p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap justify-end">
-          {vehicles.map(v => (
-            <div key={v.id} className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: v.color }} />
-              <span className="text-[10px] text-gray-500 dark:text-slate-400 font-medium">{v.driver.split(' ')[0]}</span>
-              <span className={`text-[9px] px-1 py-0.5 rounded-full font-bold ${v.status === 'driving' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' : v.status === 'stopped' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500'}`}>
-                {v.status === 'driving' ? 'En ruta' : v.status === 'stopped' ? 'Entregando' : 'Inactivo'}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Route track with trajectory */}
-      <div className="relative h-14 bg-gray-50 dark:bg-slate-800 rounded-xl overflow-hidden">
-        <div
-          className="absolute left-3 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-green-400 dark:bg-green-500 transition-all duration-500 z-[1]"
-          style={{ width: `calc(${visitedPercent}% - 12px)` }}
-        />
-        <div className="absolute left-3 right-3 top-1/2 -translate-y-1/2 h-1 bg-gray-200 dark:bg-slate-700 rounded-full" />
-        {destinations.map((dest, idx) => {
-          const percent = (idx / Math.max(1, destinations.length - 1)) * 94 + 3;
-          return (
-            <div
-              key={idx}
-              className={`absolute top-1/2 -translate-y-1/2 z-[2] transition-all duration-300 ${dest.visited ? 'w-3 h-3 -translate-x-1.5' : 'w-2.5 h-2.5 -translate-x-1.25'}`}
-              style={{ left: `${percent}%` }}
-            >
-              {dest.visited ? (
-                <div className="w-3 h-3 rounded-full bg-green-500 border-2 border-white dark:border-slate-800 shadow" />
-              ) : idx === 0 ? (
-                <div className="w-3 h-3 rounded-full bg-orange-500 border-2 border-white dark:border-slate-800 shadow" />
-              ) : (
-                <div className="w-2.5 h-2.5 rounded-full bg-gray-300 dark:bg-slate-600 border-2 border-white dark:border-slate-800" />
-              )}
-            </div>
-          );
-        })}
-        {vehicles.map(v => <VehicleRouteMarker key={v.id} vehicle={v} destinations={destinations} />)}
-      </div>
-
-      <div className="flex justify-between mt-2 px-1">
-        <div className="flex items-center gap-1 max-w-[35%]">
-          <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
-          <span className="text-[10px] text-gray-500 dark:text-slate-400 truncate">{destinations[0]?.name}</span>
-        </div>
-        <div className="flex items-center gap-1 max-w-[35%]">
-          <span className="text-[10px] text-gray-500 dark:text-slate-400 truncate text-right">{destinations[destinations.length - 1]?.name}</span>
-          <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-slate-500 flex-shrink-0" />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 dark:border-slate-700">
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-1.5 rounded-full bg-green-400" />
-          <span className="text-[10px] text-gray-400 dark:text-slate-500">Trayecto completado</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-1 rounded-full bg-gray-300 dark:bg-slate-600" />
-          <span className="text-[10px] text-gray-400 dark:text-slate-500">Ruta pendiente</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-orange-500 border border-white" />
-          <span className="text-[10px] text-gray-400 dark:text-slate-500">Repartidor activo</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Client tracking view ────────────────────────────────────────────────────
-function ClientTrackingView({ destinations, vehicles, mapStops, mapDrivers }: { destinations: Destination[]; vehicles: Vehicle[]; mapStops: MapStop[]; mapDrivers: MapDriver[] }) {
-  const activeVehicle = vehicles.find(v => v.status !== 'idle') || vehicles[0];
-  const nextStop = activeVehicle ? destinations[activeVehicle.currentStopIndex] : null;
+function ClientTrackingView({ destinations, mapStops, mapDrivers }: { destinations: Destination[]; mapStops: MapStop[]; mapDrivers: MapDriver[] }) {
   const visitedCount = destinations.filter(d => d.visited).length;
   const totalStops = destinations.length;
   const progressPercent = totalStops > 1 ? Math.round((visitedCount / (totalStops - 1)) * 100) : 0;
+  const nextStop = destinations.find(d => !d.visited) || null;
+  const activeDriversCount = mapDrivers.filter(d => d.fresh).length;
 
   return (
     <div className="space-y-4">
-      {activeVehicle ? (
+      {totalStops > 0 ? (
         <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-900/20 dark:to-orange-900/10 rounded-xl border border-orange-200 dark:border-orange-800/40 p-5">
           <div className="flex items-start gap-4">
             <div className="relative flex-shrink-0">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: activeVehicle.color + '20' }}>
-                <i className="ri-truck-line text-2xl" style={{ color: activeVehicle.color }} />
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-orange-500/20">
+                <i className="ri-truck-line text-2xl text-orange-500" />
               </div>
-              {activeVehicle.status === 'driving' && (
+              {activeDriversCount > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-green-500 border-2 border-white" />
@@ -233,14 +93,9 @@ function ClientTrackingView({ destinations, vehicles, mapStops, mapDrivers }: { 
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeVehicle.status === 'driving' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'}`}>
-                  {activeVehicle.status === 'driving' ? '● En camino' : '● Entregando'}
-                </span>
-                <span className="text-xs text-gray-500 dark:text-slate-400">{activeVehicle.speed} km/h</span>
-              </div>
-              <p className="font-bold text-gray-800 dark:text-slate-100">{activeVehicle.driver}</p>
-              <p className="text-sm text-gray-500 dark:text-slate-400">{activeVehicle.name}</p>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeDriversCount > 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                {activeDriversCount > 0 ? `● ${activeDriversCount} repartidor${activeDriversCount !== 1 ? 'es' : ''} en ruta` : 'Sin repartidores en ruta ahora mismo'}
+              </span>
             </div>
           </div>
 
@@ -257,7 +112,7 @@ function ClientTrackingView({ destinations, vehicles, mapStops, mapDrivers }: { 
             </div>
           </div>
 
-          {nextStop && !nextStop.visited && (
+          {nextStop && (
             <div className="mt-3 flex items-start gap-2 p-3 bg-white/70 dark:bg-slate-800/50 rounded-lg">
               <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <i className="ri-map-pin-line text-white text-xs" />
@@ -276,11 +131,9 @@ function ClientTrackingView({ destinations, vehicles, mapStops, mapDrivers }: { 
             <i className="ri-truck-line text-2xl text-gray-400" />
           </div>
           <p className="text-sm font-medium text-gray-600 dark:text-slate-300">Sin repartos activos</p>
-          <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">No hay repartidores en ruta en este momento</p>
+          <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">No hay paradas programadas en este momento</p>
         </div>
       )}
-
-      {destinations.length >= 2 && <TrajectoryStrip destinations={destinations} vehicles={vehicles} />}
 
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center gap-2">
@@ -296,25 +149,20 @@ function ClientTrackingView({ destinations, vehicles, mapStops, mapDrivers }: { 
             <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-100">Paradas de la ruta</h3>
           </div>
           <div className="divide-y divide-gray-50 dark:divide-slate-800">
-            {destinations.map((dest, idx) => {
-              const vehicle = getVehicleForStop(vehicles, idx);
-              return (
-                <div key={dest.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${dest.visited ? 'bg-green-500 text-white' : vehicle ? 'text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}
-                    style={!dest.visited && vehicle ? { backgroundColor: vehicle.color } : {}}>
-                    {dest.visited ? <i className="ri-check-line" /> : vehicle ? <i className="ri-truck-line" /> : idx + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${dest.visited ? 'line-through text-gray-400 dark:text-slate-500' : 'text-gray-800 dark:text-slate-200'}`}>{dest.name}</p>
-                    <p className="text-xs text-gray-400 dark:text-slate-500 truncate">{dest.address}</p>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${dest.visited ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400' : vehicle ? 'text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}
-                    style={!dest.visited && vehicle ? { backgroundColor: vehicle.color } : {}}>
-                    {dest.visited ? 'Entregado' : vehicle ? 'En ruta' : 'Pendiente'}
-                  </span>
+            {destinations.map((dest, idx) => (
+              <div key={dest.id} className="flex items-center gap-3 px-4 py-3">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${dest.visited ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                  {dest.visited ? <i className="ri-check-line" /> : idx + 1}
                 </div>
-              );
-            })}
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium truncate ${dest.visited ? 'line-through text-gray-400 dark:text-slate-500' : 'text-gray-800 dark:text-slate-200'}`}>{dest.name}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 truncate">{dest.address}</p>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${dest.visited ? 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                  {dest.visited ? 'Entregado' : 'Pendiente'}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -343,8 +191,6 @@ export default function MapaReparto() {
   const [showCamera, setShowCamera] = useState(false);
   const [uploadingProof, setUploadingProof] = useState(false);
   const [newDest, setNewDest] = useState({ name: '', address: '', phone: '', notes: '' });
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const prevVehiclesRef = useRef<Vehicle[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locLoading, setLocLoading] = useState(false);
   const [geolocationError, setGeolocationError] = useState<string | null>(null);
@@ -424,7 +270,8 @@ export default function MapaReparto() {
 
   const fetchDestinations = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('route_stops').select('*').order('order_num');
+    const { data, error } = await supabase.from('route_stops').select('*').order('order_num');
+    if (error) console.error('Error cargando paradas de la ruta:', error);
     if (data) {
       const mapped = data.map((d: any, idx: number) => ({
         id: d.id,
@@ -443,12 +290,9 @@ export default function MapaReparto() {
         photoUrl: d.photo_url || undefined,
         trackingToken: d.tracking_token || undefined,
       }));
-      const withETA = generateEstimatedMinutes(mapped);
-      setDestinations(withETA);
-      setVehicles(createDemoVehicles(withETA));
+      setDestinations(withEstimatedMinutes(mapped));
     } else {
       setDestinations([]);
-      setVehicles([]);
     }
     setLoading(false);
   }, []);
@@ -518,49 +362,6 @@ export default function MapaReparto() {
     );
   }, [addNotification]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setVehicles(prev => prev.map(v => {
-        if (v.status === 'idle') return v;
-        const nextProgress = v.progress + 0.012;
-        if (nextProgress >= 1) {
-          const nextStop = v.currentStopIndex + 1;
-          if (nextStop > v.endIndex || nextStop >= destinations.length) return { ...v, progress: 1, status: 'stopped' };
-          return { ...v, progress: 0, currentStopIndex: nextStop, status: Math.random() > 0.85 ? 'stopped' : 'driving' };
-        }
-        if (nextProgress > 0.92 && v.status === 'driving' && Math.random() > 0.97) return { ...v, progress: nextProgress, status: 'stopped' };
-        return { ...v, progress: nextProgress, status: 'driving' };
-      }));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [destinations.length]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setVehicles(prev => prev.map(v => v.status === 'stopped' && Math.random() > 0.6 ? { ...v, status: 'driving' } : v));
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const prev = prevVehiclesRef.current;
-    if (!prev.length || !vehicles.length) { prevVehiclesRef.current = vehicles; return; }
-    vehicles.forEach((v, idx) => {
-      const prevV = prev[idx];
-      if (!prevV) return;
-      if (v.currentStopIndex > prevV.currentStopIndex && v.currentStopIndex <= destinations.length - 1) {
-        const dest = destinations[v.currentStopIndex];
-        if (dest) {
-          pushToast(v.name, dest.name, v.color);
-          addNotification(`${v.name} ha llegado`, `Ha llegado a ${dest.name} (${dest.address})`, 'route');
-          supabase.from('route_stops').update({ status: 'completed' }).eq('id', dest.id);
-          setDestinations(dPrev => dPrev.map(d => d.id === dest.id ? { ...d, visited: true } : d));
-        }
-      }
-    });
-    prevVehiclesRef.current = vehicles;
-  }, [vehicles, destinations, pushToast, addNotification]);
-
   const addDestination = async () => {
     if (!newDest.name.trim() || !newDest.address.trim()) return;
     const tempId = Date.now();
@@ -569,7 +370,7 @@ export default function MapaReparto() {
       phone: newDest.phone.trim() || '', notes: newDest.notes.trim() || '',
       order_num: destinations.length + 1, visited: false, created_by: profile.full_name || 'Sin asignar',
     };
-    setDestinations(prev => { const u = [...prev, tempDest]; setVehicles(createDemoVehicles(u)); return u; });
+    setDestinations(prev => [...prev, tempDest]);
     setShowAdd(false);
     setNewDest({ name: '', address: '', phone: '', notes: '' });
     addNotification('Destino añadido', `${newDest.name.trim()} añadido a la ruta`, 'route');
@@ -580,7 +381,7 @@ export default function MapaReparto() {
       driver: profile.full_name || 'Sin asignar', route_id: null,
     });
     if (error) {
-      setDestinations(prev => { const r = prev.filter(d => d.id !== tempId); setVehicles(createDemoVehicles(r)); return r; });
+      setDestinations(prev => prev.filter(d => d.id !== tempId));
       addNotification('Error al añadir', error.message || 'No se pudo guardar', 'system');
     } else { fetchDestinations(); }
   };
@@ -708,8 +509,8 @@ export default function MapaReparto() {
   };
 
   const visitedCount = destinations.filter(d => d.visited).length;
-  const totalRouteMinutes = useMemo(() => destinations.reduce((acc, d) => acc + (d.estimated_minutes || getLegDistanceMinutes()), 0), [destinations]);
-  const totalEstimatedKm = useMemo(() => Math.round(totalRouteMinutes * 0.45), [totalRouteMinutes]);
+  const totalRouteMinutes = useMemo(() => destinations.reduce((acc, d) => acc + (d.estimated_minutes || 0), 0), [destinations]);
+  const totalEstimatedKm = useMemo(() => Math.round(destinations.reduce((acc, d, i) => i === 0 ? acc : acc + computeLegKm(destinations[i - 1], d), 0)), [destinations]);
 
   // ── Confirmar entrega SIN detalles (rápido, sin abrir el formulario) ──
   const confirmDeliveryQuick = async (dest: Destination) => {
@@ -743,11 +544,6 @@ export default function MapaReparto() {
     }
   };
 
-  const getVehicleETA = (vehicle: Vehicle) => {
-    if (!destinations.length || vehicle.status === 'idle') return 0;
-    return Math.max(0, (1 - vehicle.progress) * getLegDistanceMinutes());
-  };
-
   const trackingUrl = (dest: Destination) =>
     dest.trackingToken ? `${window.location.origin}/seguimiento/${dest.trackingToken}` : '';
 
@@ -778,7 +574,7 @@ export default function MapaReparto() {
             Sigue en tiempo real el trayecto de tu pedido
           </p>
         </div>
-        <ClientTrackingView destinations={destinations} vehicles={vehicles} mapStops={mapStops} mapDrivers={mapDrivers} />
+        <ClientTrackingView destinations={destinations} mapStops={mapStops} mapDrivers={mapDrivers} />
       </div>
     );
   }
@@ -880,7 +676,7 @@ export default function MapaReparto() {
             { icon: 'ri-pin-distance-line', color: 'orange', label: 'Distancia', value: `${totalEstimatedKm} km` },
             { icon: 'ri-time-line', color: 'blue', label: 'Tiempo estimado', value: formatETA(totalRouteMinutes) },
             { icon: 'ri-checkbox-circle-line', color: 'green', label: 'Completadas', value: `${visitedCount} / ${destinations.length}` },
-            { icon: 'ri-truck-line', color: 'amber', label: 'Vehículos activos', value: `${vehicles.filter(v => v.status !== 'idle').length} / ${vehicles.length}` },
+            { icon: 'ri-truck-line', color: 'amber', label: 'Repartidores en ruta', value: `${mapDrivers.filter(d => d.fresh).length}` },
           ].map(({ icon, color, label, value }) => (
             <div key={label} className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-3">
               <div className="flex items-center gap-2 mb-1">
@@ -892,75 +688,6 @@ export default function MapaReparto() {
               <p className="text-lg font-bold text-gray-800 dark:text-slate-100">{value}</p>
             </div>
           ))}
-        </div>
-      )}
-
-      <TrajectoryStrip destinations={destinations} vehicles={vehicles} />
-
-      {vehicles.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {vehicles.map(vehicle => {
-            const eta = getVehicleETA(vehicle);
-            const progressPercent = Math.round(vehicle.progress * 100);
-            const stopsCompleted = Math.max(0, vehicle.currentStopIndex - vehicle.startIndex);
-            const totalStops = vehicle.endIndex - vehicle.startIndex + 1;
-            const fromDest = destinations[vehicle.currentStopIndex];
-            const toDest = destinations[Math.min(vehicle.currentStopIndex + 1, destinations.length - 1)];
-
-            return (
-              <div key={vehicle.id} className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="relative">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: vehicle.color + '20', color: vehicle.color }}>
-                      <i className="ri-truck-line text-lg" />
-                    </div>
-                    {vehicle.status === 'driving' && (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center" style={{ backgroundColor: vehicle.color }}>
-                        <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">{vehicle.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-slate-400 truncate">{vehicle.driver}</p>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${vehicle.status === 'driving' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400' : vehicle.status === 'stopped' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400'}`}>
-                    {vehicle.status === 'driving' && <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" /><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" /></span>}
-                    {vehicle.status === 'driving' ? 'En ruta' : vehicle.status === 'stopped' ? 'Entregando' : 'Inactivo'}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 mb-2">
-                  <span className="font-medium text-gray-600 dark:text-slate-300 truncate max-w-[40%]">{fromDest?.name || 'Origen'}</span>
-                  <i className="ri-arrow-right-line flex-shrink-0" />
-                  <span className="font-medium text-gray-600 dark:text-slate-300 truncate max-w-[40%]">{toDest?.name || 'Destino'}</span>
-                </div>
-                <p className="text-xs text-gray-400 dark:text-slate-500 mb-3">Parada {stopsCompleted + 1}/{totalStops} &middot; {vehicle.speed} km/h</p>
-
-                <div className="flex items-center gap-3">
-                  <div className="relative w-12 h-12 flex-shrink-0">
-                    <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 36 36">
-                      <circle cx="18" cy="18" r="15.9155" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-200 dark:text-slate-700" />
-                      <circle cx="18" cy="18" r="15.9155" fill="none" stroke={vehicle.color} strokeWidth="3" strokeDasharray={`${progressPercent} ${100 - progressPercent}`} strokeLinecap="round" className="transition-all duration-1000 ease-linear" />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[11px] font-bold text-gray-700 dark:text-slate-200">{progressPercent}%</span>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <div className="w-full h-2 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden relative mb-1.5">
-                      {vehicle.status === 'driving' && <MovingDashes color={vehicle.color} />}
-                      <div className="h-full rounded-full transition-all duration-1000 ease-linear relative z-10" style={{ width: `${progressPercent}%`, backgroundColor: vehicle.color }} />
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <i className="ri-time-line text-gray-400 text-xs" />
-                      <span className="text-xs font-medium text-gray-700 dark:text-slate-200">ETA: {formatETA(eta)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
         </div>
       )}
 
@@ -986,10 +713,8 @@ export default function MapaReparto() {
                 <p className="text-xs mt-1">Añade la primera parada de la ruta</p>
               </div>
             ) : destinations.map((dest, idx) => {
-              const vehicle = getVehicleForStop(vehicles, idx);
-              const eta = vehicle && !dest.visited ? getVehicleETA(vehicle) : null;
               const isLast = idx === destinations.length - 1;
-              const legTime = !isLast ? (dest.estimated_minutes || getLegDistanceMinutes()) : 0;
+              const legTime = !isLast ? (dest.estimated_minutes || 0) : 0;
 
               return (
                 <div key={dest.id}>
@@ -997,10 +722,9 @@ export default function MapaReparto() {
                     <div className="flex flex-col items-center flex-shrink-0">
                       <button
                         onClick={() => toggleVisited(dest.id, dest.visited)}
-                        className={`w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${dest.visited ? 'bg-green-500 border-green-500 text-white' : vehicle ? 'text-white' : 'border-gray-300 dark:border-slate-600 hover:border-orange-400'}`}
-                        style={!dest.visited && vehicle ? { borderColor: vehicle.color, backgroundColor: vehicle.color } : {}}
+                        className={`w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${dest.visited ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 dark:border-slate-600 hover:border-orange-400'}`}
                       >
-                        {dest.visited ? <i className="ri-check-line text-xs" /> : vehicle ? <i className="ri-truck-line text-xs" /> : <span className="text-xs font-bold text-gray-500 dark:text-slate-400">{idx + 1}</span>}
+                        {dest.visited ? <i className="ri-check-line text-xs" /> : <span className="text-xs font-bold text-gray-500 dark:text-slate-400">{idx + 1}</span>}
                       </button>
                       {!isLast && <div className={`w-0.5 flex-1 min-h-[24px] mt-1 ${dest.visited ? 'bg-green-300 dark:bg-green-700' : 'bg-gray-200 dark:bg-slate-700'}`} />}
                     </div>
@@ -1011,18 +735,9 @@ export default function MapaReparto() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className={`text-sm font-medium truncate ${dest.visited ? 'line-through text-gray-400 dark:text-slate-500' : 'text-gray-800 dark:text-slate-200'}`}>{dest.name}</p>
-                              {vehicle && !dest.visited && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white flex-shrink-0" style={{ backgroundColor: vehicle.color }}>{vehicle.name}</span>
-                              )}
                             </div>
                             <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 truncate">{dest.address}</p>
                             {dest.phone && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 flex items-center gap-1"><i className="ri-phone-line" />{dest.phone}</p>}
-                            {vehicle && !dest.visited && eta !== null && (
-                              <div className="flex items-center gap-1.5 mt-1.5">
-                                <div className="w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ backgroundColor: vehicle.color }} />
-                                <span className="text-xs font-semibold" style={{ color: vehicle.color }}>Llegada: {formatETA(eta)}</span>
-                              </div>
-                            )}
                             {dest.visited && dest.deliveredAt && (
                               <div className="mt-1.5 flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400">
                                 <i className="ri-check-double-line" />
@@ -1073,8 +788,7 @@ export default function MapaReparto() {
                       {!isLast && legTime > 0 && (
                         <div className="flex items-center gap-2 mt-1 ml-3">
                           <i className="ri-time-line text-gray-400 text-[10px]" />
-                          <span className="text-[10px] text-gray-400 dark:text-slate-500">{legTime} min hasta siguiente parada</span>
-                          {vehicle && <span className="text-[10px] font-medium" style={{ color: vehicle.color }}>&middot; {vehicle.speed} km/h</span>}
+                          <span className="text-[10px] text-gray-400 dark:text-slate-500">{Math.round(legTime)} min hasta siguiente parada</span>
                         </div>
                       )}
                     </div>
