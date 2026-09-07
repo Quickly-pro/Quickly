@@ -33,7 +33,7 @@ export default function Asistente() {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { messages, setMessages, isLoading, executeAction, cancelAction, sendMessage } = useAssistantChat();
+  const { messages, setMessages, isLoading, sendMessage } = useAssistantChat();
 
   useEffect(() => {
     supabase.from('assistant_conversations').select('id, title, created_at').order('created_at', { ascending: false }).limit(30)
@@ -210,20 +210,10 @@ export default function Asistente() {
                             <p className="text-sm text-gray-700 dark:text-slate-200">{msg.pendingAction.summary}</p>
                           </div>
                           {msg.actionStatus === 'pending' && (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => executeAction(msg.id, msg.pendingAction!.type, msg.pendingAction!.params)}
-                                className="flex-1 px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600"
-                              >
-                                Confirmar
-                              </button>
-                              <button
-                                onClick={() => cancelAction(msg.id)}
-                                className="px-3 py-1.5 bg-gray-100 dark:bg-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-xs font-medium hover:bg-gray-200"
-                              >
-                                Cancelar
-                              </button>
-                            </div>
+                            <p className="text-xs text-gray-400 dark:text-slate-500 flex items-center gap-1.5">
+                              <span className="w-3 h-3 border-2 border-gray-300 dark:border-slate-500 border-t-orange-500 rounded-full animate-spin" />
+                              Ejecutando...
+                            </p>
                           )}
                           {msg.actionStatus === 'done' && (
                             <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1"><i className="ri-check-line" /> Hecho</p>

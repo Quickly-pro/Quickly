@@ -13,6 +13,12 @@ Deno.serve(async (req) => {
   try {
     const { message, userId, language = 'es', history = [] } = await req.json();
 
+    // Si el mensaje suena a una orden (crear, añadir, registrar, dar de
+    // alta...), obligamos a la IA a usar una herramienta en vez de dejarle
+    // elegir si contesta solo con texto informativo.
+    const ACTION_VERBS = ['crea', 'crear', 'añade', 'anade', 'agrega', 'agregar', 'da de alta', 'dar de alta', 'registra', 'registrar', 'apunta', 'apuntar', 'nuevo', 'nueva', 'create', 'add'];
+    const looksLikeAction = typeof message === 'string' && ACTION_VERBS.some((v) => message.toLowerCase().includes(v));
+
     // Historial reciente de la conversación (para que la IA tenga memoria
     // real entre mensajes, en vez de responder cada uno como si fuera el
     // primero). Se limita a los últimos 16 turnos por coste/latencia.
@@ -242,9 +248,10 @@ INSTRUCCIONES:
         body: JSON.stringify({
           model: 'claude-sonnet-4-5-20250929',
           max_tokens: 2048,
-          system: systemPrompt + `\n\nSi el usuario te pide una ACCIÓN concreta (crear un cliente, un empleado, un producto, un evento de calendario, un ticket de combustible, un recordatorio, añadir una parada a la ruta, crear una factura, un pedido, o registrar una incidencia de vehículo), usa la herramienta correspondiente en vez de responder solo con texto. No ejecutes la acción tú mismo — el sistema le pedirá confirmación al usuario antes de aplicarla. Ten en cuenta el historial de la conversación para entender referencias a mensajes anteriores.`,
+          system: systemPrompt + `\n\nSi el usuario te pide una ACCIÓN concreta (crear un cliente/contacto, un empleado, un producto, un evento de calendario, un ticket de combustible, un recordatorio, añadir una parada a la ruta, crear una factura, un pedido, o registrar una incidencia de vehículo), SIEMPRE debes usar la herramienta correspondiente — nunca respondas solo con texto a una petición de acción, ni pidas confirmación por escrito: el sistema ya ejecuta la acción de inmediato en cuanto usas la herramienta, así que hazlo directamente con los datos que el usuario te dio (usa valores razonables por defecto para lo que falte, no dejes de actuar por falta de un dato opcional). Ten en cuenta el historial de la conversación para entender referencias a mensajes anteriores.`,
           messages: [...recentHistory, { role: 'user', content: message }],
           tools,
+          ...(looksLikeAction ? { tool_choice: { type: 'any' } } : {}),
         }),
       });
 

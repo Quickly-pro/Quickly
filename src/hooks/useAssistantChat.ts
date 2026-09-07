@@ -252,10 +252,18 @@ export function useAssistantChat() {
         dataCards = result.dataCards;
       }
 
+      const aiMsgId = Date.now() + 1;
       addMessage({
-        id: Date.now() + 1, text: aiText, isUser: false, time: timeNow(),
+        id: aiMsgId, text: aiText, isUser: false, time: timeNow(),
         dataCards, pendingAction, actionStatus: pendingAction ? 'pending' : undefined,
       });
+
+      // Ejecutar la acción de inmediato — sin esperar a que el usuario la
+      // confirme. La tarjeta sigue mostrando qué se hizo, pero ya no hace
+      // falta pulsar "Confirmar" para que ocurra de verdad.
+      if (pendingAction) {
+        executeAction(aiMsgId, pendingAction.type, pendingAction.params);
+      }
 
       const title = query.length > 40 ? query.slice(0, 37) + '...' : query;
       const { data: savedConv } = await supabase.from('assistant_conversations').insert({ title, query, response: aiText }).select('id').single();
@@ -269,7 +277,7 @@ export function useAssistantChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, isLoading, addMessage]);
+  }, [messages, isLoading, addMessage, executeAction]);
 
   return { messages, setMessages, isLoading, addMessage, executeAction, cancelAction, sendMessage };
 }
