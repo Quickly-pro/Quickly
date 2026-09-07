@@ -61,14 +61,14 @@ export default function Navbar() {
   const LANG_COLS = [LANGUAGES.slice(0, 9), LANGUAGES.slice(9)];
 
   return (
-    <header className="h-16 bg-white dark:glass-navbar border-b border-gray-100 flex items-center justify-between px-3 sm:px-4 md:px-6 sticky top-0 z-30">
+    <header className="h-16 bg-white dark:glass-navbar border-b border-gray-100 flex items-center justify-between pr-3 sm:pr-4 md:pr-6 sticky top-0 z-30">
 
-      {/* Izquierda: logo + nombre empresa */}
-      <div className="ml-10 md:ml-0 flex items-center gap-2.5 md:gap-3 min-w-0">
+      {/* Izquierda: logo + nombre empresa — pegados a la esquina, logo a toda altura */}
+      <div className="h-full flex items-center gap-2 md:gap-3 min-w-0">
         <img
           src={company.logo || '/logo.png'}
           alt={company.name}
-          className="w-10 h-10 md:w-11 md:h-11 object-contain rounded-lg flex-shrink-0"
+          className="h-full w-14 sm:w-16 object-contain flex-shrink-0"
           onError={(e) => { (e.target as HTMLImageElement).src = '/logo.png'; }}
         />
         <div className="min-w-0">
